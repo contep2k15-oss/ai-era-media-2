@@ -13,6 +13,7 @@
     "appId": "com.aieramedia.app",
     "productName": "AI Era Media",
     "copyright": "AI Era Media",
+    "publish": null,
     "directories": {
       "output": "dist"
     },
