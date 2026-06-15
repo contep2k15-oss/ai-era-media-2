@@ -2645,7 +2645,7 @@ ${subTruncated}`;
 
   try{
     // Dùng Gemini API trực tiếp
-    const res=await fetch(`${API_DIRECT}/v1beta/models/gemini-2.0-flash-lite:generateContent?key=${encodeURIComponent(apiKey)}`,{
+    const res=await fetch(`${API_DIRECT}/v1beta/models/gemini-3.1-flash-lite:generateContent?key=${encodeURIComponent(apiKey)}`,{
       method:'POST',headers:{'Content-Type':'application/json'},
       body:JSON.stringify({
         contents:[{parts:[{text:prompt}]}],
