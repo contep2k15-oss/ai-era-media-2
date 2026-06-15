@@ -642,6 +642,10 @@ html,body{height:100%;overflow:hidden;background:var(--bg0);color:var(--text);fo
     <div class="titlebar-dot" id="topBadgeDot"></div>
     <span id="topBadgeTxt">Gemini</span>
   </div>
+  <div class="titlebar-badge" id="googleBadge" style="display:none;margin-left:4px;border-color:rgba(66,133,244,.3);background:rgba(66,133,244,.08);">
+    <div class="titlebar-dot" style="background:#4285f4;"></div>
+    <span style="color:#7baaf7;">Google Free</span>
+  </div>
   <button class="btn-settings" id="btnInstall" onclick="installPWA()" title="Cài app ra Desktop" style="display:none;color:var(--accent2);border-color:rgba(16,185,129,.3);">
     <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
   </button>
@@ -796,12 +800,12 @@ html,body{height:100%;overflow:hidden;background:var(--bg0);color:var(--text);fo
       <button class="settings-close" onclick="closeSettings()">✕</button>
     </div>
     <div class="settings-body">
+      <!-- API chính -->
       <div class="settings-section">
-        <div class="settings-label">API Key</div>
+        <div class="settings-label">API <span style="font-size:10px;font-weight:400;color:var(--text3);">— Character · TTS · Rewrite · Prompt Engineer</span></div>
         <div class="api-row">
           <div class="api-field">
-            <div class="api-pre">AIza...</div>
-            <input class="api-input" id="apiKey" type="password" placeholder="Dán API key vào đây" autocomplete="off"/>
+            <input class="api-input" id="apiKey" type="password" placeholder="Dán API key vào đây" autocomplete="off" style="padding-left:12px;" oninput="showProviderBadge('apiProviderBadge',this.value)"/>
           </div>
           <button class="btn-verify" id="verifyBtn" onclick="verifyKey()">
             <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/></svg>
@@ -809,9 +813,30 @@ html,body{height:100%;overflow:hidden;background:var(--bg0);color:var(--text);fo
           </button>
         </div>
         <div class="api-status" id="apiStatus"></div>
-        <div style="margin-top:8px;">
-          <button onclick="saveApiKey()" style="padding:6px 14px;background:#10b981;border:none;border-radius:7px;color:#0a0f0e;font-size:12px;font-weight:700;cursor:pointer;">💾 Lưu API Key</button>
-          <span id="saveStatus" style="font-size:11px;color:#10b981;margin-left:8px;display:none;">✓ Đã lưu!</span>
+        <div id="apiProviderBadge" style="margin-top:4px;"></div>
+        <div style="margin-top:8px;display:flex;align-items:center;gap:8px;">
+          <button onclick="saveApiKey()" style="padding:6px 14px;background:#10b981;border:none;border-radius:7px;color:#0a0f0e;font-size:12px;font-weight:700;cursor:pointer;">💾 Lưu</button>
+          <span id="saveStatus" style="font-size:11px;color:#10b981;display:none;">✓ Đã lưu!</span>
+        </div>
+      </div>
+
+      <!-- API Image -->
+      <div class="settings-section" style="margin-top:10px;">
+        <div class="settings-label">API Image <span style="font-size:10px;font-weight:400;color:var(--text3);">— Tạo ảnh</span></div>
+        <div class="api-row">
+          <div class="api-field">
+            <input class="api-input" id="googleApiKey" type="password" placeholder="Dán API Image key vào đây" autocomplete="off" style="padding-left:12px;" oninput="showProviderBadge('imageProviderBadge',this.value)"/>
+          </div>
+          <button class="btn-verify" onclick="verifyGoogleKey()">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/></svg>
+            Xác nhận
+          </button>
+        </div>
+        <div class="api-status" id="googleApiStatus"></div>
+        <div id="imageProviderBadge" style="margin-top:4px;"></div>
+        <div style="margin-top:8px;display:flex;align-items:center;gap:8px;">
+          <button onclick="saveGoogleApiKey()" style="padding:6px 14px;background:#10b981;border:none;border-radius:7px;color:#0a0f0e;font-size:12px;font-weight:700;cursor:pointer;">💾 Lưu</button>
+          <span id="googleSaveStatus" style="font-size:11px;color:#10b981;display:none;">✓ Đã lưu!</span>
         </div>
       </div>
     </div>
@@ -1585,8 +1610,34 @@ const STYLE_NAMES = {auto:'Tự động theo video',anime:'Anime / Manga',ghibli
 const ROLE_CLASSES = {main:'role-main',sub:'role-sub',villain:'role-villain',crowd:'role-crowd',soldier:'role-soldier',support:'role-support'};
 
 // ── API ENDPOINTS ──
-const API_FAST   = 'https://api.shopaikey.com';    // tác vụ nhanh (<5s)
-const API_DIRECT = 'https://direct.shopaikey.com'; // tác vụ lâu: ảnh, TTS, character gen
+const API_FAST   = 'https://api.shopaikey.com';
+const API_DIRECT = 'https://direct.shopaikey.com';
+const API_GOOGLE = 'https://generativelanguage.googleapis.com';
+
+// ── PROVIDER AUTO-DETECT ──
+function detectProvider(key){
+  if(!key) return null;
+  if(key.startsWith('AIza'))          return {name:'Google AI Studio', fast:`${API_GOOGLE}/v1beta`, direct:`${API_GOOGLE}/v1beta`, tts:null};
+  if(key.match(/^sk-jnT|^sk-[a-zA-Z0-9]{6,}/)) return {name:'ShopAIKey',        fast:`${API_FAST}/v1beta`,    direct:`${API_DIRECT}/v1beta`,   tts:`${API_DIRECT}/tts/google/generations`};
+  // Generic fallback — thử dùng như ShopAIKey
+  return {name:'Custom',             fast:`${API_FAST}/v1beta`,    direct:`${API_DIRECT}/v1beta`,   tts:`${API_DIRECT}/tts/google/generations`};
+}
+
+function getMainProvider(){ return detectProvider($('apiKey')?.value?.trim()); }
+function getImageProvider(){ return detectProvider($('googleApiKey')?.value?.trim()); }
+
+// Hiện badge provider trong settings
+function showProviderBadge(elId, key){
+  const p=detectProvider(key);
+  const el=$(elId);
+  if(!el||!p)return;
+  const colors={
+    'Google AI Studio':'#4285f4',
+    'ShopAIKey':'#10b981',
+    'Custom':'#f59e0b'
+  };
+  el.innerHTML=`<span style="font-size:10px;padding:2px 8px;border-radius:99px;background:${colors[p.name]||'#666'}22;color:${colors[p.name]||'#999'};border:1px solid ${colors[p.name]||'#666'}44;">⚡ ${p.name}</span>`;
+}
 
 let selectedStyle='auto', usedModel='', lastChars=[];
 const $=id=>document.getElementById(id);
@@ -1599,9 +1650,53 @@ function saveApiKey(){
   setTimeout(()=>s.style.display='none',2000);
 }
 
+function saveGoogleApiKey(){
+  const key=$('googleApiKey').value.trim();
+  if(!key){alert('Vui lòng nhập Google AI Studio key trước.');return;}
+  localStorage.setItem('aiera_google_apikey', key);
+  const s=$('googleSaveStatus');s.style.display='inline';
+  setTimeout(()=>s.style.display='none',2000);
+}
+
+async function verifyGoogleKey(){
+  const key=$('googleApiKey').value.trim();
+  if(!key){alert('Vui lòng nhập key trước.');return;}
+  const p=detectProvider(key);
+  const el=$('googleApiStatus');
+  el.textContent='⏳ Đang xác nhận...';el.style.color='var(--text3)';
+  showProviderBadge('imageProviderBadge',key);
+  try{
+    const res=await fetch(`${p.fast}/models/gemini-2.0-flash:generateContent?key=${encodeURIComponent(key)}`,{
+      method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({contents:[{parts:[{text:'hi'}]}],generationConfig:{maxOutputTokens:5}})
+    });
+    const data=await res.json();
+    if(data.error)throw new Error(data.error.message);
+    el.textContent=`✅ ${p.name} key hợp lệ!`;
+    el.style.color='var(--green)';
+    updateTopBadge();
+  }catch(e){
+    el.textContent='❌ Key không hợp lệ: '+e.message.slice(0,80);
+    el.style.color='var(--red)';
+  }
+}
+
+function getGoogleApiKey(){
+  return $('googleApiKey')?.value?.trim() || localStorage.getItem('aiera_google_apikey') || '';
+}
+
+function updateTopBadge(){
+  const gkey=getGoogleApiKey();
+  const badge=$('googleBadge');
+  if(badge)badge.style.display=gkey?'flex':'none';
+}
+
 window.addEventListener('DOMContentLoaded',()=>{
   const saved=localStorage.getItem('aiera_apikey');
-  if(saved)$('apiKey').value=saved;
+  if(saved){$('apiKey').value=saved;showProviderBadge('apiProviderBadge',saved);}
+  const savedGoogle=localStorage.getItem('aiera_google_apikey');
+  if(savedGoogle&&$('googleApiKey')){$('googleApiKey').value=savedGoogle;showProviderBadge('imageProviderBadge',savedGoogle);}
+  updateTopBadge();
 });
 
 function selectStyle(s){
@@ -1614,17 +1709,17 @@ function selectStyle(s){
 async function verifyKey(){
   const key=$('apiKey').value.trim();
   if(!key){showVerify('fail','⚠','Vui lòng nhập API key trước.');return;}
+  const p=detectProvider(key);
+  showProviderBadge('apiProviderBadge',key);
   $('verifyBtn').disabled=true;
-  showVerify('checking',null,'Đang xác minh…');
+  showVerify('checking',null,`Đang xác minh (${p?.name||'Unknown'})…`);
   try{
-    const res=await fetch(`${API_FAST}/v1beta/models?key=${encodeURIComponent(key)}&pageSize=5`);
+    const res=await fetch(`${p?.fast||API_FAST}/v1beta/models?key=${encodeURIComponent(key)}&pageSize=5`);
     const data=await res.json();
     if(data.error)throw new Error(data.error.message);
     const names=(data.models||[]).map(m=>m.name?.replace('models/','')).filter(n=>n?.includes('flash')).slice(0,3).join(', ');
-    // Check if image model available
-    const hasImg=(data.models||[]).some(m=>m.name?.includes('flash-image'));
-    showVerify('ok','✓',`Key hợp lệ · ${hasImg?'✓ Image gen available · ':''}${names||'OK'}`);
-    $('topBadgeTxt').textContent='Key ✓';
+    showVerify('ok','✓',`${p?.name} key hợp lệ · ${names||'OK'}`);
+    $('topBadgeTxt').textContent=`${p?.name||'Key'} ✓`;
   }catch(e){
     let msg=e.message||'';
     if(msg.includes('400')||msg.includes('not valid'))msg='API key không hợp lệ — kiểm tra lại.';
@@ -1643,11 +1738,12 @@ function showVerify(type,icon,msg){
 
 // ── GEMINI TEXT CALL ──
 async function callGeminiText(parts,apiKey){
+  const p=detectProvider(apiKey);
   let lastErr=null;
   for(const modelId of FREE_TEXT_MODELS){
     try{
       showStatus(`Đang dùng ${MODEL_LABELS[modelId]}…`,'Phân tích video & thiết kế nhân vật');
-      const url=`${API_DIRECT}/v1beta/models/${modelId}:generateContent?key=${encodeURIComponent(apiKey)}`;
+      const url=`${p?.direct||API_DIRECT+'/v1beta'}/models/${modelId}:generateContent?key=${encodeURIComponent(apiKey)}`;
       const res=await fetch(url,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({
         contents:[{parts}],
         generationConfig:{temperature:0.5,maxOutputTokens:8192,responseMimeType:'application/json'},
@@ -2967,8 +3063,9 @@ let igCharDNA={};
 let igProjectStyleDNA='';
 
 // ── STEP 1: Extract Visual DNA from ref image via Gemini Vision ──
-async function igExtractDNA(apiKey, charName, refBase64){
-  const url=`${API_DIRECT}/v1beta/models/gemini-3.1-flash-lite:generateContent?key=${encodeURIComponent(apiKey)}`;
+async function igExtractDNA(imgApiKey, charName, refBase64){
+  const p=detectProvider(imgApiKey);
+  const url=`${p?.fast||API_DIRECT+'/v1beta'}/models/gemini-2.0-flash:generateContent?key=${encodeURIComponent(imgApiKey)}`;
   const prompt=`You are a visual analyst for AI image generation. Analyze this character reference image and extract a precise Visual DNA description.
 
 Return a JSON object with these fields:
@@ -3002,8 +3099,9 @@ Be extremely specific about colors (not 'dark hair' but 'blue-black hair with su
 }
 
 // ── STEP 2: Optimize prompt for gemini-2.5-flash-image-preview with DNA injection ──
-async function igOptimizePrompt(apiKey, rawPrompt, charDNAMap, isEstablishingShot, projectStyleDNA){
-  const url=`${API_DIRECT}/v1beta/models/gemini-3.1-flash-lite:generateContent?key=${encodeURIComponent(apiKey)}`;
+async function igOptimizePrompt(imgApiKey, rawPrompt, charDNAMap, isEstablishingShot, projectStyleDNA){
+  const p=detectProvider(imgApiKey);
+  const url=`${p?.fast||API_DIRECT+'/v1beta'}/models/gemini-2.0-flash:generateContent?key=${encodeURIComponent(imgApiKey)}`;
 
   // Build DNA context for all characters referenced in this prompt
   let dnaContext='';
@@ -3062,8 +3160,9 @@ RULES:
 // Supports both text-only and image+text (ref image) inputs
 const IG_MODEL='gemini-2.5-flash-image-preview';
 
-async function igCallGeminiImage(apiKey, optimizedPrompt, refImageBase64){
-  const url=`${API_DIRECT}/v1beta/models/${IG_MODEL}:generateContent?key=${encodeURIComponent(apiKey)}`;
+async function igCallGeminiImage(apiKey, optimizedPrompt, refImageBase64, endpoint){
+  const base=endpoint||`${API_DIRECT}/v1beta`;
+  const url=`${base}/models/${IG_MODEL}:generateContent?key=${encodeURIComponent(apiKey)}`;
 
   const parts=[];
   if(refImageBase64){
@@ -3120,8 +3219,10 @@ async function igGenerateRef(idx){
 Full body standing pose, facing forward, arms slightly away from body so all limbs clearly visible. Plain white background. Studio lighting, even and flat. Complete figure from head to toe, no cropping. High quality character illustration. Small name label "${name}" at the very bottom center.`;
 
   try{
-    // Generate ref image
-    const imgB64=await igCallGeminiImage(apiKey, refPrompt, null);
+    const imgApiKey=getGoogleApiKey()||apiKey;
+    const imgProvider=detectProvider(imgApiKey);
+    const imgEndpoint=imgProvider?.direct||`${API_DIRECT}/v1beta`;
+    const imgB64=await igCallGeminiImage(imgApiKey, refPrompt, null, imgEndpoint);
     const dataUrl='data:image/png;base64,'+imgB64;
     igRefImages[name]=dataUrl;
     igCharDNA[name]=null; // reset DNA, will re-extract when running batch
@@ -3133,7 +3234,7 @@ Full body standing pose, facing forward, arms slightly away from body so all lim
     // Auto-extract DNA in background
     btn.textContent='🔬 Đang extract DNA…';
     try{
-      const dna=await igExtractDNA(apiKey,name,imgB64);
+      const dna=await igExtractDNA(imgApiKey,name,imgB64);
       igCharDNA[name]=dna;
       // Set project style from first ref
       if(!igProjectStyleDNA && dna.art_style_dna) igProjectStyleDNA=dna.art_style_dna;
@@ -3152,7 +3253,18 @@ Full body standing pose, facing forward, arms slightly away from body so all lim
 // ── MAIN PIPELINE: Run All ──
 async function igRunAll(){
   const apiKey=$('apiKey').value.trim();
-  if(!apiKey){alert('Cần API key.');return;}
+  if(!apiKey){alert('Cần ShopAIKey.');return;}
+
+  // Detect provider từ image key
+  const googleKey=getGoogleApiKey();
+  const imgApiKey=googleKey||apiKey;
+  const imgProvider=detectProvider(imgApiKey);
+  const imgEndpoint=imgProvider?.direct||`${API_DIRECT}/v1beta`;
+
+  if(!googleKey){
+    const ok=confirm('Bạn chưa nhập API Image.\n\nTiếp tục dùng API chính để tạo ảnh (có thể mất phí)?');
+    if(!ok)return;
+  }
   igParsePrompts();
   if(!igParsedPrompts.length){alert('Chưa có prompt. Dán hoặc sync từ Prompt Engineer.');return;}
 
@@ -3187,7 +3299,7 @@ async function igRunAll(){
       try{
         $('igProgLabel').textContent=`🔬 Extracting DNA: ${name}…`;
         const b64=igRefImages[name].split(',')[1];
-        const dna=await igExtractDNA(apiKey,name,b64);
+        const dna=await igExtractDNA(imgApiKey,name,b64);
         igCharDNA[name]=dna;
         if(!igProjectStyleDNA && dna.art_style_dna) igProjectStyleDNA=dna.art_style_dna;
       }catch(e){
@@ -3197,67 +3309,80 @@ async function igRunAll(){
     }
   }
 
-  // ── PHASE 2: Generate each image ──
-  for(let i=0;i<total;i++){
-    if(igStopped)break;
-    while(igPaused){await new Promise(r=>setTimeout(r,200));if(igStopped)break;}
-    if(igStopped)break;
+  // ── PHASE 2: Generate images in parallel (3 at a time) ──
+  const PARALLEL=3;
+  let completed=0;
+
+  async function generateOne(i){
+    if(igStopped)return;
+    while(igPaused){await new Promise(r=>setTimeout(r,200));if(igStopped)return;}
     const p=igParsedPrompts[i];
-    const isEstablishing=!p.refName; // [N.A] shots
+    const isEstablishing=!p.refName;
 
-    $('igProgBar').style.width=(10+i/total*88)+'%';
-    $('igProgPct').textContent=Math.round(i/total*100)+'%';
-
-    // Find which chars are referenced in this prompt
-    // A prompt may ref multiple chars: [REF: Kira — main][REF: Zara — sub]
+    // Find ref image for this prompt
     const refMatches=[...p.text.matchAll(/\[REF:\s*([^—\]]+)/gi)].map(m=>m[1].trim());
-    const charDNAMap={};
     let primaryRefB64=null;
+    const charDNAMap={};
     for(const rname of refMatches){
-      // fuzzy match against igCharDNA keys
       const matchKey=Object.keys(igCharDNA).find(k=>k.toLowerCase().includes(rname.toLowerCase())||rname.toLowerCase().includes(k.toLowerCase()));
-      if(matchKey && igCharDNA[matchKey]){
-        charDNAMap[matchKey]=igCharDNA[matchKey];
-        if(!primaryRefB64 && igRefImages[matchKey]){
-          primaryRefB64=igRefImages[matchKey].split(',')[1];
-        }
+      if(matchKey){
+        if(igCharDNA[matchKey])charDNAMap[matchKey]=igCharDNA[matchKey];
+        if(!primaryRefB64&&igRefImages[matchKey])primaryRefB64=igRefImages[matchKey].split(',')[1];
       }
     }
 
-    $('igProgLabel').textContent=`✍ [${p.label}] Optimizing prompt…`;
-
-    // Optimize prompt
-    let optimizedPrompt=p.text;
-    try{
-      optimizedPrompt=await igOptimizePrompt(apiKey,p.text,charDNAMap,isEstablishing,igProjectStyleDNA);
-    }catch(e){
-      console.warn('Prompt optimize failed, using raw:',e.message);
+    // Build prompt — dùng thẳng prompt từ Prompt Engineer, không optimize riêng từng ảnh
+    // Chỉ append DNA nếu có ref
+    let finalPrompt=p.text;
+    if(Object.keys(charDNAMap).length>0){
+      const dnaSnippet=Object.entries(charDNAMap).map(([name,dna])=>
+        `[${name}: ${dna.visual_summary||dna.hair||''}]`
+      ).join(' ');
+      finalPrompt=`${p.text}\n\nCharacter DNA: ${dnaSnippet}\nMaintain character consistency. Cinematic lighting. 16:9 aspect ratio.`;
     }
 
-    $('igProgLabel').textContent=`🎨 [${p.label}] Generating${p.refName?' (with ref)':''}…`;
+    $(`igimg_${i}`).querySelector('div').innerHTML=`<div style="font-size:10px;color:var(--accent2)">🎨 Generating...</div>`;
 
-    // Generate image
     let imgB64=null,attempts=0;
+
     while(attempts<3&&!imgB64){
       attempts++;
       try{
-        imgB64=await igCallGeminiImage(apiKey,optimizedPrompt,primaryRefB64);
+        imgB64=await igCallGeminiImage(imgApiKey,finalPrompt,primaryRefB64,imgEndpoint);
       }catch(e){
-        const retry=(e.message||'').match(/quota|demand|retry|500|503|429|overload/i);
-        if(retry&&attempts<3){
-          for(let s=20;s>0;s--){
+        const msg=e.message||'';
+        const isLimit=msg.match(/quota|limit|429|resource.*exhausted/i);
+        const isRetry=msg.match(/demand|retry|500|503|overload/i);
+
+        if(isLimit){
+          // Google key hết limit → dừng toàn bộ pipeline
+          igStopped=true;
+          $(`igimg_${i}`).classList.remove('loading');
+          $(`igimg_${i}`).innerHTML=`<div style="text-align:center;padding:12px;color:var(--amber);font-size:11px;">⏸ Dừng do limit</div>`;
+          $('igProgLabel').textContent=`⚠ Google AI Studio đã hết quota hôm nay (500 ảnh/ngày). Thử lại vào ngày mai.`;
+          $('igProgBar').style.background='var(--amber)';
+          alert('⚠ Google AI Studio key đã hết quota hôm nay!\n\nGiới hạn miễn phí: 500 ảnh/ngày.\nVui lòng thử lại vào ngày mai.');
+          return;
+        }
+
+        if(isRetry&&attempts<3){
+          for(let s=15;s>0;s--){
             if(igStopped)break;
-            while(igPaused){await new Promise(r=>setTimeout(r,200));if(igStopped)break;}
-            $('igProgLabel').textContent=`Retry sau ${s}s (${attempts}/3)…`;
+            $(`igimg_${i}`).querySelector('div').innerHTML=`<div style="font-size:10px;color:var(--amber)">⏳ Retry ${attempts}/3 sau ${s}s...</div>`;
             await new Promise(r=>setTimeout(r,1000));
           }
         }else{
           $(`igimg_${i}`).classList.remove('loading');
-          $(`igimg_${i}`).innerHTML=`<div style="text-align:center;padding:12px;color:var(--red);font-size:11px;">❌ ${esc((e.message||'').slice(0,100))}</div>`;
+          $(`igimg_${i}`).innerHTML=`<div style="text-align:center;padding:12px;color:var(--red);font-size:11px;">❌ ${esc(msg.slice(0,100))}</div>`;
           break;
         }
       }
     }
+
+    completed++;
+    $('igProgBar').style.width=(10+completed/total*88)+'%';
+    $('igProgPct').textContent=Math.round(completed/total*100)+'%';
+    $('igProgLabel').textContent=`🎨 ${completed}/${total} ảnh xong — đang chạy song song…`;
 
     if(imgB64){
       const dataUrl='data:image/png;base64,'+imgB64;
@@ -3267,8 +3392,17 @@ async function igRunAll(){
       $(`iglabel_${i}`).innerHTML=`<span>${esc(p.label)}${p.refName?' · '+esc(p.refName):''}</span><button class="btn-ig-dl" onclick="igDlOne('${dataUrl}','${p.label.replace(/\./g,'_')}.png')" title="Download">⬇</button>`;
       $('igResultsTitle').textContent=`✅ ${igGeneratedImages.length}/${total} ảnh`;
     }
+  }
 
-    if(i<total-1) await new Promise(r=>setTimeout(r,1200));
+  // Chạy song song theo batch PARALLEL ảnh
+  for(let i=0;i<total;i+=PARALLEL){
+    if(igStopped)break;
+    while(igPaused){await new Promise(r=>setTimeout(r,200));if(igStopped)break;}
+    const batch=[];
+    for(let j=i;j<Math.min(i+PARALLEL,total);j++) batch.push(generateOne(j));
+    await Promise.all(batch);
+    // Delay nhỏ giữa các batch để tránh rate limit
+    if(i+PARALLEL<total&&!igStopped) await new Promise(r=>setTimeout(r,300));
   }
 
   if(igStopped){
