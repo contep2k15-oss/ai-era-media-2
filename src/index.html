@@ -3515,84 +3515,85 @@ function vsCheckReady(){
   if(ok)vsLog('Sẵn sàng render. Nhấn "Render & Download MP4" để xuất video.');
 }
 
-// ── RENDER ──
+// ── RENDER via FFmpeg ──
 async function vsStartRender(){
   if(!vsImages.length||!vsAudioBuffer)return;
   const btn=$('vsRenderBtn');btn.disabled=true;
   const[W,H]=$('vsRes').value.split('x').map(Number);
   const fps=parseInt($('vsFps').value);
-  const bitrate=parseInt($('vsBr').value);
   const total=vsAudioDuration||vsSegments.reduce((a,s)=>Math.max(a,s.start+s.dur),0)||1;
   const totalFrames=Math.ceil(total*fps);
 
   const oc=document.createElement('canvas');oc.width=W;oc.height=H;
   const octx=oc.getContext('2d');
 
-  let stream;
-  try{stream=oc.captureStream(fps);}
-  catch(e){vsLog('Lỗi: captureStream không hỗ trợ. Dùng Chrome/Edge.');btn.disabled=false;return;}
-
-  const actx=vsGetCtx();const dest=actx.createMediaStreamDestination();
-  const src=actx.createBufferSource();src.buffer=vsAudioBuffer;src.connect(dest);
-  stream.addTrack(dest.stream.getAudioTracks()[0]);
-
-  const mime=MediaRecorder.isTypeSupported('video/mp4')?'video/mp4':
-             MediaRecorder.isTypeSupported('video/webm;codecs=vp9,opus')?'video/webm;codecs=vp9,opus':
-             MediaRecorder.isTypeSupported('video/webm')?'video/webm':'video/mp4';
-  let rec;
-  try{rec=new MediaRecorder(stream,{mimeType:mime,videoBitsPerSecond:bitrate});}
-  catch(e){vsLog('Lỗi MediaRecorder: '+e.message);btn.disabled=false;return;}
-
-  const chunks=[];
-  rec.ondataavailable=e=>{if(e.data.size>0)chunks.push(e.data);};
-  rec.onstop=async()=>{
-    const blob=new Blob(chunks,{type:'video/webm'});
-    vsLog(`Render xong (${(blob.size/1024/1024).toFixed(1)}MB). Đang convert sang MP4...`);
-
-    // Nếu chạy trong Electron → dùng FFmpeg thật
-    if(window.electronAPI?.convertToMp4){
-      try{
-        const arrayBuf=await blob.arrayBuffer();
-        const result=await window.electronAPI.convertToMp4({
-          webmBuffer:Array.from(new Uint8Array(arrayBuf)),
-          filename:'video.mp4'
-        });
-        if(result.success){
-          vsLog(`✅ Đã lưu MP4 thành công! ${W}×${H} @ ${fps}fps → ${result.outPath}`);
-        } else {
-          vsLog('⚠ Convert lỗi: '+result.error);
-          // Fallback: download WebM
-          const url=URL.createObjectURL(blob);
-          const a=document.createElement('a');a.href=url;a.download='video.webm';
-          document.body.appendChild(a);a.click();document.body.removeChild(a);
-        }
-      } catch(e){
-        vsLog('⚠ Lỗi: '+e.message);
-      }
-    } else {
-      // Fallback browser: download WebM
-      const url=URL.createObjectURL(blob);
-      const a=document.createElement('a');a.href=url;a.download='video.webm';
-      document.body.appendChild(a);a.click();document.body.removeChild(a);
-      vsLog(`✅ Đã tải WebM! ${(blob.size/1024/1024).toFixed(1)}MB — ${W}×${H} @ ${fps}fps`);
-    }
-    btn.disabled=false;
-  };
-
-  rec.start(100);src.start(0);vsLog('Đang render...');
-  let frame=0;
-  function next(){
-    if(frame>=totalFrames){
-      setTimeout(()=>{rec.stop();try{src.stop();}catch(e){}},200);
-      return;
-    }
-    const t=frame/fps;
-    octx.clearRect(0,0,W,H);vsDrawFrame(t,octx,W,H);
-    frame++;
-    vsLog(`Render ${Math.round(frame/totalFrames*100)}% (${frame}/${totalFrames} frames)`);
-    setTimeout(next,1000/fps*0.5);
+  // Kiểm tra Electron
+  if(!window.electronAPI?.renderVideoFFmpeg){
+    vsLog('⚠ Chỉ hỗ trợ trong Electron app.');btn.disabled=false;return;
   }
-  next();
+
+  vsLog(`Đang xuất ${totalFrames} frames...`);
+
+  // Export từng frame thành PNG base64
+  const frames=[];
+  for(let f=0;f<totalFrames;f++){
+    const t=f/fps;
+    octx.clearRect(0,0,W,H);
+    vsDrawFrame(t,octx,W,H);
+    // Lấy PNG data (bỏ prefix "data:image/png;base64,")
+    frames.push(oc.toDataURL('image/png').split(',')[1]);
+    if(f%30===0) vsLog(`Xuất frames: ${Math.round(f/totalFrames*100)}% (${f}/${totalFrames})`);
+    // Yield để UI không bị đơ
+    if(f%10===0) await new Promise(r=>setTimeout(r,0));
+  }
+
+  vsLog('Đang xuất audio...');
+
+  // Export audio thành WAV bytes
+  const audioBytes = vsAudioBufferToWav(vsAudioBuffer);
+
+  vsLog('Đang gọi FFmpeg ghép video...');
+
+  try{
+    const result=await window.electronAPI.renderVideoFFmpeg({
+      frames,
+      audioBytes: Array.from(audioBytes),
+      fps,
+      width: W,
+      height: H,
+      filename: 'video.mp4'
+    });
+    if(result.success){
+      vsLog(`✅ Xuất MP4 thành công! ${W}×${H} @ ${fps}fps → ${result.outPath}`);
+    } else {
+      vsLog('⚠ Lỗi: '+result.error);
+    }
+  } catch(e){
+    vsLog('⚠ Lỗi: '+e.message);
+  }
+  btn.disabled=false;
+}
+
+// Convert AudioBuffer → WAV Uint8Array
+function vsAudioBufferToWav(buf){
+  const numCh=buf.numberOfChannels,sr=buf.sampleRate,len=buf.length;
+  const wavLen=44+len*numCh*2;
+  const ab=new ArrayBuffer(wavLen);
+  const view=new DataView(ab);
+  const writeStr=(o,s)=>{for(let i=0;i<s.length;i++)view.setUint8(o+i,s.charCodeAt(i));};
+  writeStr(0,'RIFF');view.setUint32(4,wavLen-8,true);writeStr(8,'WAVE');
+  writeStr(12,'fmt ');view.setUint32(16,16,true);view.setUint16(20,1,true);
+  view.setUint16(22,numCh,true);view.setUint32(24,sr,true);
+  view.setUint32(28,sr*numCh*2,true);view.setUint16(32,numCh*2,true);
+  view.setUint16(34,16,true);writeStr(36,'data');view.setUint32(40,len*numCh*2,true);
+  let off=44;
+  for(let i=0;i<len;i++){
+    for(let ch=0;ch<numCh;ch++){
+      const s=Math.max(-1,Math.min(1,buf.getChannelData(ch)[i]));
+      view.setInt16(off,s<0?s*0x8000:s*0x7FFF,true);off+=2;
+    }
+  }
+  return new Uint8Array(ab);
 }
 
 function vsLog(msg){$('vsLog').textContent=msg;}
