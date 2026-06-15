@@ -787,7 +787,7 @@ html,body{height:100%;overflow:hidden;background:var(--bg0);color:var(--text);fo
     </div>
     <div class="settings-body">
       <div class="settings-section">
-        <div class="settings-label">API Key — ShopAIKey (Gemini)</div>
+        <div class="settings-label">API Key</div>
         <div class="api-row">
           <div class="api-field">
             <div class="api-pre">AIza...</div>
@@ -799,22 +799,9 @@ html,body{height:100%;overflow:hidden;background:var(--bg0);color:var(--text);fo
           </button>
         </div>
         <div class="api-status" id="apiStatus"></div>
-        <div style="margin-top:6px;font-size:10px;color:var(--text3);">
-          Dùng cho: Character Sheet · Prompt Engineer · TTS · Image (Gemini) · Audio Transcribe<br>
-          Lấy key tại <a href="https://shopaikey.com" target="_blank" style="color:var(--accent);">shopaikey.com</a>
-        </div>
-      </div>
-
-      <div class="settings-section">
-        <div class="settings-label">Thông tin</div>
-        <div style="font-size:11px;color:var(--text3);line-height:1.8;">
-          <div>Text: <span style="color:var(--text2);">gemini-3.1-flash-lite</span></div>
-          <div>TTS: <span style="color:var(--text2);">gemini-2.5-flash-preview-tts</span></div>
-          <div>Image: <span style="color:var(--text2);">gemini-2.5-flash-image-preview (native image gen)</span></div>
-          <div>DNA Extractor: <span style="color:var(--text2);">gemini-3.1-flash-lite vision</span></div>
-          <div style="margin-top:6px;">
-            <a href="https://shopaikey.com/docs/google-genai" target="_blank" style="color:var(--accent);font-size:10px;">Xem docs →</a>
-          </div>
+        <div style="margin-top:8px;">
+          <button onclick="saveApiKey()" style="padding:6px 14px;background:#10b981;border:none;border-radius:7px;color:#0a0f0e;font-size:12px;font-weight:700;cursor:pointer;">💾 Lưu API Key</button>
+          <span id="saveStatus" style="font-size:11px;color:#10b981;margin-left:8px;display:none;">✓ Đã lưu!</span>
         </div>
       </div>
     </div>
@@ -1093,7 +1080,7 @@ html,body{height:100%;overflow:hidden;background:var(--bg0);color:var(--text);fo
     <div class="as-card">
       <span class="as-label">Thời lượng mỗi đoạn</span>
       <div class="as-num-row">
-        <input type="number" class="as-num" id="asSegS" value="6" min="1" max="3600" oninput="asUpdateInfo();asDeselectQ()">
+        <input type="number" class="as-num" id="asSegS" value="" placeholder="giây" min="1" max="3600" oninput="asUpdateInfo();asDeselectQ()">
         <span class="as-num-unit">giây</span>
       </div>
       <div class="as-qb">
@@ -1108,7 +1095,7 @@ html,body{height:100%;overflow:hidden;background:var(--bg0);color:var(--text);fo
     </div>
     <div class="as-card">
       <span class="as-label">Tên file đầu ra</span>
-      <input type="text" class="as-input" id="asPrefix" value="segment">
+      <input type="text" class="as-input" id="asPrefix" value="era">
       <span class="as-label">Định dạng xuất</span>
       <select class="as-select" id="asFmt">
         <option value="mp3">MP3 (128kbps)</option>
@@ -1384,7 +1371,7 @@ html,body{height:100%;overflow:hidden;background:var(--bg0);color:var(--text);fo
     </div>
   </div>
 
-  <div class="block" style="margin-bottom:10px;">
+  <div class="block" style="display:none;margin-bottom:10px;">
     <div class="section-head">
       <span class="section-num">C</span>
       <span class="section-title">Model tạo ảnh</span>
@@ -1553,7 +1540,7 @@ html,body{height:100%;overflow:hidden;background:var(--bg0);color:var(--text);fo
     <button class="btn-vs-play" id="vsPlayBtn" onclick="vsTogglePlay()" disabled>▶ Play</button>
     <button class="btn-vs-play" onclick="vsStopPreview()" disabled id="vsStopBtn">⏹ Stop</button>
     <span class="vs-time" id="vsTimeDisp">0:00 / 0:00</span>
-    <button class="btn-vs-render" id="vsRenderBtn" onclick="vsStartRender()" disabled>🎬 Render & Download WebM</button>
+    <button class="btn-vs-render" id="vsRenderBtn" onclick="vsStartRender()" disabled>🎬 Render & Download MP4</button>
   </div>
 
   <div class="vs-log" id="vsLog">Chờ upload ảnh và audio để bắt đầu...</div>
@@ -1567,7 +1554,7 @@ html,body{height:100%;overflow:hidden;background:var(--bg0);color:var(--text);fo
 
 <div class="footer">
   <div class="tbdot"></div>
-  AI Era Media · ShopAIKey · Gemini 3.1 Flash-Lite
+  Bản quyền: <span onclick="alert('📞 0986001830')" style="cursor:pointer;color:var(--text2);text-decoration:underline;text-underline-offset:2px;margin-left:4px;" onmouseover="this.style.color='var(--accent)'" onmouseout="this.style.color='var(--text2)'">Duong</span>
 </div>
 
 <script>
@@ -1587,6 +1574,19 @@ const ROLE_CLASSES = {main:'role-main',sub:'role-sub',villain:'role-villain',cro
 
 let selectedStyle='auto', usedModel='', lastChars=[];
 const $=id=>document.getElementById(id);
+
+function saveApiKey(){
+  const key=$('apiKey').value.trim();
+  if(!key){alert('Vui lòng nhập API key trước.');return;}
+  localStorage.setItem('aiera_apikey', key);
+  const s=$('saveStatus');s.style.display='inline';
+  setTimeout(()=>s.style.display='none',2000);
+}
+
+window.addEventListener('DOMContentLoaded',()=>{
+  const saved=localStorage.getItem('aiera_apikey');
+  if(saved)$('apiKey').value=saved;
+});
 
 function selectStyle(s){
   selectedStyle=s;
@@ -3512,7 +3512,7 @@ function vsCheckReady(){
   const ok=vsImages.length>0&&vsAudioBuffer!==null;
   $('vsPlayBtn').disabled=!ok;$('vsStopBtn').disabled=!ok;$('vsRenderBtn').disabled=!ok;
   $('vsStatStatus').textContent=ok?'✅':'⬜';
-  if(ok)vsLog('Sẵn sàng render. Nhấn "Render & Download WebM" để xuất video.');
+  if(ok)vsLog('Sẵn sàng render. Nhấn "Render & Download MP4" để xuất video.');
 }
 
 // ── RENDER ──
@@ -3536,7 +3536,8 @@ async function vsStartRender(){
   const src=actx.createBufferSource();src.buffer=vsAudioBuffer;src.connect(dest);
   stream.addTrack(dest.stream.getAudioTracks()[0]);
 
-  const mime=MediaRecorder.isTypeSupported('video/webm;codecs=vp9,opus')?'video/webm;codecs=vp9,opus':
+  const mime=MediaRecorder.isTypeSupported('video/mp4')?'video/mp4':
+             MediaRecorder.isTypeSupported('video/webm;codecs=vp9,opus')?'video/webm;codecs=vp9,opus':
              MediaRecorder.isTypeSupported('video/webm')?'video/webm':'video/mp4';
   let rec;
   try{rec=new MediaRecorder(stream,{mimeType:mime,videoBitsPerSecond:bitrate});}
@@ -3544,18 +3545,47 @@ async function vsStartRender(){
 
   const chunks=[];
   rec.ondataavailable=e=>{if(e.data.size>0)chunks.push(e.data);};
-  rec.onstop=()=>{
-    const blob=new Blob(chunks,{type:mime}),url=URL.createObjectURL(blob);
-    const a=document.createElement('a');a.href=url;a.download='video.webm';
-    document.body.appendChild(a);a.click();document.body.removeChild(a);
-    vsLog(`✅ Hoàn tất! ${(blob.size/1024/1024).toFixed(1)}MB — ${W}×${H} @ ${fps}fps`);
+  rec.onstop=async()=>{
+    const blob=new Blob(chunks,{type:'video/webm'});
+    vsLog(`Render xong (${(blob.size/1024/1024).toFixed(1)}MB). Đang convert sang MP4...`);
+
+    // Nếu chạy trong Electron → dùng FFmpeg thật
+    if(window.electronAPI?.convertToMp4){
+      try{
+        const arrayBuf=await blob.arrayBuffer();
+        const result=await window.electronAPI.convertToMp4({
+          webmBuffer:Array.from(new Uint8Array(arrayBuf)),
+          filename:'video.mp4'
+        });
+        if(result.success){
+          vsLog(`✅ Đã lưu MP4 thành công! ${W}×${H} @ ${fps}fps → ${result.outPath}`);
+        } else {
+          vsLog('⚠ Convert lỗi: '+result.error);
+          // Fallback: download WebM
+          const url=URL.createObjectURL(blob);
+          const a=document.createElement('a');a.href=url;a.download='video.webm';
+          document.body.appendChild(a);a.click();document.body.removeChild(a);
+        }
+      } catch(e){
+        vsLog('⚠ Lỗi: '+e.message);
+      }
+    } else {
+      // Fallback browser: download WebM
+      const url=URL.createObjectURL(blob);
+      const a=document.createElement('a');a.href=url;a.download='video.webm';
+      document.body.appendChild(a);a.click();document.body.removeChild(a);
+      vsLog(`✅ Đã tải WebM! ${(blob.size/1024/1024).toFixed(1)}MB — ${W}×${H} @ ${fps}fps`);
+    }
     btn.disabled=false;
   };
 
   rec.start(100);src.start(0);vsLog('Đang render...');
   let frame=0;
   function next(){
-    if(frame>=totalFrames){rec.stop();try{src.stop();}catch(e){}return;}
+    if(frame>=totalFrames){
+      setTimeout(()=>{rec.stop();try{src.stop();}catch(e){}},200);
+      return;
+    }
     const t=frame/fps;
     octx.clearRect(0,0,W,H);vsDrawFrame(t,octx,W,H);
     frame++;

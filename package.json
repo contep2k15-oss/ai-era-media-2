@@ -13,6 +13,7 @@
     "appId": "com.aieramedia.app",
     "productName": "AI Era Media",
     "copyright": "AI Era Media",
+    "publish": null,
     "directories": {
       "output": "dist"
     },
@@ -20,7 +21,8 @@
       "main.js",
       "preload.js",
       "src/**/*",
-      "assets/**/*"
+      "assets/**/*",
+      "node_modules/ffmpeg-static/**/*"
     ],
     "win": {
       "target": [
@@ -47,6 +49,9 @@
       "installerLanguages": ["vi-VN", "en-US"],
       "language": "1033"
     }
+  },
+  "dependencies": {
+    "ffmpeg-static": "^5.2.0"
   },
   "devDependencies": {
     "electron": "^30.0.0",
