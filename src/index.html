@@ -2469,7 +2469,7 @@ const TTS_MODELS_PRIORITY=[
   'gemini-2.5-flash-preview-tts',
 ];
 let ttsActiveModel=null; // set after auto-detect
-const TTS_CHUNK_SIZE=3500; // chars per API call (safe under 4000 byte limit)
+const TTS_CHUNK_SIZE=4500; // chars per API call
 
 const TTS_VOICES=[
   {id:'Zephyr',    desc:'Bright'},
@@ -2717,29 +2717,37 @@ async function ttsGenerate(){
     $('ttsProgLabel').textContent=`Chunk ${i+1}/${chunks.length} đang xử lý…`;
 
     let wavBuf=null;let attempts=0;
-    while(attempts<3&&!wavBuf){
+    while(attempts<5&&!wavBuf){
       attempts++;
       try{
         wavBuf=await ttsCallAPI(apiKey,chunks[i],ttsSelectedVoice,stylePrompt);
+        if(!wavBuf||wavBuf.length<100){
+          // API trả về empty/rỗng — retry
+          wavBuf=null;
+          throw new Error('Audio data rỗng, thử lại...');
+        }
       }catch(e){
         const msg=e.message||'';
-        const isRetry=msg.match(/quota|demand|retry|500|503|429/i);
-        if(isRetry&&attempts<3){
-          for(let s=15;s>0;s--){
+        const isRetry=msg.match(/quota|demand|retry|500|503|429|rỗng|empty/i);
+        if(attempts<5){
+          const wait=isRetry?20:8; // 20s nếu quota, 8s nếu lỗi khác
+          for(let s=wait;s>0;s--){
             if(ttsStopped)break;
-            while(ttsPaused){await new Promise(r=>setTimeout(r,200));if(ttsStopped)break;}
-            $('ttsProgLabel').textContent=`Retry sau ${s}s (lần ${attempts}/3)…`;
+            $('ttsProgLabel').textContent=`Chunk ${i+1}: Thử lại sau ${s}s (lần ${attempts}/5)…`;
             await new Promise(r=>setTimeout(r,1000));
           }
         }else{
-          $('ttsErrEl').textContent=`Lỗi chunk ${i+1}: ${msg}`;$('ttsErrEl').classList.add('show');
-          $('ttsBtnGen').disabled=false;$('ttsProgWrap').style.display='none';ttsResetControls();return;
+          // Sau 5 lần vẫn lỗi → bỏ qua chunk này và tiếp tục
+          $('ttsErrEl').textContent=`⚠ Chunk ${i+1} lỗi sau 5 lần thử: ${msg} — Bỏ qua và tiếp tục`;
+          $('ttsErrEl').classList.add('show');
+          break;
         }
       }
     }
     if(ttsStopped)break;
     if(wavBuf)allWavBuffers.push(wavBuf);
-    if(i<chunks.length-1)await new Promise(r=>setTimeout(r,500));
+    // Tăng delay giữa chunks để tránh rate limit
+    if(i<chunks.length-1)await new Promise(r=>setTimeout(r,1500));
   }
 
   if(ttsStopped){
