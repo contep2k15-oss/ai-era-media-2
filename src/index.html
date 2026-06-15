@@ -1584,6 +1584,10 @@ const STYLE_PROMPTS = {
 const STYLE_NAMES = {auto:'Tự động theo video',anime:'Anime / Manga',ghibli:'Ghibli / Watercolor',cyberpunk:'Cyberpunk / Sci-fi',darkfantasy:'Dark Fantasy / Gothic',chibi:'Chibi / Cute',realistic:'Realistic'};
 const ROLE_CLASSES = {main:'role-main',sub:'role-sub',villain:'role-villain',crowd:'role-crowd',soldier:'role-soldier',support:'role-support'};
 
+// ── API ENDPOINTS ──
+const API_FAST   = 'https://api.shopaikey.com';    // tác vụ nhanh (<5s)
+const API_DIRECT = 'https://direct.shopaikey.com'; // tác vụ lâu: ảnh, TTS, character gen
+
 let selectedStyle='auto', usedModel='', lastChars=[];
 const $=id=>document.getElementById(id);
 
@@ -1613,7 +1617,7 @@ async function verifyKey(){
   $('verifyBtn').disabled=true;
   showVerify('checking',null,'Đang xác minh…');
   try{
-    const res=await fetch(`https://api.shopaikey.com/v1beta/models?key=${encodeURIComponent(key)}&pageSize=5`);
+    const res=await fetch(`${API_FAST}/v1beta/models?key=${encodeURIComponent(key)}&pageSize=5`);
     const data=await res.json();
     if(data.error)throw new Error(data.error.message);
     const names=(data.models||[]).map(m=>m.name?.replace('models/','')).filter(n=>n?.includes('flash')).slice(0,3).join(', ');
@@ -1643,7 +1647,7 @@ async function callGeminiText(parts,apiKey){
   for(const modelId of FREE_TEXT_MODELS){
     try{
       showStatus(`Đang dùng ${MODEL_LABELS[modelId]}…`,'Phân tích video & thiết kế nhân vật');
-      const url=`https://api.shopaikey.com/v1beta/models/${modelId}:generateContent?key=${encodeURIComponent(apiKey)}`;
+      const url=`${API_DIRECT}/v1beta/models/${modelId}:generateContent?key=${encodeURIComponent(apiKey)}`;
       const res=await fetch(url,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({
         contents:[{parts}],
         generationConfig:{temperature:0.5,maxOutputTokens:8192,responseMimeType:'application/json'},
@@ -2395,7 +2399,7 @@ RULES:
 
   const userPrompt=`Generate ${densityMap[peDensity]}.\n\nScenes:\n${scenesText}`;
 
-  const url=`https://api.shopaikey.com/v1beta/models/gemini-3.1-flash-lite:generateContent?key=${encodeURIComponent(apiKey)}`;
+  const url=`${API_DIRECT}/v1beta/models/gemini-3.1-flash-lite:generateContent?key=${encodeURIComponent(apiKey)}`;
 
   let res, data, attempts=0;
   while(attempts<4){
@@ -2603,7 +2607,7 @@ function ttsCountScript(){
 // ── REWRITE ──
 async function ttsRewrite(){
   const apiKey=$('apiKey').value.trim();
-  if(!apiKey){alert('Vui lòng nhập API key ở tab Character Sheet.');return;}
+  if(!apiKey){alert('Vui lòng nhập API key.');return;}
   const sub=$('ttsSubInput').value.trim();
   if(!sub){alert('Vui lòng dán phụ đề YouTube vào ô trên.');return;}
 
@@ -2617,6 +2621,15 @@ async function ttsRewrite(){
 
   const stylePrompt=TTS_REWRITE_PROMPTS[ttsSelectedStyle];
 
+  // Truncate nếu quá dài (Gemini có limit ~30k token input)
+  const MAX_INPUT=12000;
+  const subTruncated=sub.length>MAX_INPUT
+    ? sub.slice(0,MAX_INPUT)+'...[truncated]'
+    : sub;
+  if(sub.length>MAX_INPUT){
+    console.warn(`Input truncated from ${sub.length} to ${MAX_INPUT} chars`);
+  }
+
   const prompt=`${stylePrompt}
 
 ${durInstruction}
@@ -2624,24 +2637,34 @@ ${durInstruction}
 CRITICAL RULES:
 - Remove ALL: advertisements, sponsor segments, "like and subscribe" CTAs, self-promotion, channel plugs, merchandise mentions, Patreon plugs, viewer comments/shoutouts
 - Remove policy-violating content: hate speech, discrimination, dangerous misinformation, self-harm content, explicit content
-- Remove TikTok-unsafe content: excessive profanity, controversial political statements, content targeting minors inappropriately
-- Output ONLY the rewritten script, no headers, no meta-commentary, no "[Script begins]" labels
+- Output ONLY the rewritten script, no headers, no meta-commentary
 - Write for spoken audio — no bullet points, no markdown, continuous flowing prose
 
 SOURCE SUBTITLE:
-${sub}`;
+${subTruncated}`;
 
   try{
-    const res=await fetch(`https://api.shopaikey.com/v1beta/models/gemini-3.1-flash-lite:generateContent?key=${encodeURIComponent(apiKey)}`,{
+    // Dùng Gemini API trực tiếp
+    const res=await fetch(`${API_DIRECT}/v1beta/models/gemini-2.0-flash-lite:generateContent?key=${encodeURIComponent(apiKey)}`,{
       method:'POST',headers:{'Content-Type':'application/json'},
       body:JSON.stringify({
         contents:[{parts:[{text:prompt}]}],
-        generationConfig:{temperature:0.7,maxOutputTokens:4096}
+        generationConfig:{temperature:0.7,maxOutputTokens:8192}
       })
     });
+
+    // Kiểm tra content-type trước khi parse JSON
+    const ct=res.headers.get('content-type')||'';
+    if(!ct.includes('application/json')){
+      const txt=await res.text();
+      throw new Error(`API trả về không phải JSON (${res.status}): ${txt.slice(0,200)}`);
+    }
+
     const data=await res.json();
-    if(data.error)throw new Error(data.error.message);
+    if(data.error)throw new Error(data.error.message||JSON.stringify(data.error));
     const text=data.candidates?.[0]?.content?.parts?.map(p=>p.text||'').join('')||'';
+    if(!text)throw new Error('API trả về nội dung trống');
+
     $('ttsScriptOut').value=text.trim();
     ttsCountScript();
     $('ttsRewriteBlock').style.display='block';
@@ -2649,7 +2672,7 @@ ${sub}`;
     $('ttsGenerateBlock').style.display='block';
     ttsInitVoices();
     const words=text.trim().split(/\s+/).length;
-    $('ttsRewriteMeta').textContent=`${words} từ · phong cách: ${ttsSelectedStyle} · chỉnh sửa nếu cần`;
+    $('ttsRewriteMeta').textContent=`${words} từ · phong cách: ${ttsSelectedStyle}${sub.length>MAX_INPUT?' (đã cắt bớt input)':''} · chỉnh sửa nếu cần`;
     $('ttsRewriteBlock').scrollIntoView({behavior:'smooth',block:'start'});
   }catch(e){
     alert('Viết lại thất bại: '+e.message);
@@ -2790,7 +2813,7 @@ async function ttsDetectModel(apiKey){
   if(ttsActiveModel)return ttsActiveModel;
   for(const model of TTS_MODELS_PRIORITY){
     try{
-      const res=await fetch(`https://api.shopaikey.com/v1beta/models/${model}:generateContent?key=${encodeURIComponent(apiKey)}`,{
+      const res=await fetch(`${API_FAST}/v1beta/models/${model}:generateContent?key=${encodeURIComponent(apiKey)}`,{
         method:'POST',headers:{'Content-Type':'application/json'},
         body:JSON.stringify({
           contents:[{parts:[{text:'Hi'}]}],
@@ -2812,7 +2835,7 @@ async function ttsCallAPI(apiKey,text,voice,stylePrompt){
   // Use ShopAIKey's dedicated Gemini TTS endpoint
   // POST /tts/google/generations — Auth: Bearer, returns {url} WAV file
   const fullText=stylePrompt?`${stylePrompt}\n\nTRANSCRIPT:\n${text}`:text;
-  const res=await fetch('https://api.shopaikey.com/tts/google/generations',{
+  const res=await fetch(`${API_DIRECT}/tts/google/generations`,{
     method:'POST',
     headers:{'Authorization':'Bearer '+apiKey,'Content-Type':'application/json'},
     body:JSON.stringify({text:fullText,model:TTS_MODEL,voice:voice})
@@ -2945,7 +2968,7 @@ let igProjectStyleDNA='';
 
 // ── STEP 1: Extract Visual DNA from ref image via Gemini Vision ──
 async function igExtractDNA(apiKey, charName, refBase64){
-  const url=`https://api.shopaikey.com/v1beta/models/gemini-3.1-flash-lite:generateContent?key=${encodeURIComponent(apiKey)}`;
+  const url=`${API_DIRECT}/v1beta/models/gemini-3.1-flash-lite:generateContent?key=${encodeURIComponent(apiKey)}`;
   const prompt=`You are a visual analyst for AI image generation. Analyze this character reference image and extract a precise Visual DNA description.
 
 Return a JSON object with these fields:
@@ -2980,7 +3003,7 @@ Be extremely specific about colors (not 'dark hair' but 'blue-black hair with su
 
 // ── STEP 2: Optimize prompt for gemini-2.5-flash-image-preview with DNA injection ──
 async function igOptimizePrompt(apiKey, rawPrompt, charDNAMap, isEstablishingShot, projectStyleDNA){
-  const url=`https://api.shopaikey.com/v1beta/models/gemini-3.1-flash-lite:generateContent?key=${encodeURIComponent(apiKey)}`;
+  const url=`${API_DIRECT}/v1beta/models/gemini-3.1-flash-lite:generateContent?key=${encodeURIComponent(apiKey)}`;
 
   // Build DNA context for all characters referenced in this prompt
   let dnaContext='';
@@ -3040,7 +3063,7 @@ RULES:
 const IG_MODEL='gemini-2.5-flash-image-preview';
 
 async function igCallGeminiImage(apiKey, optimizedPrompt, refImageBase64){
-  const url=`https://api.shopaikey.com/v1beta/models/${IG_MODEL}:generateContent?key=${encodeURIComponent(apiKey)}`;
+  const url=`${API_DIRECT}/v1beta/models/${IG_MODEL}:generateContent?key=${encodeURIComponent(apiKey)}`;
 
   const parts=[];
   if(refImageBase64){
@@ -3941,7 +3964,7 @@ async function asTranscribeAll(){
     try{
       // Transcribe từng segment một (xử lý bên trong vòng lặp riêng)
 
-      const url=`https://api.shopaikey.com/v1beta/models/gemini-3.1-flash-lite:generateContent?key=${encodeURIComponent(apiKey)}`;
+      const url=`${API_DIRECT}/v1beta/models/gemini-3.1-flash-lite:generateContent?key=${encodeURIComponent(apiKey)}`;
       let res,data,attempts=0;
 
       // Transcribe từng segment riêng lẻ trong batch để tránh lỗi multi-audio
