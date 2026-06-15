@@ -501,27 +501,35 @@ html,body{height:100%;overflow:hidden;background:var(--bg0);color:var(--text);fo
 .vs-drop p{font-size:12px;color:var(--text2);}
 .vs-drop small{font-size:10px;color:var(--text3);}
 .vs-sync-row{display:flex;gap:5px;margin-bottom:8px;flex-wrap:wrap;}
-.vs-pair-list{display:flex;flex-direction:column;gap:4px;margin-bottom:10px;max-height:220px;overflow-y:auto;}
-.vs-pair{display:flex;align-items:center;gap:7px;padding:7px 10px;background:var(--bg3);border:1px solid var(--border2);border-radius:var(--rs);}
-.vs-pair-idx{font-size:10px;color:var(--text3);min-width:18px;text-align:right;}
+.vs-pair-list{display:flex;flex-direction:column;gap:4px;margin-bottom:10px;max-height:300px;overflow-y:auto;}
+.vs-pair{display:flex;align-items:center;gap:7px;padding:7px 10px;background:var(--bg3);border:1px solid var(--border2);border-radius:var(--rs);cursor:grab;transition:all .15s;}
+.vs-pair.dragging{opacity:.4;border-color:var(--accent);}
+.vs-pair.drag-over{border-color:var(--accent);background:var(--accentbg);}
+.vs-pair:active{cursor:grabbing;}
+.vs-pair-drag{color:var(--text3);font-size:14px;cursor:grab;padding:0 2px;flex-shrink:0;}
+.vs-pair-idx{font-size:10px;color:var(--text3);min-width:18px;text-align:right;flex-shrink:0;}
 .vs-pair-thumb{width:48px;height:27px;border-radius:4px;background:var(--bg2);border:1px solid var(--border2);overflow:hidden;flex-shrink:0;}
 .vs-pair-thumb img{width:100%;height:100%;object-fit:cover;display:block;}
 .vs-pair-info{flex:1;min-width:0;}
 .vs-pair-name{font-size:11px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
 .vs-pair-dur{font-size:9px;color:var(--text3);margin-top:1px;}
+.vs-dur-input{width:52px;padding:3px 6px;font-size:11px;font-family:var(--mono);background:var(--bg2);border:1px solid var(--border2);border-radius:5px;color:var(--text);outline:none;text-align:center;}
+.vs-dur-input:focus{border-color:var(--accent);}
+.vs-pair-del{padding:2px 6px;font-size:11px;background:transparent;border:none;color:var(--text3);cursor:pointer;border-radius:4px;flex-shrink:0;}
+.vs-pair-del:hover{color:var(--red);background:var(--redbg);}
 .vs-pair-badge{font-size:9px;padding:2px 6px;border-radius:99px;border:1px solid var(--border2);color:var(--text3);white-space:nowrap;}
 .vs-pair-badge.ok{border-color:rgba(34,211,165,.3);color:var(--green);}
 .vs-pair-badge.warn{border-color:rgba(251,191,36,.3);color:var(--amber);}
 .vs-audio-bar{padding:8px 10px;background:var(--bg3);border:1px solid var(--border2);border-radius:var(--rs);display:flex;align-items:center;gap:8px;margin-bottom:8px;}
 .vs-audio-name{flex:1;font-size:11px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
 .vs-audio-dur{font-size:10px;color:var(--text3);white-space:nowrap;}
-.vs-settings{display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;margin-bottom:10px;}
+.vs-settings{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:10px;}
 .vs-setting{background:var(--bg3);border:1px solid var(--border2);border-radius:var(--rs);padding:9px 10px;}
 .vs-setting label{font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--text3);display:block;margin-bottom:5px;}
 .vs-select{width:100%;padding:5px 7px;font-size:11px;font-family:var(--sans);background:var(--bg2);border:1px solid var(--border2);border-radius:5px;color:var(--text);outline:none;cursor:pointer;}
-.vs-trans-row{display:flex;gap:4px;flex-wrap:wrap;}
-.btn-vs-trans{padding:4px 9px;font-size:10px;font-weight:600;font-family:var(--sans);background:var(--bg2);border:1px solid var(--border2);border-radius:99px;color:var(--text2);cursor:pointer;transition:all .15s;}
-.btn-vs-trans:hover,.btn-vs-trans.active{background:var(--accentbg);border-color:var(--accent);color:var(--accent2);}
+.vs-dur-mode{display:flex;gap:6px;margin-bottom:10px;}
+.vs-dur-btn{padding:5px 12px;font-size:11px;font-weight:600;font-family:var(--sans);background:var(--bg3);border:1px solid var(--border2);border-radius:99px;color:var(--text2);cursor:pointer;transition:all .15s;}
+.vs-dur-btn.active{background:var(--accentbg);border-color:var(--accent);color:var(--accent2);}
 .vs-preview-wrap{background:#000;border-radius:var(--r);overflow:hidden;margin-bottom:6px;position:relative;}
 .vs-preview-wrap canvas{display:block;width:100%;aspect-ratio:16/9;}
 .vs-prog-bar-wrap{height:3px;background:var(--bg3);cursor:pointer;border-radius:2px;margin-bottom:8px;}
@@ -540,6 +548,8 @@ html,body{height:100%;overflow:hidden;background:var(--bg0);color:var(--text);fo
 .vs-stat{background:var(--bg3);border:1px solid var(--border2);border-radius:var(--rs);padding:7px 12px;text-align:center;}
 .vs-stat-val{font-size:16px;font-weight:700;color:var(--accent2);}
 .vs-stat-lbl{font-size:9px;color:var(--text3);margin-top:1px;}
+.vs-ffmpeg-progress{height:4px;background:var(--bg3);border-radius:2px;margin:6px 0;overflow:hidden;display:none;}
+.vs-ffmpeg-bar{height:100%;background:linear-gradient(90deg,#10b981,#6ee7b7);width:0%;border-radius:2px;transition:width .3s;}
 
 /* ── EXPORT BTN ── */
 .btn-export{display:inline-flex;align-items:center;gap:5px;padding:6px 12px;font-size:11px;font-weight:600;font-family:var(--sans);background:var(--bg3);color:var(--text2);border:1px solid var(--border2);border-radius:var(--rs);cursor:pointer;transition:all .15s;}
@@ -1431,12 +1441,11 @@ html,body{height:100%;overflow:hidden;background:var(--bg0);color:var(--text);fo
 <div class="panel-inner">
 
   <div class="panel-header">
-    <div class="panel-tag"><span class="panel-tag-dot"></span>Video Studio · WebM trong browser</div>
-    <div class="panel-title">Ghép ảnh + audio → <em>Video hoàn chỉnh</em></div>
-    <div class="panel-desc">Sync ảnh + audio → ghép 1:1 → preview → xuất WebM.</div>
+    <div class="panel-tag"><span class="panel-tag-dot"></span>Video Studio · MP4</div>
+    <div class="panel-title">Ghép ảnh + audio → <em>Video MP4 hoàn chỉnh</em></div>
+    <div class="panel-desc">Sắp xếp ảnh → chọn audio → FFmpeg ghép trực tiếp → MP4 chuẩn, đúng thời lượng.</div>
   </div>
 
-  <!-- STATS -->
   <div class="vs-stat-row">
     <div class="vs-stat"><div class="vs-stat-val" id="vsStatImgs">0</div><div class="vs-stat-lbl">ảnh</div></div>
     <div class="vs-stat"><div class="vs-stat-val" id="vsStatAud">—</div><div class="vs-stat-lbl">audio</div></div>
@@ -1444,12 +1453,12 @@ html,body{height:100%;overflow:hidden;background:var(--bg0);color:var(--text);fo
     <div class="vs-stat"><div class="vs-stat-val" id="vsStatStatus">⬜</div><div class="vs-stat-lbl">trạng thái</div></div>
   </div>
 
-  <!-- PHẦN A: NGUỒN ẢNH -->
+  <!-- A: ẢNH -->
   <div class="block" style="margin-bottom:14px;">
     <div class="section-head">
       <div class="section-num">A</div>
       <div class="section-title">Nguồn ảnh</div>
-      <div class="section-sub">Sync hoặc upload tay</div>
+      <div class="section-sub">Kéo thả để sắp xếp thứ tự</div>
     </div>
     <div class="block-body">
       <div class="vs-sync-row">
@@ -1457,16 +1466,16 @@ html,body{height:100%;overflow:hidden;background:var(--bg0);color:var(--text);fo
           <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
           Sync từ Image Generator
         </button>
-        <button class="btn-sync" style="background:transparent;color:var(--text3);border-color:var(--border2);" onclick="document.getElementById('vsImgInput').click()">
-          ⬆ Upload ảnh tay
-        </button>
+        <button class="btn-sync" style="background:transparent;color:var(--text3);border-color:var(--border2);" onclick="document.getElementById('vsImgInput').click()">⬆ Upload ảnh tay</button>
         <input type="file" id="vsImgInput" accept="image/*" multiple style="display:none" onchange="vsHandleImgUpload(this.files)">
+        <button class="btn-sync" style="background:transparent;color:var(--text3);border-color:var(--border2);" onclick="vsSortByName()" title="Sắp xếp theo tên file">🔤 Sắp theo tên</button>
+        <button class="btn-sync" style="background:transparent;color:var(--red);border-color:var(--redbg);" onclick="vsImages=[];vsRenderPairList();vsCheckReady();" title="Xóa tất cả ảnh">✕ Xóa tất cả</button>
       </div>
       <div id="vsPairList" class="vs-pair-list"></div>
     </div>
   </div>
 
-  <!-- PHẦN B: NGUỒN AUDIO -->
+  <!-- B: AUDIO -->
   <div class="block" style="margin-bottom:14px;">
     <div class="section-head">
       <div class="section-num">B</div>
@@ -1476,7 +1485,7 @@ html,body{height:100%;overflow:hidden;background:var(--bg0);color:var(--text);fo
     <div class="block-body">
       <div class="vs-sync-row">
         <button class="btn-sync" onclick="vsSyncAudioTTS()">🎤 Sync từ TTS (1 file)</button>
-        <button class="btn-sync" onclick="vsSyncAudioSegments()">✂ Sync từ Audio Splitter (segments)</button>
+        <button class="btn-sync" onclick="vsSyncAudioSegments()">✂ Sync từ Audio Splitter</button>
         <button class="btn-sync" style="background:transparent;color:var(--text3);border-color:var(--border2);" onclick="document.getElementById('vsAudioInput').click()">⬆ Upload audio tay</button>
         <input type="file" id="vsAudioInput" accept="audio/*" style="display:none" onchange="vsHandleAudioUpload(this.files[0])">
       </div>
@@ -1485,13 +1494,22 @@ html,body{height:100%;overflow:hidden;background:var(--bg0);color:var(--text);fo
     </div>
   </div>
 
-  <!-- PHẦN C: CÀI ĐẶT -->
+  <!-- C: CÀI ĐẶT -->
   <div class="block" style="margin-bottom:14px;">
     <div class="section-head">
       <div class="section-num">C</div>
       <div class="section-title">Cài đặt xuất video</div>
     </div>
     <div class="block-body">
+      <!-- Chế độ thời lượng -->
+      <div style="margin-bottom:10px;">
+        <span class="as-label" style="margin-bottom:6px;display:block;">Thời lượng mỗi ảnh</span>
+        <div class="vs-dur-mode">
+          <button class="vs-dur-btn active" id="vsDurAuto" onclick="vsSetDurMode('auto')">⚡ Tự động chia đều</button>
+          <button class="vs-dur-btn" id="vsDurManual" onclick="vsSetDurMode('manual')">✏️ Tự đặt từng ảnh</button>
+        </div>
+        <div id="vsDurAutoInfo" style="font-size:11px;color:var(--text3);margin-top:4px;"></div>
+      </div>
       <div class="vs-settings">
         <div class="vs-setting">
           <label>Độ phân giải</label>
@@ -1508,22 +1526,6 @@ html,body{height:100%;overflow:hidden;background:var(--bg0);color:var(--text);fo
             <option value="24">24 fps</option>
             <option value="60">60 fps</option>
           </select>
-        </div>
-        <div class="vs-setting">
-          <label>Bitrate</label>
-          <select class="vs-select" id="vsBr">
-            <option value="8000000">8 Mbps (cao)</option>
-            <option value="4000000" selected>4 Mbps (chuẩn)</option>
-            <option value="2000000">2 Mbps (nhỏ)</option>
-          </select>
-        </div>
-      </div>
-      <div style="margin-top:4px;">
-        <span class="as-label">Transition</span>
-        <div class="vs-trans-row">
-          <button class="btn-vs-trans active" data-t="cut" onclick="vsSetTrans(this)">Cut</button>
-          <button class="btn-vs-trans" data-t="fade" onclick="vsSetTrans(this)">Fade</button>
-          <button class="btn-vs-trans" data-t="slide" onclick="vsSetTrans(this)">Slide</button>
         </div>
       </div>
     </div>
@@ -1543,7 +1545,17 @@ html,body{height:100%;overflow:hidden;background:var(--bg0);color:var(--text);fo
     <button class="btn-vs-render" id="vsRenderBtn" onclick="vsStartRender()" disabled>🎬 Render & Download MP4</button>
   </div>
 
+  <div class="vs-ffmpeg-progress" id="vsFfmpegProgress">
+    <div class="vs-ffmpeg-bar" id="vsFfmpegBar"></div>
+  </div>
   <div class="vs-log" id="vsLog">Chờ upload ảnh và audio để bắt đầu...</div>
+
+  <!-- Download bar sau khi render xong -->
+  <div id="vsDownloadBar" style="display:none;align-items:center;gap:10px;margin-top:10px;padding:12px 14px;background:rgba(16,185,129,0.08);border:1px solid rgba(16,185,129,0.25);border-radius:var(--r);">
+    <span style="font-size:16px;">✅</span>
+    <span style="font-size:12px;color:var(--text2);flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" id="vsDownloadPath"></span>
+    <button id="vsOpenBtn" style="padding:6px 14px;background:#10b981;border:none;border-radius:var(--rs);color:#0a0f0e;font-size:12px;font-weight:700;cursor:pointer;">📂 Mở file</button>
+  </div>
 
 </div>
 </div><!-- end #panelVideo -->
@@ -3262,48 +3274,54 @@ async function igDownloadZip(){
 
 
 // ══════════════════════════════════════════
-// VIDEO STUDIO
+// VIDEO STUDIO — FFmpeg Direct
 // ══════════════════════════════════════════
-let vsImages=[];        // [{img, name, url}]
-let vsAudioBuffer=null; // AudioBuffer
+let vsImages=[];       // [{img, name, filePath, url, dur}]
+let vsAudioBuffer=null;
 let vsAudioFile=null;
+let vsAudioFilePath=null;
 let vsAudioDuration=0;
-let vsAudioMode='single'; // 'single' | 'segments'
-let vsSegments=[];      // [{imgIdx, start, dur}] — 1:1 with vsImages
-let vsTransition='cut';
-let vsAudioCtx=null;
+let vsAudioMode='single';
+let vsSegments=[];
+let vsDurMode='auto';  // 'auto' | 'manual'
 let vsPvCtx=null;
 let vsIsPlaying=false;
 let vsPreviewSrc=null;
 let vsPreviewStartT=0;
 let vsPreviewOffset=0;
 let vsRafId=null;
+let vsDragSrcIdx=null;
 
-function vsGetCtx(){if(!vsAudioCtx)vsAudioCtx=new(window.AudioContext||window.webkitAudioContext)();return vsAudioCtx;}
+function vsGetCtx(){
+  if(!window._vsAudioCtx) window._vsAudioCtx=new(window.AudioContext||window.webkitAudioContext)();
+  return window._vsAudioCtx;
+}
 
 // ── SYNC FROM OTHER TABS ──
 function vsSyncImages(){
   if(!igGeneratedImages||!igGeneratedImages.length){
     alert('Image Generator chưa có ảnh. Hãy generate ở tab Image Generator trước.');return;
   }
-  vsImages=igGeneratedImages.map((img,i)=>({
-    img:null, name:img.label, url:img.dataUrl, dataUrl:img.dataUrl
+  vsImages=igGeneratedImages.map(img=>({
+    img:null, name:img.label, url:img.dataUrl, dataUrl:img.dataUrl, filePath:null,
+    dur: vsAudioDuration>0 ? vsAudioDuration/igGeneratedImages.length : 5
   }));
-  // Preload Image objects
   let loaded=0;
   vsImages.forEach((item,i)=>{
     const im=new Image();
-    im.onload=()=>{vsImages[i].img=im;loaded++;if(loaded===vsImages.length){vsRebuildSegs();vsRenderPairList();vsCheckReady();}};
-    im.src=item.dataUrl;
+    im.onload=()=>{vsImages[i].img=im;loaded++;if(loaded===vsImages.length){
+      vsNaturalSort();
+      vsRebuildSegs();vsRenderPairList();vsCheckReady();}};
+    im.src=item.url;
   });
-  vsLog(`Đã sync ${vsImages.length} ảnh từ Image Generator`);
+  vsLog(`Đã sync ${vsImages.length} ảnh từ Image Generator — tự động sắp xếp theo tên`);
 }
 
 function vsSyncAudioTTS(){
   if(!ttsAudioUrl){alert('TTS chưa có audio. Hãy tạo voice ở tab Text to Speech trước.');return;}
   fetch(ttsAudioUrl).then(r=>r.arrayBuffer()).then(ab=>{
     vsGetCtx().decodeAudioData(ab.slice(0),buf=>{
-      vsAudioBuffer=buf;vsAudioFile=null;
+      vsAudioBuffer=buf;vsAudioFilePath=null;
       vsAudioDuration=buf.duration;vsAudioMode='single';
       vsUpdateAudioUI('TTS Voice Output',buf.duration);
       vsDrawWave(buf);vsRebuildSegs();vsCheckReady();
@@ -3313,25 +3331,23 @@ function vsSyncAudioTTS(){
 }
 
 function vsSyncAudioSegments(){
-  if(!asSegs||!asSegs.length){alert('Audio Splitter chưa có segment. Hãy cắt audio ở tab Audio Splitter trước.');return;}
-  // Merge all segment blobs into one ArrayBuffer then decode
+  if(!asSegs||!asSegs.length){alert('Audio Splitter chưa có segment.');return;}
   const mergeBlobs=async()=>{
-    const arrayBufs=await Promise.all(asSegs.map(s=>s.blob.arrayBuffer()));
-    const total=arrayBufs.reduce((a,b)=>a+b.byteLength,0);
+    const bufs=await Promise.all(asSegs.map(s=>s.blob.arrayBuffer()));
+    const total=bufs.reduce((a,b)=>a+b.byteLength,0);
     const merged=new Uint8Array(total);
-    let off=0;arrayBufs.forEach(ab=>{merged.set(new Uint8Array(ab),off);off+=ab.byteLength;});
+    let off=0;bufs.forEach(ab=>{merged.set(new Uint8Array(ab),off);off+=ab.byteLength;});
     return merged.buffer;
   };
   mergeBlobs().then(ab=>{
     vsGetCtx().decodeAudioData(ab,buf=>{
-      vsAudioBuffer=buf;vsAudioDuration=buf.duration;vsAudioMode='segments';
+      vsAudioBuffer=buf;vsAudioFilePath=null;vsAudioDuration=buf.duration;vsAudioMode='segments';
       vsUpdateAudioUI(`${asSegs.length} segments từ Audio Splitter`,buf.duration);
       vsDrawWave(buf);vsRebuildSegs();vsCheckReady();
     }).catch(()=>{
-      // Fallback: use first segment duration * count as estimate
       vsAudioDuration=asSegs.reduce((s,seg)=>s+(parseFloat(seg.e)-parseFloat(seg.s)),0);
       vsAudioMode='segments';
-      vsUpdateAudioUI(`${asSegs.length} segments (estimate)`,vsAudioDuration);
+      vsUpdateAudioUI(`${asSegs.length} segments`,vsAudioDuration);
       vsRebuildSegs();vsCheckReady();
     });
   });
@@ -3340,28 +3356,34 @@ function vsSyncAudioSegments(){
 
 function vsHandleAudioUpload(file){
   if(!file)return;
+  vsAudioFile=file;
+  vsAudioFilePath=file.path||null; // Electron cung cấp file.path
   const fr=new FileReader();
   fr.onload=e=>vsGetCtx().decodeAudioData(e.target.result.slice(0),buf=>{
-    vsAudioBuffer=buf;vsAudioFile=file;vsAudioDuration=buf.duration;vsAudioMode='single';
+    vsAudioBuffer=buf;vsAudioDuration=buf.duration;vsAudioMode='single';
     vsUpdateAudioUI(file.name,buf.duration);vsDrawWave(buf);vsRebuildSegs();vsCheckReady();
   });
   fr.readAsArrayBuffer(file);
 }
 
 function vsHandleImgUpload(files){
-  const newImgs=Array.from(files);
+  const arr=Array.from(files);
   let loaded=0;
-  newImgs.forEach(f=>{
+  arr.forEach(f=>{
     const url=URL.createObjectURL(f);
     const im=new Image();
     im.onload=()=>{
-      vsImages.push({img:im,name:f.name,url,dataUrl:null});
+      vsImages.push({img:im, name:f.name, url, dataUrl:null, filePath:f.path||null,
+        dur: vsAudioDuration>0 ? vsAudioDuration/Math.max(vsImages.length+1,1) : 5});
       loaded++;
-      if(loaded===newImgs.length){vsRebuildSegs();vsRenderPairList();vsCheckReady();}
+      if(loaded===arr.length){
+        vsNaturalSort();
+        vsRebuildSegs();vsRenderPairList();vsCheckReady();
+        vsLog(`Đã load ${arr.length} ảnh — tự động sắp xếp theo tên`);
+      }
     };
     im.src=url;
   });
-  vsLog(`Upload ${newImgs.length} ảnh`);
 }
 
 function vsUpdateAudioUI(name,dur){
@@ -3375,37 +3397,71 @@ function vsUpdateAudioUI(name,dur){
   $('vsWaveWrap').style.display='block';
 }
 
-// ── REBUILD SEGMENTS 1:1 ──
-function vsRebuildSegs(){
-  if(!vsImages.length)return;
-  const dur=vsAudioDuration>0?vsAudioDuration/vsImages.length:5;
-  let t=0;
-  vsSegments=vsImages.map((_,i)=>{
-    const s={imgIdx:i,start:parseFloat(t.toFixed(3)),dur:parseFloat(dur.toFixed(3))};
-    t+=dur;return s;
-  });
-  $('vsStatImgs').textContent=vsImages.length;
-  $('vsStatDur').textContent=vsFmt(vsAudioDuration||vsImages.length*5);
-  vsRenderPairList();
+// ── DUR MODE ──
+function vsSetDurMode(mode){
+  vsDurMode=mode;
+  $('vsDurAuto').classList.toggle('active',mode==='auto');
+  $('vsDurManual').classList.toggle('active',mode==='manual');
+  vsRebuildSegs();vsRenderPairList();
 }
 
+// ── REBUILD SEGMENTS ──
+function vsRebuildSegs(){
+  if(!vsImages.length)return;
+  const autoDur=vsAudioDuration>0?vsAudioDuration/vsImages.length:5;
+  if(vsDurMode==='auto'){
+    vsImages.forEach(img=>img.dur=autoDur);
+    $('vsDurAutoInfo').textContent=vsAudioDuration>0
+      ?`Mỗi ảnh hiển thị ${autoDur.toFixed(2)}s (${vsAudioDuration.toFixed(1)}s ÷ ${vsImages.length} ảnh)`
+      :'Chưa có audio — mỗi ảnh mặc định 5s';
+  }
+  let t=0;
+  vsSegments=vsImages.map((_,i)=>{
+    const s={imgIdx:i,start:parseFloat(t.toFixed(3)),dur:parseFloat((vsImages[i].dur||5).toFixed(3))};
+    t+=s.dur;return s;
+  });
+  const total=vsSegments.reduce((a,s)=>a+s.dur,0);
+  $('vsStatImgs').textContent=vsImages.length;
+  $('vsStatDur').textContent=vsFmt(total);
+}
+
+// ── RENDER PAIR LIST (with drag-sort) ──
 function vsRenderPairList(){
   if(!vsImages.length){$('vsPairList').innerHTML='';return;}
   $('vsPairList').innerHTML=vsImages.map((img,i)=>{
     const seg=vsSegments[i];
-    const hasAudio=vsAudioDuration>0;
-    return `<div class="vs-pair">
+    const durVal=(img.dur||5).toFixed(1);
+    return `<div class="vs-pair" draggable="true" data-idx="${i}"
+      ondragstart="vsDragStart(event,${i})" ondragover="vsDragOver(event,${i})"
+      ondrop="vsDrop(event,${i})" ondragleave="vsDragLeave(event)" ondragend="vsDragEnd(event)">
+      <span class="vs-pair-drag">⠿</span>
       <span class="vs-pair-idx">${i+1}</span>
-      <div class="vs-pair-thumb">${img.dataUrl||img.url?`<img src="${img.dataUrl||img.url}">`:'📷'}</div>
+      <div class="vs-pair-thumb">${img.url||img.dataUrl?`<img src="${img.dataUrl||img.url}">`:'📷'}</div>
       <div class="vs-pair-info">
         <div class="vs-pair-name">${esc(img.name)}</div>
         <div class="vs-pair-dur">${seg?vsFmt(seg.start)+' → '+vsFmt(seg.start+seg.dur):'—'}</div>
       </div>
-      <span class="vs-pair-badge ${hasAudio?'ok':'warn'}">${hasAudio?'✓ audio':'no audio'}</span>
+      ${vsDurMode==='manual'?`<input class="vs-dur-input" type="number" value="${durVal}" min="0.5" step="0.5"
+        oninput="vsImages[${i}].dur=parseFloat(this.value)||5;vsRebuildSegs();vsRenderPairList();" title="Thời lượng (giây)">
+        <span style="font-size:10px;color:var(--text3);">s</span>`:''}
+      <button class="vs-pair-del" onclick="vsImages.splice(${i},1);vsRebuildSegs();vsRenderPairList();vsCheckReady();" title="Xóa">✕</button>
     </div>`;
   }).join('');
-  // Draw first frame in preview
-  if(vsImages[0]?.img) vsDrawFrame(0,vsPvCtx,960,540);
+  if(vsImages[0]?.img && vsPvCtx) vsDrawFrame(0,vsPvCtx,960,540);
+}
+
+// ── DRAG SORT ──
+function vsDragStart(e,idx){vsDragSrcIdx=idx;e.currentTarget.classList.add('dragging');}
+function vsDragOver(e,idx){e.preventDefault();if(idx!==vsDragSrcIdx)e.currentTarget.classList.add('drag-over');}
+function vsDragLeave(e){e.currentTarget.classList.remove('drag-over');}
+function vsDragEnd(e){e.currentTarget.classList.remove('dragging');}
+function vsDrop(e,idx){
+  e.preventDefault();e.currentTarget.classList.remove('drag-over');
+  if(vsDragSrcIdx===null||vsDragSrcIdx===idx)return;
+  const moved=vsImages.splice(vsDragSrcIdx,1)[0];
+  vsImages.splice(idx,0,moved);
+  vsDragSrcIdx=null;
+  vsRebuildSegs();vsRenderPairList();vsCheckReady();
 }
 
 // ── WAVE ──
@@ -3422,17 +3478,15 @@ function vsDrawWave(buf){
   }
 }
 
-// ── TRANSITIONS & DRAW ──
-function vsSetTrans(btn){document.querySelectorAll('.btn-vs-trans').forEach(b=>b.classList.remove('active'));btn.classList.add('active');vsTransition=btn.dataset.t;}
-
+// ── DRAW FRAME (for preview) ──
 function vsGetImgAt(t){
   for(let i=0;i<vsSegments.length;i++){
     const s=vsSegments[i];
-    if(t>=s.start&&t<s.start+s.dur)return{seg:s,idx:i,prog:(t-s.start)/s.dur};
+    if(t>=s.start&&t<s.start+s.dur)return{seg:s,idx:i};
   }
-  if(vsSegments.length===0)return null;
-  if(t<vsSegments[0].start)return{seg:vsSegments[0],idx:0,prog:0};
-  return{seg:vsSegments[vsSegments.length-1],idx:vsSegments.length-1,prog:1};
+  if(!vsSegments.length)return null;
+  if(t<vsSegments[0].start)return{seg:vsSegments[0],idx:0};
+  return{seg:vsSegments[vsSegments.length-1],idx:vsSegments.length-1};
 }
 
 function vsDrawCover(ctx,img,W,H){
@@ -3445,18 +3499,8 @@ function vsDrawFrame(t,ctx,W,H){
   if(!vsImages.length||!ctx)return;
   ctx.fillStyle='#111';ctx.fillRect(0,0,W,H);
   const res=vsGetImgAt(t);if(!res)return;
-  const{seg,idx,prog}=res;
-  const img=vsImages[seg.imgIdx]?.img;if(!img)return;
-  if(vsTransition==='fade'&&prog>0.8&&idx<vsSegments.length-1){
-    ctx.globalAlpha=1;vsDrawCover(ctx,img,W,H);
-    const ni=vsImages[vsSegments[idx+1].imgIdx]?.img;
-    if(ni){ctx.globalAlpha=(prog-0.8)/0.2;vsDrawCover(ctx,ni,W,H);ctx.globalAlpha=1;}
-  }else if(vsTransition==='slide'&&prog>0.85&&idx<vsSegments.length-1){
-    vsDrawCover(ctx,img,W,H);
-    const p=(prog-0.85)/0.15;
-    const ni=vsImages[vsSegments[idx+1].imgIdx]?.img;
-    if(ni){ctx.save();ctx.beginPath();ctx.rect(Math.round(W*p),0,W,H);ctx.clip();vsDrawCover(ctx,ni,W,H);ctx.restore();}
-  }else{vsDrawCover(ctx,img,W,H);}
+  const img=vsImages[res.seg.imgIdx]?.img;if(!img)return;
+  vsDrawCover(ctx,img,W,H);
 }
 
 // ── PREVIEW ──
@@ -3483,28 +3527,28 @@ function vsStopPreview(){
   if(vsPreviewSrc){try{vsPreviewSrc.stop();}catch(e){}vsPreviewSrc=null;}
   vsIsPlaying=false;vsPreviewOffset=0;cancelAnimationFrame(vsRafId);
   $('vsPlayBtn').textContent='▶ Play';$('vsProgFill').style.width='0%';
-  $('vsTimeDisp').textContent='0:00 / '+vsFmt(vsAudioDuration);
-  vsDrawFrame(0,vsPvCtx,960,540);
+  const total=vsSegments.reduce((a,s)=>a+s.dur,0)||vsAudioDuration||0;
+  $('vsTimeDisp').textContent='0:00 / '+vsFmt(total);
+  if(vsPvCtx)vsDrawFrame(0,vsPvCtx,960,540);
 }
 
 function vsAnimatePV(){
   const ctx=vsGetCtx(),t=ctx.currentTime-vsPreviewStartT;
-  const total=vsAudioDuration||vsSegments.reduce((a,s)=>Math.max(a,s.start+s.dur),0)||1;
-  vsPvCtx.clearRect(0,0,960,540);vsDrawFrame(t,vsPvCtx,960,540);
-  const pct=Math.min(t/total*100,100);
-  $('vsProgFill').style.width=pct.toFixed(1)+'%';
+  const total=vsSegments.reduce((a,s)=>a+s.dur,0)||vsAudioDuration||1;
+  if(vsPvCtx){vsPvCtx.clearRect(0,0,960,540);vsDrawFrame(t,vsPvCtx,960,540);}
+  $('vsProgFill').style.width=Math.min(t/total*100,100).toFixed(1)+'%';
   $('vsTimeDisp').textContent=vsFmt(t)+' / '+vsFmt(total);
   if(t<total&&vsIsPlaying)vsRafId=requestAnimationFrame(vsAnimatePV);else if(t>=total)vsStopPreview();
 }
 
 function vsSeek(e){
   const track=$('vsProgBarWrap'),pct=e.offsetX/track.offsetWidth;
-  const total=vsAudioDuration||1;
+  const total=vsSegments.reduce((a,s)=>a+s.dur,0)||vsAudioDuration||1;
   vsPreviewOffset=pct*total;
   if(vsIsPlaying){vsPausePreview();vsStartPreview();}
-  else{vsPvCtx.clearRect(0,0,960,540);vsDrawFrame(vsPreviewOffset,vsPvCtx,960,540);
+  else{if(vsPvCtx){vsPvCtx.clearRect(0,0,960,540);vsDrawFrame(vsPreviewOffset,vsPvCtx,960,540);}
     $('vsProgFill').style.width=(pct*100).toFixed(1)+'%';
-    $('vsTimeDisp').textContent=vsFmt(vsPreviewOffset)+' / '+vsFmt(vsAudioDuration);}
+    $('vsTimeDisp').textContent=vsFmt(vsPreviewOffset)+' / '+vsFmt(total);}
 }
 
 // ── CHECK READY ──
@@ -3512,97 +3556,100 @@ function vsCheckReady(){
   const ok=vsImages.length>0&&vsAudioBuffer!==null;
   $('vsPlayBtn').disabled=!ok;$('vsStopBtn').disabled=!ok;$('vsRenderBtn').disabled=!ok;
   $('vsStatStatus').textContent=ok?'✅':'⬜';
-  if(ok)vsLog('Sẵn sàng render. Nhấn "Render & Download MP4" để xuất video.');
+  if(ok)vsLog(`✅ Sẵn sàng! ${vsImages.length} ảnh · ${vsFmt(vsAudioDuration)} audio → Bấm Render để xuất MP4`);
 }
 
-// ── RENDER via FFmpeg ──
+// ── RENDER: gửi đường dẫn file cho FFmpeg, không gửi data ──
 async function vsStartRender(){
   if(!vsImages.length||!vsAudioBuffer)return;
   const btn=$('vsRenderBtn');btn.disabled=true;
-  const[W,H]=$('vsRes').value.split('x').map(Number);
-  const fps=parseInt($('vsFps').value);
-  const total=vsAudioDuration||vsSegments.reduce((a,s)=>Math.max(a,s.start+s.dur),0)||1;
-  const totalFrames=Math.ceil(total*fps);
+  $('vsDownloadBar').style.display='none';
 
-  const oc=document.createElement('canvas');oc.width=W;oc.height=H;
-  const octx=oc.getContext('2d');
-
-  // Kiểm tra Electron
   if(!window.electronAPI?.renderVideoFFmpeg){
     vsLog('⚠ Chỉ hỗ trợ trong Electron app.');btn.disabled=false;return;
   }
 
-  vsLog(`Đang xuất ${totalFrames} frames...`);
+  const[W,H]=$('vsRes').value.split('x').map(Number);
+  const fps=parseInt($('vsFps').value);
 
-  // Export từng frame thành PNG base64
-  const frames=[];
-  for(let f=0;f<totalFrames;f++){
-    const t=f/fps;
-    octx.clearRect(0,0,W,H);
-    vsDrawFrame(t,octx,W,H);
-    // Lấy PNG data (bỏ prefix "data:image/png;base64,")
-    frames.push(oc.toDataURL('image/png').split(',')[1]);
-    if(f%30===0) vsLog(`Xuất frames: ${Math.round(f/totalFrames*100)}% (${f}/${totalFrames})`);
-    // Yield để UI không bị đơ
-    if(f%10===0) await new Promise(r=>setTimeout(r,0));
+  // Build danh sách ảnh: {filePath hoặc dataUrl, dur}
+  const imageList=vsImages.map((img,i)=>({
+    filePath: img.filePath||null,
+    dataUrl: img.dataUrl||img.url||null,
+    dur: vsSegments[i]?.dur||img.dur||5,
+    name: img.name
+  }));
+
+  // Audio: filePath nếu có, fallback export WAV
+  let audioData=null;
+  if(vsAudioFile&&vsAudioFile.path){
+    audioData={filePath:vsAudioFile.path};
+    vsLog('Đang gọi FFmpeg...');
+  } else {
+    vsLog('Đang export audio WAV...');
+    const wav=vsAudioBufferToWav(vsAudioBuffer);
+    audioData={wavBytes:Array.from(wav)};
   }
 
-  vsLog('Đang xuất audio...');
-
-  // Export audio thành WAV bytes
-  const audioBytes = vsAudioBufferToWav(vsAudioBuffer);
-
-  vsLog('Đang gọi FFmpeg ghép video...');
+  $('vsFfmpegProgress').style.display='block';
+  // Animate progress bar (estimate)
+  let prog=0;
+  const progInterval=setInterval(()=>{
+    prog=Math.min(prog+2,90);
+    $('vsFfmpegBar').style.width=prog+'%';
+  },500);
 
   try{
     const result=await window.electronAPI.renderVideoFFmpeg({
-      frames,
-      audioBytes: Array.from(audioBytes),
-      fps,
-      width: W,
-      height: H,
-      filename: 'video.mp4'
+      imageList, audioData, fps, width:W, height:H, filename:'video.mp4'
     });
+    clearInterval(progInterval);
+    $('vsFfmpegBar').style.width='100%';
+    setTimeout(()=>{$('vsFfmpegProgress').style.display='none';$('vsFfmpegBar').style.width='0%';},1000);
+
     if(result.success){
-      vsLog(`✅ Xuất MP4 thành công! ${W}×${H} @ ${fps}fps → ${result.outPath}`);
+      vsLog(`✅ Xuất MP4 thành công! ${W}×${H} @ ${fps}fps`);
+      $('vsDownloadBar').style.display='flex';
+      $('vsDownloadPath').textContent=result.outPath;
+      $('vsOpenBtn').onclick=()=>window.electronAPI?.openFile?.(result.outPath);
     } else {
       vsLog('⚠ Lỗi: '+result.error);
     }
   } catch(e){
+    clearInterval(progInterval);
     vsLog('⚠ Lỗi: '+e.message);
   }
   btn.disabled=false;
 }
 
-// Convert AudioBuffer → WAV Uint8Array
+// Convert AudioBuffer → WAV (fallback khi không có file path)
 function vsAudioBufferToWav(buf){
   const numCh=buf.numberOfChannels,sr=buf.sampleRate,len=buf.length;
-  const wavLen=44+len*numCh*2;
-  const ab=new ArrayBuffer(wavLen);
+  const ab=new ArrayBuffer(44+len*numCh*2);
   const view=new DataView(ab);
-  const writeStr=(o,s)=>{for(let i=0;i<s.length;i++)view.setUint8(o+i,s.charCodeAt(i));};
-  writeStr(0,'RIFF');view.setUint32(4,wavLen-8,true);writeStr(8,'WAVE');
-  writeStr(12,'fmt ');view.setUint32(16,16,true);view.setUint16(20,1,true);
-  view.setUint16(22,numCh,true);view.setUint32(24,sr,true);
-  view.setUint32(28,sr*numCh*2,true);view.setUint16(32,numCh*2,true);
-  view.setUint16(34,16,true);writeStr(36,'data');view.setUint32(40,len*numCh*2,true);
+  const ws=(o,s)=>{for(let i=0;i<s.length;i++)view.setUint8(o+i,s.charCodeAt(i));};
+  ws(0,'RIFF');view.setUint32(4,36+len*numCh*2,true);ws(8,'WAVE');ws(12,'fmt ');
+  view.setUint32(16,16,true);view.setUint16(20,1,true);view.setUint16(22,numCh,true);
+  view.setUint32(24,sr,true);view.setUint32(28,sr*numCh*2,true);
+  view.setUint16(32,numCh*2,true);view.setUint16(34,16,true);ws(36,'data');
+  view.setUint32(40,len*numCh*2,true);
   let off=44;
-  for(let i=0;i<len;i++){
-    for(let ch=0;ch<numCh;ch++){
-      const s=Math.max(-1,Math.min(1,buf.getChannelData(ch)[i]));
-      view.setInt16(off,s<0?s*0x8000:s*0x7FFF,true);off+=2;
-    }
+  for(let i=0;i<len;i++)for(let ch=0;ch<numCh;ch++){
+    const s=Math.max(-1,Math.min(1,buf.getChannelData(ch)[i]));
+    view.setInt16(off,s<0?s*0x8000:s*0x7FFF,true);off+=2;
   }
   return new Uint8Array(ab);
 }
 
-function vsLog(msg){$('vsLog').textContent=msg;}
+function vsNaturalSort(){
+  vsImages.sort((a,b)=>a.name.localeCompare(b.name,undefined,{numeric:true,sensitivity:'base'}));
+}
+function vsLog(msg){const el=$('vsLog');if(el)el.textContent=msg;}
 function vsFmt(s){s=Math.max(0,s||0);const m=Math.floor(s/60),sec=(s%60).toFixed(1);return m+':'+(parseFloat(sec)<10?'0':'')+sec;}
-
-// Init canvas on tab switch
 function vsInitCanvas(){
   if(vsPvCtx)return;
-  const cv=$('vsPvCanvas');vsPvCtx=cv.getContext('2d');
+  const cv=$('vsPvCanvas');if(!cv)return;
+  vsPvCtx=cv.getContext('2d');
   vsPvCtx.fillStyle='#111';vsPvCtx.fillRect(0,0,960,540);
   vsPvCtx.fillStyle='#444';vsPvCtx.font='14px sans-serif';vsPvCtx.textAlign='center';
   vsPvCtx.fillText('Preview sẽ hiện ở đây sau khi load ảnh & audio',480,270);

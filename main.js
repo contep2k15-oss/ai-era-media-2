@@ -31,17 +31,18 @@ ipcMain.on('win-maximize', () => {
 });
 ipcMain.on('win-close', () => BrowserWindow.getFocusedWindow()?.close());
 
-// ── Helper: get ffmpeg path (handle asar) ──
+ipcMain.handle('open-file', async (event, filePath) => {
+  shell.showItemInFolder(filePath);
+});
+
 function getFFmpegPath() {
   let p = require('ffmpeg-static');
-  if (p && p.includes('app.asar')) {
-    p = p.replace('app.asar', 'app.asar.unpacked');
-  }
+  if (p && p.includes('app.asar')) p = p.replace('app.asar', 'app.asar.unpacked');
   return p;
 }
 
-// ── RENDER VIDEO: frames PNG + audio WAV → MP4 via FFmpeg ──
-ipcMain.handle('render-video-ffmpeg', async (event, { frames, audioBytes, fps, width, height, filename }) => {
+// ── RENDER VIDEO: imageList + audioData → MP4 ──
+ipcMain.handle('render-video-ffmpeg', async (event, { imageList, audioData, fps, width, height, filename }) => {
   const { spawn } = require('child_process');
   let ffmpegPath;
   try { ffmpegPath = getFFmpegPath(); } catch(e) {
@@ -50,21 +51,38 @@ ipcMain.handle('render-video-ffmpeg', async (event, { frames, audioBytes, fps, w
 
   const tmpDir = os.tmpdir();
   const sessionId = Date.now();
-  const framesDir = path.join(tmpDir, `aiera_frames_${sessionId}`);
-  const audioPath = path.join(tmpDir, `aiera_audio_${sessionId}.wav`);
-  const tmpOut   = path.join(tmpDir, `aiera_out_${sessionId}.mp4`);
-
-  // Tạo folder frames
+  const framesDir = path.join(tmpDir, `aiera_${sessionId}`);
   fs.mkdirSync(framesDir, { recursive: true });
 
-  // Ghi từng frame PNG
-  for (let i = 0; i < frames.length; i++) {
-    const buf = Buffer.from(frames[i], 'base64');
-    fs.writeFileSync(path.join(framesDir, `frame_${String(i).padStart(6,'0')}.png`), buf);
+  const tmpFiles = []; // track files to cleanup
+
+  // Chuẩn bị từng ảnh → file tạm nếu cần (dataUrl → file)
+  const preparedImages = [];
+  for (let i = 0; i < imageList.length; i++) {
+    const item = imageList[i];
+    if (item.filePath && fs.existsSync(item.filePath)) {
+      // Dùng thẳng file gốc — KHÔNG tốn IPC data
+      preparedImages.push({ filePath: item.filePath, dur: item.dur });
+    } else if (item.dataUrl) {
+      // Fallback: dataUrl → ghi file tạm
+      const ext = item.dataUrl.startsWith('data:image/png') ? 'png' : 'jpg';
+      const tmpImg = path.join(framesDir, `img_${String(i).padStart(4,'0')}.${ext}`);
+      const base64 = item.dataUrl.split(',')[1];
+      fs.writeFileSync(tmpImg, Buffer.from(base64, 'base64'));
+      tmpFiles.push(tmpImg);
+      preparedImages.push({ filePath: tmpImg, dur: item.dur });
+    }
   }
 
-  // Ghi audio WAV
-  fs.writeFileSync(audioPath, Buffer.from(audioBytes));
+  // Chuẩn bị audio
+  let audioPath;
+  if (audioData.filePath && fs.existsSync(audioData.filePath)) {
+    audioPath = audioData.filePath; // Dùng thẳng file gốc
+  } else if (audioData.wavBytes) {
+    audioPath = path.join(framesDir, `audio_${sessionId}.wav`);
+    fs.writeFileSync(audioPath, Buffer.from(audioData.wavBytes));
+    tmpFiles.push(audioPath);
+  }
 
   // Hỏi nơi lưu
   const win = BrowserWindow.getFocusedWindow();
@@ -74,49 +92,61 @@ ipcMain.handle('render-video-ffmpeg', async (event, { frames, audioBytes, fps, w
     filters: [{ name: 'MP4 Video', extensions: ['mp4'] }],
   });
 
+  function cleanup() {
+    tmpFiles.forEach(f => { try { fs.unlinkSync(f); } catch(e) {} });
+    try { fs.rmdirSync(framesDir); } catch(e) {}
+  }
+
   if (saveResult.canceled || !saveResult.filePath) {
     cleanup(); return { success: false, error: 'Đã hủy.' };
   }
 
   const outPath = saveResult.filePath;
 
-  function cleanup() {
-    try { fs.rmSync(framesDir, { recursive: true, force: true }); } catch(e) {}
-    try { fs.unlinkSync(audioPath); } catch(e) {}
-    try { fs.unlinkSync(tmpOut); } catch(e) {}
-  }
+  // Build FFmpeg args: mỗi ảnh loop đúng thời lượng
+  // ffmpeg -loop 1 -t DUR -i img1 -loop 1 -t DUR -i img2 ... -i audio
+  //        -filter_complex "[0][1][2]concat=n=N:v=1:a=0[v]" -map "[v]" -map N:a ...
+  const args = [];
+  preparedImages.forEach(img => {
+    args.push('-loop', '1', '-t', String(img.dur), '-i', img.filePath);
+  });
+  args.push('-i', audioPath);
 
-  // Chạy FFmpeg: ghép frames + audio → MP4
+  const n = preparedImages.length;
+  const audioIdx = n;
+
+  // Filter: scale tất cả ảnh về cùng resolution rồi concat
+  const scaleFilters = preparedImages.map((_, i) =>
+    `[${i}:v]scale=${width}:${height}:force_original_aspect_ratio=decrease,pad=${width}:${height}:(ow-iw)/2:(oh-ih)/2,setsar=1,fps=${fps}[v${i}]`
+  ).join(';');
+  const concatInputs = preparedImages.map((_,i) => `[v${i}]`).join('');
+  const filterComplex = `${scaleFilters};${concatInputs}concat=n=${n}:v=1:a=0[vout]`;
+
+  args.push(
+    '-filter_complex', filterComplex,
+    '-map', '[vout]',
+    '-map', `${audioIdx}:a`,
+    '-c:v', 'libx264',
+    '-preset', 'fast',
+    '-crf', '18',
+    '-pix_fmt', 'yuv420p',
+    '-c:a', 'aac',
+    '-b:a', '192k',
+    '-movflags', '+faststart',
+    '-shortest',
+    '-y',
+    outPath
+  );
+
   return new Promise((resolve) => {
-    const args = [
-      '-y',
-      '-framerate', String(fps),
-      '-i', path.join(framesDir, 'frame_%06d.png'),
-      '-i', audioPath,
-      '-c:v', 'libx264',
-      '-preset', 'fast',
-      '-crf', '18',
-      '-pix_fmt', 'yuv420p',
-      '-c:a', 'aac',
-      '-b:a', '192k',
-      '-movflags', '+faststart',
-      '-shortest',
-      outPath
-    ];
-
     const proc = spawn(ffmpegPath, args);
     let stderr = '';
     proc.stderr.on('data', d => stderr += d.toString());
-
     proc.on('close', (code) => {
       cleanup();
-      if (code === 0) {
-        resolve({ success: true, outPath });
-      } else {
-        resolve({ success: false, error: `FFmpeg lỗi (${code}): ` + stderr.slice(-500) });
-      }
+      if (code === 0) resolve({ success: true, outPath });
+      else resolve({ success: false, error: `FFmpeg lỗi (${code}): ` + stderr.slice(-600) });
     });
-
     proc.on('error', (e) => {
       cleanup();
       resolve({ success: false, error: 'Không chạy được FFmpeg: ' + e.message });

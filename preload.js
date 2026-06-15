@@ -5,4 +5,5 @@ contextBridge.exposeInMainWorld('electronAPI', {
   maximize: () => ipcRenderer.send('win-maximize'),
   close:    () => ipcRenderer.send('win-close'),
   renderVideoFFmpeg: (data) => ipcRenderer.invoke('render-video-ffmpeg', data),
+  openFile: (filePath) => ipcRenderer.invoke('open-file', filePath),
 });
