@@ -10,7 +10,7 @@ app.commandLine.appendSwitch('disable-features', 'OutOfBlinkCors');
 // ── GOOGLE OAUTH2 CONFIG ──
 // Credentials được load từ file config riêng (không commit lên Git)
 let OAUTH_CLIENT_ID = '738539837274-00os94b9bbn5iid8bkmbhuq647t4qc80.apps.googleusercontent.com';
-let OAUTH_CLIENT_SECRET = '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';
+let OAUTH_CLIENT_SECRET = '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';
 const OAUTH_SCOPES = 'https://www.googleapis.com/auth/cloud-platform';
 let TOKEN_PATH = '';
 
@@ -35,7 +35,7 @@ function loadOAuthConfig() {
   }
   // Fallback: dùng credentials mặc định
   OAUTH_CLIENT_ID = '738539837274-00os94b9bbn5iid8bkmbhuq647t4qc80.apps.googleusercontent.com';
-  OAUTH_CLIENT_SECRET = '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';
+  OAUTH_CLIENT_SECRET = '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';
   console.log('OAuth config: using default credentials');
 }
 let vertexTokenData = null;
