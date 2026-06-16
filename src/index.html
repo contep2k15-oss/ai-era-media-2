@@ -495,7 +495,7 @@ html,body{height:100%;overflow:hidden;background:var(--bg0);color:var(--text);fo
 .btn-ig-regen.loading{background:var(--bg3);color:var(--text2);pointer-events:none;}
 .ig-results-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;flex-wrap:wrap;gap:6px;}
 .ig-card-img{width:100%;aspect-ratio:16/9;background:var(--bg3);display:flex;align-items:center;justify-content:center;font-size:10px;color:var(--text3);position:relative;overflow:hidden;}
-.ig-card-img img{width:100%;height:100%;object-fit:cover;display:block;}
+.ig-card-img img{width:100%;height:100%;object-fit:cover;object-position:center;display:block;}
 .ig-card-img.loading::after{content:'';position:absolute;inset:0;background:linear-gradient(90deg,transparent,rgba(16,185,129,.06),transparent);animation:igShimmer 1.2s infinite;}
 @keyframes igShimmer{0%{transform:translateX(-100%)}100%{transform:translateX(100%)}}
 .ig-card-label{padding:6px 9px;font-size:10px;font-weight:600;color:var(--text2);display:flex;align-items:center;justify-content:space-between;gap:5px;}
@@ -1409,6 +1409,11 @@ html,body{height:100%;overflow:hidden;background:var(--bg0);color:var(--text);fo
           </button>
           <input type="file" id="igImportFile" accept=".json" style="display:none" onchange="igImportChars(this)">
         </div>
+        <!-- Nút tạo tất cả ref song song -->
+        <button onclick="igGenerateAllRefs()" id="igBtnAllRefs" style="width:100%;margin-bottom:8px;padding:7px;background:var(--bg3);border:1px solid var(--border2);border-radius:var(--rs);color:var(--text2);font-size:11px;font-weight:600;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:5px;">
+          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+          Tạo tất cả ảnh tham chiếu (song song)
+        </button>
         <div class="ig-char-grid" id="igCharGrid">
           <div style="font-size:13px;color:var(--text3);padding:12px;">Chưa có nhân vật. Tạo Character Sheet ở tab 1 trước.</div>
         </div>
@@ -1561,7 +1566,7 @@ html,body{height:100%;overflow:hidden;background:var(--bg0);color:var(--text);fo
     <div class="block-body">
       <div class="vs-sync-row">
         <button class="btn-sync" onclick="vsSyncAudioTTS()">🎤 Sync từ TTS (1 file)</button>
-        <button class="btn-sync" onclick="vsSyncAudioSegments()">✂ Sync từ Audio Splitter</button>
+        <button class="btn-sync" onclick="vsSyncAudioSegments()">✂ Sync từ Audio Cutterr</button>
         <button class="btn-sync" style="background:transparent;color:var(--text3);border-color:var(--border2);" onclick="document.getElementById('vsAudioInput').click()">⬆ Upload audio tay</button>
         <input type="file" id="vsAudioInput" accept="audio/*" style="display:none" onchange="vsHandleAudioUpload(this.files[0])">
       </div>
@@ -1648,7 +1653,8 @@ html,body{height:100%;overflow:hidden;background:var(--bg0);color:var(--text);fo
 <script>
 // ── MODEL ASSIGNMENT ──
 const MODEL_TEXT    = 'gemini-3.1-flash-lite';  // Character Sheet, Prompt Engineer, Rewrite, DNA, mọi tác vụ text
-const MODEL_TTS     = 'gemini-3.1-flash-tts-preview'; // TTS voice generation
+const MODEL_TTS     = 'gemini-3.1-flash-tts-preview'; // TTS voice generation (full)
+const MODEL_TTS_PREVIEW = 'gemini-2.5-flash-preview-tts'; // Preview nghe thử giọng
 const MODEL_IMAGE   = 'gemini-2.5-flash-image'; // Nano Banana
 const FREE_TEXT_MODELS = [MODEL_TEXT];
 const MODEL_LABELS = {'gemini-3.1-flash-lite':'3.1 Flash-Lite'};
@@ -1892,11 +1898,11 @@ function renderStyleAnalysisCard(sa, proj){
         </label>
         <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:12px;color:var(--text2);">
           <input type="checkbox" id="dnaChkPE" checked style="width:14px;height:14px;accent-color:var(--accent);cursor:pointer;">
-          Prompt Engineer <span style="font-size:10px;color:var(--text3);">— tạo prompt ảnh</span>
+          Storyboard <span style="font-size:10px;color:var(--text3);">— tạo prompt ảnh</span>
         </label>
         <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:12px;color:var(--text2);">
           <input type="checkbox" id="dnaChkIG" checked style="width:14px;height:14px;accent-color:var(--accent);cursor:pointer;">
-          Image Generator <span style="font-size:10px;color:var(--text3);">— generate ảnh</span>
+          Image Gen <span style="font-size:10px;color:var(--text3);">— generate ảnh</span>
         </label>
       </div>
       <button onclick="igApplyStyle('${esc(sa.visual_dna).replace(/'/g,'\\\'')}',event)" style="width:100%;padding:9px;background:#10b981;border:none;border-radius:var(--rs);color:#0a0f0e;font-size:12px;font-weight:700;cursor:pointer;">
@@ -2043,8 +2049,8 @@ function igApplyStyle(visualDna,evt){
   if(status){
     const applied=[];
     if(chkChar)applied.push('Character Sheet');
-    if(chkPE)applied.push('Prompt Engineer');
-    if(chkIG)applied.push('Image Generator');
+    if(chkPE)applied.push('Storyboard');
+    if(chkIG)applied.push('Image Gen');
     status.style.background='rgba(16,185,129,0.1)';
     status.style.borderColor='rgba(16,185,129,0.3)';
     status.style.color='var(--green)';
@@ -2722,11 +2728,15 @@ async function peRunBatch(apiKey,batchIndex,totalBatches){
     return `[REF: ${c.name} — ${getRoleLabelEN(c.role)}]`;
   }).join(', ');
 
-  // Per-character refer notes
-  const refNote=[...peSelectedChars].map(i=>{
+  // Per-character refer notes — map để Gemini dùng đúng nhân vật có REF tag
+  const refNoteMap=[...peSelectedChars].map(i=>{
     const c=lastChars[i];
-    return `Refer to uploaded reference image for ${c.name}'s exact appearance.`;
-  }).join(' ');
+    return `${c.name}: "Refer to uploaded reference image for ${c.name}'s exact appearance."`;
+  }).join(' | ');
+
+  const refNoteInstruction=charCount>0
+    ?`REFER NOTE RULE: For each B/C/D prompt, ONLY include refer notes for characters whose [REF: name] tag appears in THAT prompt. Available: ${refNoteMap}`
+    :'';
 
   // For [N.A] — match style of reference images even without characters
   const styleMatchNote=`Match the visual style and art direction of the provided character reference images. ${styleAnchor}.`;
@@ -2735,22 +2745,28 @@ async function peRunBatch(apiKey,batchIndex,totalBatches){
     ?`Multiple characters available: ${selectedCharList.join(', ')}. For B/C/D shots, include only the REF tag(s) of character(s) present in that scene.`
     :`Single character: ${selectedCharList[0]}.`;
 
+  const aspectConstraint=`MANDATORY: wide 16:9 horizontal cinematic frame, scene and environment fill ALL edges including left and right sides, NO white borders, NO black bars, NO letterbox, NO pillarbox, full bleed image`;
+
   const systemPrompt=`You are Imagen Prompt Engineer v4. ${multiCharNote}
 
 CHARACTER REFERENCE TAGS: ${refTags}
 These tags reference uploaded character images for appearance consistency. Place at start of B/C/D shots only.
+${refNoteInstruction}
 ${igDNA_PE?`\nVISUAL DNA (apply to ALL prompts): ${igDNA_PE}\n`:''}
+ASPECT RATIO RULE (CRITICAL): ALL prompts MUST produce wide 16:9 horizontal images. Even for close-up shots, include wide environmental context on both sides. NEVER describe a tight/portrait composition.
+
 PROMPT STRUCTURE:
-- [N.A] Establishing Shot: environment/location ONLY. No REF tags. No character names or appearance. 50-70 words. End with: "${styleMatchNote} No text. No watermarks."
-- [N.B] Action Shot: REF tag(s) first, then exact action/pose/expression from the audio. 40-60 words. End with: "${styleAnchor}. ${refNote} No text. No watermarks."
-- [N.C] Emotion/Detail Shot: REF tag(s) first, then close-up face or meaningful detail. 40-60 words. End with: "${styleAnchor}. ${refNote} No text. No watermarks."
-- [N.D] Bonus Angle: REF tag(s) first, creative angle (overhead/low/silhouette). 40-60 words. End with: "${styleAnchor}. ${refNote} No text. No watermarks."
+- [N.A] Establishing Shot: wide environment/location ONLY, camera pulls back far to show full setting. No REF tags. No character names or appearance. 50-70 words. End with: "${styleMatchNote} ${aspectConstraint}. No text. No watermarks."
+- [N.B] Action Shot: REF tag(s) first, then exact action/pose/expression from the audio, wide shot showing character in environment context. 40-60 words. End with: "${styleAnchor}. ${aspectConstraint}. [add refer note ONLY for characters tagged in this prompt] No text. No watermarks."
+- [N.C] Emotion/Detail Shot: REF tag(s) first, medium close-up showing character face AND surrounding environment visible on both sides of frame (NOT tight crop). 40-60 words. End with: "${styleAnchor}. ${aspectConstraint}. [add refer note ONLY for characters tagged in this prompt] No text. No watermarks."
+- [N.D] Bonus Angle: REF tag(s) first, creative angle (overhead/low/silhouette) in wide 16:9 frame. 40-60 words. End with: "${styleAnchor}. ${aspectConstraint}. [add refer note ONLY for characters tagged in this prompt] No text. No watermarks."
 
 RULES:
 1. [N.A] — NO REF tags, NO character appearance description whatsoever
 2. B/C/D — correct REF tag(s) at the very start, then vivid scene description
 3. Same scene: same location, outfit, time of day across all shots — only camera angle differs
-4. Output: plain text, labels [N.X] on own line, prompts separated by ---, no extra headers`;
+4. CRITICAL: refer notes at end of B/C/D MUST match ONLY the [REF: name] tags used in that specific prompt
+5. Output: plain text, labels [N.X] on own line, prompts separated by ---, no extra headers`;
 
   const densityMap={1:'1 prompt per scene: [N.A] only — single action shot',2:'2 prompts per scene: [N.A] establishing shot, then [N.B] action shot',3:'3 prompts per scene: [N.A] establishing, [N.B] action, [N.C] close-up/detail',4:'4 prompts per scene: [N.A] establishing, [N.B] action, [N.C] close-up, [N.D] bonus reaction/detail',5:'5 prompts per scene: [N.A] establishing, [N.B] action, [N.C] close-up, [N.D] detail shot, [N.E] emotional beat'};
 
@@ -2921,8 +2937,33 @@ async function ttsPreviewVoice(voiceId){
     btn.textContent='⏳';btn.style.color='var(--accent)';
     const sampleText=`Hello, I'm ${voiceId}. This is how I sound when narrating your content.`;
     try{
-      pcmBuf=await ttsCallAPI(apiKey,sampleText,voiceId,null);
-      // Cache — lưu dưới dạng base64
+      // Dùng Gemini 2.5 Flash TTS riêng cho preview (nhanh hơn)
+      const url=`${API_GOOGLE}/v1beta/models/${MODEL_TTS_PREVIEW}:generateContent?key=${encodeURIComponent(apiKey)}`;
+      const res=await fetch(url,{
+        method:'POST',
+        headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({
+          contents:[{parts:[{text:sampleText}]}],
+          generationConfig:{
+            responseModalities:['AUDIO'],
+            speechConfig:{voiceConfig:{prebuiltVoiceConfig:{voiceName:voiceId}}}
+          }
+        })
+      });
+      const data=await res.json();
+      if(data.error)throw new Error(data.error.message||JSON.stringify(data.error));
+      const parts=data.candidates?.[0]?.content?.parts||[];
+      let found=false;
+      for(const part of parts){
+        if(part.inlineData?.data){
+          const raw=atob(part.inlineData.data);
+          pcmBuf=new Uint8Array(raw.length);
+          for(let i=0;i<raw.length;i++)pcmBuf[i]=raw.charCodeAt(i);
+          found=true;break;
+        }
+      }
+      if(!found)throw new Error('TTS không trả về audio data');
+      // Cache
       try{
         let binary='';
         pcmBuf.forEach(b=>binary+=String.fromCharCode(b));
@@ -3461,19 +3502,19 @@ function igSetAspect(ratio){
 }
 
 function igGetAspectPrompt(){
-  const noFrame='ABSOLUTELY NO white background, NO plain background, NO blank background, NO white border, NO black border, NO border of any kind, NO frame, NO letterbox, NO pillarbox, NO vignette, NO watermark, NO overlay, full bleed image edge to edge, rich detailed scene background fills entire image';
   const map={
-    '16:9':`wide landscape 16:9 aspect ratio, cinematic horizontal frame, ${noFrame}`,
-    '9:16':`vertical portrait 9:16 aspect ratio, mobile format, ${noFrame}`,
-    '1:1':`square 1:1 aspect ratio, ${noFrame}`
+    '16:9':'WIDE CINEMATIC 16:9 HORIZONTAL FRAME — camera pulls back to wide shot, scene fills entire width, environment extends to both left and right edges, NO empty space on sides, NO borders, NO letterbox bars, NO white margins, full bleed',
+    '9:16':'VERTICAL PORTRAIT 9:16 FRAME — camera frames vertically, scene fills entire height, NO empty space on top or bottom, NO borders, NO white margins, full bleed',
+    '1:1':'SQUARE 1:1 FRAME — scene fills entire frame equally, NO empty space, NO borders, NO white margins, full bleed'
   };
-  return map[igAspectRatio]||map['16:9'];
+  const noWhite='ABSOLUTELY NO white background, NO gray background, NO plain background, NO border of any kind, background scene fills EVERY SINGLE PIXEL';
+  return `${map[igAspectRatio]||map['16:9']}. ${noWhite}`;
 }
 let igGeneratedImages=[]; // [{label, dataUrl}]
 
 function igSyncFromPE(){
   const peOut=$('peOutputBox')?.value?.trim();
-  if(!peOut){alert('Prompt Engineer chưa có output. Hãy generate ở tab Prompt Engineer trước.');return;}
+  if(!peOut){alert('Storyboard chưa có output. Hãy generate ở tab Storyboard trước.');return;}
   $('igPromptBox').value=peOut;
   igParsePrompts();
 }
@@ -3667,6 +3708,42 @@ async function igUrlToB64(url){
 }
 
 // ── GENERATE REF IMAGE (Step 0) ──
+// ── TẠO TẤT CẢ REF SONG SONG ──
+async function igGenerateAllRefs(){
+  if(!lastChars.length){alert('Chưa có nhân vật.');return;}
+  const apiKey=$('apiKey').value.trim();
+  if(!apiKey){alert('Cần API key.');return;}
+
+  const btn=$('igBtnAllRefs');
+  btn.disabled=true;
+  btn.innerHTML='⏳ Đang tạo song song...';
+
+  // Chỉ tạo những nhân vật chưa có ref
+  const todo=lastChars.map((_,i)=>i).filter(i=>!igRefImages[lastChars[i]?.name]);
+  if(!todo.length){
+    // Tất cả đã có → hỏi có tạo lại không
+    if(!confirm('Tất cả nhân vật đã có ảnh tham chiếu.\nTạo lại tất cả?')){
+      btn.disabled=false;
+      btn.innerHTML='<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="5 3 19 12 5 21 5 3"/></svg> Tạo tất cả ảnh tham chiếu (song song)';
+      return;
+    }
+    todo.push(...lastChars.map((_,i)=>i));
+  }
+
+  btn.innerHTML=`⏳ 0/${todo.length} xong...`;
+
+  let done=0;
+  // Chạy parallel tất cả
+  await Promise.allSettled(todo.map(async idx=>{
+    await igGenerateRef(idx);
+    done++;
+    btn.innerHTML=`⏳ ${done}/${todo.length} xong...`;
+  }));
+
+  btn.disabled=false;
+  btn.innerHTML='✅ Xong! Tạo lại tất cả';
+}
+
 async function igGenerateRef(idx){
   const apiKey=$('apiKey').value.trim();
   if(!apiKey){alert('Cần API key.');return;}
@@ -3682,8 +3759,27 @@ Full body standing pose, facing forward, arms slightly away from body so all lim
   try{
     const imgApiKey=apiKey;
     const imgEndpoint=`${API_GOOGLE}/v1beta`;
-    btn.textContent='🎨 Đang tạo ảnh...';
-    const imgB64=await igCallGeminiImage(imgApiKey, refPrompt, null, imgEndpoint);
+
+    let imgB64=null, attempts=0;
+    while(attempts<4 && !imgB64){
+      attempts++;
+      try{
+        btn.textContent=attempts>1?`🔄 Retry ${attempts}/4…`:'🎨 Đang tạo ảnh...';
+        imgB64=await igCallGeminiImage(imgApiKey, refPrompt, null, imgEndpoint);
+      }catch(e){
+        const isRetry=(e.message||'').match(/demand|retry|500|503|overload|temporarily/i);
+        if(isRetry && attempts<4){
+          // Countdown retry
+          for(let s=10;s>0;s--){
+            btn.textContent=`⏳ Server bận, thử lại sau ${s}s (${attempts}/4)`;
+            await new Promise(r=>setTimeout(r,1000));
+          }
+        } else {
+          throw e;
+        }
+      }
+    }
+
     const dataUrl='data:image/png;base64,'+imgB64;
     igRefImages[name]=dataUrl;
     igCharDNA[name]=null;
@@ -3702,7 +3798,13 @@ Full body standing pose, facing forward, arms slightly away from body so all lim
   }catch(e){
     btn.textContent='❌ Thử lại';
     btn.disabled=false;
-    alert(`Lỗi ref cho ${name}: ${e.message}`);
+    // Không alert nếu là high demand — user tự bấm lại
+    const isHighDemand=(e.message||'').match(/demand|retry|500|503|overload/i);
+    if(!isHighDemand){
+      alert(`Lỗi ref cho ${name}: ${e.message}`);
+    } else {
+      console.warn(`Ref ${name} failed after retries:`, e.message);
+    }
   }
 }
 
@@ -3717,7 +3819,7 @@ async function igRunAll(){
 
 
   igParsePrompts();
-  if(!igParsedPrompts.length){alert('Chưa có prompt. Dán hoặc sync từ Prompt Engineer.');return;}
+  if(!igParsedPrompts.length){alert('Chưa có prompt. Dán hoặc sync từ Storyboard.');return;}
 
   const total=igParsedPrompts.length;
 
@@ -3776,14 +3878,17 @@ async function igRunAll(){
 
     let finalPrompt=p.text;
     const aspectStr=igGetAspectPrompt();
-    const styleDNA=igDNA_IG?`\nVisual Style: ${igDNA_IG}`:'';
+    const hasRef=refMatches.length>0 && primaryRefB64;
+    // Chỉ inject DNA khi KHÔNG có ref image — ref image tự handle style
+    const styleDNA=(!hasRef && igDNA_IG)?`\nVisual Style: ${igDNA_IG}`:'';
+
     if(Object.keys(charDNAMap).length>0){
       const dnaSnippet=Object.entries(charDNAMap).map(([name,dna])=>
         `[${name}: ${dna.visual_summary||dna.hair||''}]`
       ).join(' ');
-      finalPrompt=`${p.text}${styleDNA}\n\nCharacter DNA: ${dnaSnippet}\nMaintain character consistency. ${aspectStr}.`;
+      finalPrompt=`[${aspectStr}]\n\n${p.text}\n\nCharacter DNA: ${dnaSnippet}\nMaintain character consistency.`;
     } else {
-      finalPrompt=`${p.text}${styleDNA}\n\n${aspectStr}.`;
+      finalPrompt=`[${aspectStr}]\n\n${p.text}${styleDNA}`;
     }
 
     $(`igimg_${i}`).querySelector('div').innerHTML=`<div style="font-size:10px;color:var(--accent2)">🎨 Generating...</div>`;
@@ -3837,7 +3942,7 @@ async function igRunAll(){
       const el=$(`igimg_${i}`);
       if(el){
         el.classList.remove('loading');
-        el.innerHTML=`<img src="${dataUrl}" style="width:100%;height:100%;object-fit:cover;display:block;">`;
+        el.innerHTML=`<div class="img-bg" style="background-image:url('${dataUrl}')"></div><img src="${dataUrl}" style="position:relative;z-index:1;width:100%;height:100%;object-fit:contain;object-position:center;display:block;">`;
       }
       const labelEl=$(`iglabel_${i}`);
       if(labelEl) labelEl.innerHTML=`<span>${esc(p.label)}${p.refName?' · '+esc(p.refName):''}</span><button class="btn-ig-dl" onclick="igDlOne('${dataUrl}','${p.label.replace(/\./g,'_')}.png')" title="Download">⬇</button>`;
@@ -3909,13 +4014,14 @@ async function igRegenOne(i){
     }
   }
   const aspectStr=igGetAspectPrompt();
-  const styleDNA=igDNA_IG?`\nVisual Style: ${igDNA_IG}`:'';
+  const hasRef=refMatches.length>0 && primaryRefB64;
+  const styleDNA=(!hasRef && igDNA_IG)?`\nVisual Style: ${igDNA_IG}`:'';
   let finalPrompt=p.text;
   if(Object.keys(charDNAMap).length>0){
     const dnaSnippet=Object.entries(charDNAMap).map(([name,dna])=>`[${name}: ${dna?.visual_summary||dna?.hair||''}]`).join(' ');
-    finalPrompt=`${p.text}${styleDNA}\n\nCharacter DNA: ${dnaSnippet}\nMaintain character consistency. ${aspectStr}.`;
+    finalPrompt=`[${aspectStr}]\n\n${p.text}\n\nCharacter DNA: ${dnaSnippet}\nMaintain character consistency.`;
   } else {
-    finalPrompt=`${p.text}${styleDNA}\n\n${aspectStr}.`;
+    finalPrompt=`[${aspectStr}]\n\n${p.text}${styleDNA}`;
   }
 
   try{
@@ -3923,7 +4029,7 @@ async function igRegenOne(i){
     if(imgB64){
       const dataUrl='data:image/png;base64,'+imgB64;
       igGeneratedImages[i]={label:p.label,dataUrl};
-      if(imgEl){imgEl.classList.remove('loading');imgEl.innerHTML=`<img src="${dataUrl}" style="width:100%;height:100%;object-fit:cover;display:block;">`;}
+      if(imgEl){imgEl.classList.remove('loading');imgEl.innerHTML=`<div class="img-bg" style="background-image:url('${dataUrl}')"></div><img src="${dataUrl}" style="position:relative;z-index:1;width:100%;height:100%;object-fit:contain;object-position:center;display:block;">`;}
       const labelEl=$(`iglabel_${i}`);
       if(labelEl)labelEl.innerHTML=`<span>${esc(p.label)}${p.refName?' · '+esc(p.refName):''}</span><button class="btn-ig-dl" onclick="igDlOne('${dataUrl}','${p.label.replace(/\./g,'_')}.png')" title="Download">⬇</button>`;
     }
@@ -4030,7 +4136,7 @@ function vsGetCtx(){
 // ── SYNC FROM OTHER TABS ──
 function vsSyncImages(){
   if(!igGeneratedImages||!igGeneratedImages.length){
-    alert('Image Generator chưa có ảnh. Hãy generate ở tab Image Generator trước.');return;
+    alert('Image Gen chưa có ảnh. Hãy generate ở tab Image Gen trước.');return;
   }
   const validImages=igGeneratedImages.filter(Boolean);
   vsImages=validImages.map(img=>({
@@ -4045,11 +4151,11 @@ function vsSyncImages(){
       vsRebuildSegs();vsRenderPairList();vsCheckReady();}};
     im.src=item.url;
   });
-  vsLog(`Đã sync ${vsImages.length} ảnh từ Image Generator — tự động sắp xếp theo tên`);
+  vsLog(`Đã sync ${vsImages.length} ảnh từ Image Gen — tự động sắp xếp theo tên`);
 }
 
 function vsSyncAudioTTS(){
-  if(!ttsAudioUrl){alert('TTS chưa có audio. Hãy tạo voice ở tab Text to Speech trước.');return;}
+  if(!ttsAudioUrl){alert('TTS chưa có audio. Hãy tạo voice ở tab Voiceover trước.');return;}
   fetch(ttsAudioUrl).then(r=>r.arrayBuffer()).then(ab=>{
     vsGetCtx().decodeAudioData(ab.slice(0),buf=>{
       vsAudioBuffer=buf;vsAudioFilePath=null;
@@ -4058,11 +4164,11 @@ function vsSyncAudioTTS(){
       vsDrawWave(buf);vsRebuildSegs();vsCheckReady();
     });
   }).catch(e=>alert('Không đọc được audio TTS: '+e.message));
-  vsLog('Đã sync audio từ Text to Speech');
+  vsLog('Đã sync audio từ Voiceover');
 }
 
 function vsSyncAudioSegments(){
-  if(!asSegs||!asSegs.length){alert('Audio Splitter chưa có segment.');return;}
+  if(!asSegs||!asSegs.length){alert('Audio Cutter chưa có segment.');return;}
   const mergeBlobs=async()=>{
     const bufs=await Promise.all(asSegs.map(s=>s.blob.arrayBuffer()));
     const total=bufs.reduce((a,b)=>a+b.byteLength,0);
@@ -4073,7 +4179,7 @@ function vsSyncAudioSegments(){
   mergeBlobs().then(ab=>{
     vsGetCtx().decodeAudioData(ab,buf=>{
       vsAudioBuffer=buf;vsAudioFilePath=null;vsAudioDuration=buf.duration;vsAudioMode='segments';
-      vsUpdateAudioUI(`${asSegs.length} segments từ Audio Splitter`,buf.duration);
+      vsUpdateAudioUI(`${asSegs.length} segments từ Audio Cutter`,buf.duration);
       vsDrawWave(buf);vsRebuildSegs();vsCheckReady();
     }).catch(()=>{
       vsAudioDuration=asSegs.reduce((s,seg)=>s+(parseFloat(seg.e)-parseFloat(seg.s)),0);
@@ -4082,7 +4188,7 @@ function vsSyncAudioSegments(){
       vsRebuildSegs();vsCheckReady();
     });
   });
-  vsLog(`Đã sync ${asSegs.length} segments từ Audio Splitter`);
+  vsLog(`Đã sync ${asSegs.length} segments từ Audio Cutter`);
 }
 
 function vsHandleAudioUpload(file){
