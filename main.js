@@ -2,8 +2,153 @@ const { app, BrowserWindow, shell, ipcMain, dialog } = require('electron');
 const path = require('path');
 const fs = require('fs');
 const os = require('os');
+const http = require('http');
+const { URL } = require('url');
 
 app.commandLine.appendSwitch('disable-features', 'OutOfBlinkCors');
+
+// ── GOOGLE OAUTH2 CONFIG ──
+// Dùng Google's OAuth2 for installed apps (localhost redirect)
+const OAUTH_CLIENT_ID = '738539837274-00os94b9bbn5iid8bkmbhuq647t4qc80.apps.googleusercontent.com';
+const OAUTH_CLIENT_SECRET = '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';
+const OAUTH_SCOPES = 'https://www.googleapis.com/auth/cloud-platform';
+const TOKEN_PATH = path.join(app.getPath('userData'), 'vertex_token.json');
+
+let vertexTokenData = null;
+
+// Load saved token on startup
+function loadSavedToken() {
+  try {
+    if (fs.existsSync(TOKEN_PATH)) {
+      vertexTokenData = JSON.parse(fs.readFileSync(TOKEN_PATH, 'utf8'));
+    }
+  } catch(e) {}
+}
+
+// Save token to disk
+function saveToken(tokenData) {
+  vertexTokenData = tokenData;
+  fs.writeFileSync(TOKEN_PATH, JSON.stringify(tokenData));
+}
+
+// Get valid access token (refresh if expired)
+async function getValidAccessToken() {
+  if (!vertexTokenData) return null;
+  const now = Date.now();
+  // Token còn hạn (buffer 5 phút)
+  if (vertexTokenData.access_token && vertexTokenData.expires_at > now + 300000) {
+    return vertexTokenData.access_token;
+  }
+  // Refresh token
+  if (vertexTokenData.refresh_token) {
+    try {
+      const res = await fetch('https://oauth2.googleapis.com/token', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: new URLSearchParams({
+          client_id: OAUTH_CLIENT_ID,
+          client_secret: OAUTH_CLIENT_SECRET,
+          refresh_token: vertexTokenData.refresh_token,
+          grant_type: 'refresh_token'
+        })
+      });
+      const data = await res.json();
+      if (data.access_token) {
+        vertexTokenData.access_token = data.access_token;
+        vertexTokenData.expires_at = Date.now() + (data.expires_in * 1000);
+        saveToken(vertexTokenData);
+        return data.access_token;
+      }
+    } catch(e) {}
+  }
+  return null;
+}
+
+// OAuth2 login flow với local redirect server
+ipcMain.handle('google-oauth-login', async () => {
+  return new Promise((resolve) => {
+    // Start local server để catch OAuth callback
+    const server = http.createServer(async (req, res) => {
+      const url = new URL(req.url, 'http://localhost:4389');
+      const code = url.searchParams.get('code');
+      const error = url.searchParams.get('error');
+
+      if (error) {
+        res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
+        res.end('<html><body style="font-family:sans-serif;padding:20px"><h2>❌ Đã hủy đăng nhập</h2><p>Bạn có thể đóng tab này.</p></body></html>');
+        server.close();
+        resolve({ success: false, error });
+        return;
+      }
+
+      if (code) {
+        res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
+        res.end('<html><body style="font-family:sans-serif;padding:20px;background:#0a0f0e;color:#10b981"><h2>✅ Đăng nhập thành công!</h2><p style="color:#94a3b8">Bạn có thể đóng tab này và quay lại app.</p></body></html>');
+
+        // Exchange code for token
+        try {
+          const tokenRes = await fetch('https://oauth2.googleapis.com/token', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+            body: new URLSearchParams({
+              code,
+              client_id: OAUTH_CLIENT_ID,
+              client_secret: OAUTH_CLIENT_SECRET,
+              redirect_uri: 'http://localhost:4389/callback',
+              grant_type: 'authorization_code'
+            })
+          });
+          const tokenData = await tokenRes.json();
+          if (tokenData.access_token) {
+            tokenData.expires_at = Date.now() + (tokenData.expires_in * 1000);
+            saveToken(tokenData);
+            server.close();
+            resolve({ success: true });
+          } else {
+            server.close();
+            resolve({ success: false, error: tokenData.error_description || 'Token exchange failed' });
+          }
+        } catch(e) {
+          server.close();
+          resolve({ success: false, error: e.message });
+        }
+      }
+    });
+
+    server.listen(4389, () => {
+      const authUrl = `https://accounts.google.com/o/oauth2/v2/auth?` +
+        `client_id=${OAUTH_CLIENT_ID}` +
+        `&redirect_uri=${encodeURIComponent('http://localhost:4389/callback')}` +
+        `&response_type=code` +
+        `&scope=${encodeURIComponent(OAUTH_SCOPES)}` +
+        `&access_type=offline` +
+        `&prompt=consent`;
+      shell.openExternal(authUrl);
+    });
+
+    // Timeout sau 5 phút
+    setTimeout(() => {
+      server.close();
+      resolve({ success: false, error: 'Timeout' });
+    }, 300000);
+  });
+});
+
+ipcMain.handle('google-get-token', async () => {
+  const token = await getValidAccessToken();
+  return token;
+});
+
+ipcMain.handle('google-logout', async () => {
+  vertexTokenData = null;
+  try { fs.unlinkSync(TOKEN_PATH); } catch(e) {}
+  return { success: true };
+});
+
+ipcMain.handle('google-auth-status', async () => {
+  const token = await getValidAccessToken();
+  return { loggedIn: !!token };
+});
 
 function createWindow() {
   const win = new BrowserWindow({
@@ -154,6 +299,6 @@ ipcMain.handle('render-video-ffmpeg', async (event, { imageList, audioData, fps,
   });
 });
 
-app.whenReady().then(createWindow);
+app.whenReady().then(() => { loadSavedToken(); createWindow(); });
 app.on('window-all-closed', () => { if (process.platform !== 'darwin') app.quit(); });
 app.on('activate', () => { if (BrowserWindow.getAllWindows().length === 0) createWindow(); });

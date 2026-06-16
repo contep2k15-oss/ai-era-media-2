@@ -819,7 +819,7 @@ html,body{height:100%;overflow:hidden;background:var(--bg0);color:var(--text);fo
     </div>
     <div class="settings-body">
       <div class="settings-section">
-        <div class="settings-label">API Key <span style="font-size:10px;font-weight:400;color:var(--text3);">— Xử lý toàn bộ tính năng</span></div>
+        <div class="settings-label">API Key <span style="font-size:10px;font-weight:400;color:var(--text3);">— Google AI Studio (Text, TTS)</span></div>
         <div class="api-row">
           <div class="api-field">
             <input class="api-input" id="apiKey" type="password" placeholder="Dán API key vào đây" autocomplete="off" style="padding-left:12px;" oninput="showProviderBadge('apiProviderBadge',this.value)"/>
@@ -835,6 +835,20 @@ html,body{height:100%;overflow:hidden;background:var(--bg0);color:var(--text);fo
           <button onclick="saveApiKey()" style="padding:6px 14px;background:#10b981;border:none;border-radius:7px;color:#0a0f0e;font-size:12px;font-weight:700;cursor:pointer;">💾 Lưu</button>
           <span id="saveStatus" style="font-size:11px;color:#10b981;display:none;">✓ Đã lưu!</span>
         </div>
+      </div>
+
+      <div class="settings-section" style="margin-top:12px;padding-top:12px;border-top:1px solid var(--border2);">
+        <div class="settings-label">Vertex AI <span style="font-size:10px;font-weight:400;color:var(--text3);">— Dùng $300 Google Cloud credit cho Image Gen</span></div>
+        <div id="vertexAuthStatus" style="margin-bottom:8px;font-size:12px;color:var(--text3);">Đang kiểm tra...</div>
+        <div style="display:flex;gap:8px;">
+          <button id="vertexLoginBtn" onclick="vertexLogin()" style="padding:7px 14px;background:#6366f1;border:none;border-radius:7px;color:#fff;font-size:12px;font-weight:700;cursor:pointer;">
+            🔗 Kết nối Google Cloud
+          </button>
+          <button id="vertexLogoutBtn" onclick="vertexLogout()" style="display:none;padding:7px 14px;background:var(--bg3);border:1px solid var(--border2);border-radius:7px;color:var(--text2);font-size:12px;font-weight:600;cursor:pointer;">
+            Ngắt kết nối
+          </button>
+        </div>
+        <div style="margin-top:6px;font-size:10px;color:var(--text3);">Đăng nhập 1 lần · Token tự gia hạn · Image Gen dùng credit thay AI Studio</div>
       </div>
     </div>
   </div>
@@ -1672,6 +1686,9 @@ const ROLE_CLASSES = {main:'role-main',sub:'role-sub',villain:'role-villain',cro
 
 // ── API ENDPOINT ──
 const API_GOOGLE = 'https://generativelanguage.googleapis.com';
+const API_VERTEX = 'https://us-central1-aiplatform.googleapis.com';
+const VERTEX_PROJECT = ''; // Set by user in settings
+const VERTEX_MODEL = 'gemini-3.1-flash-image'; // Nano Banana 2 trên Vertex AI
 
 // Helper: get endpoint cho key hiện tại
 function getEndpoint(key){ return `${API_GOOGLE}/v1beta`; }
@@ -1694,6 +1711,69 @@ function showProviderBadge(elId, key){
 
 let selectedStyle='auto', usedModel='', lastChars=[], lastProject={}, lastAnalyzedDNA='';
 const $=id=>document.getElementById(id);
+
+// ── VERTEX AI OAUTH ──
+let vertexAccessToken = null;
+
+async function vertexCheckAuth(){
+  const status=$('vertexAuthStatus');
+  const loginBtn=$('vertexLoginBtn');
+  const logoutBtn=$('vertexLogoutBtn');
+  if(!window.electronAPI?.googleAuthStatus){
+    if(status) status.textContent='';
+    return;
+  }
+  try{
+    const res=await window.electronAPI.googleAuthStatus();
+    if(res.loggedIn){
+      if(status){status.textContent='✅ Đã kết nối Google Cloud — Image Gen dùng $300 credit';status.style.color='var(--green)';}
+      if(loginBtn)loginBtn.style.display='none';
+      if(logoutBtn)logoutBtn.style.display='';
+    } else {
+      if(status){status.textContent='⚠ Chưa kết nối — Image Gen dùng AI Studio';status.style.color='var(--text3)';}
+      if(loginBtn)loginBtn.style.display='';
+      if(logoutBtn)logoutBtn.style.display='none';
+    }
+  }catch(e){}
+}
+
+async function vertexLogin(){
+  const btn=$('vertexLoginBtn');
+  const status=$('vertexAuthStatus');
+  if(btn){btn.disabled=true;btn.textContent='⏳ Đang mở trình duyệt...';}
+  if(status){status.textContent='Đang chờ đăng nhập Google...';status.style.color='var(--accent2)';}
+  try{
+    const res=await window.electronAPI.googleOAuthLogin();
+    if(res.success){
+      if(status){status.textContent='✅ Đã kết nối! Image Gen sẽ dùng $300 credit';status.style.color='var(--green)';}
+      const loginBtn=$('vertexLoginBtn');
+      const logoutBtn=$('vertexLogoutBtn');
+      if(loginBtn)loginBtn.style.display='none';
+      if(logoutBtn)logoutBtn.style.display='';
+    } else {
+      if(status){status.textContent='❌ Lỗi: '+res.error;status.style.color='var(--red)';}
+      if(btn){btn.disabled=false;btn.textContent='🔗 Kết nối Google Cloud';}
+    }
+  }catch(e){
+    if(status){status.textContent='❌ '+e.message;status.style.color='var(--red)';}
+    if(btn){btn.disabled=false;btn.textContent='🔗 Kết nối Google Cloud';}
+  }
+}
+
+async function vertexLogout(){
+  await window.electronAPI?.googleLogout();
+  vertexCheckAuth();
+}
+
+async function getVertexToken(){
+  try{
+    return await window.electronAPI?.googleGetToken();
+  }catch(e){return null;}
+}
+
+function saveVertexConfig(){}
+function loadVertexConfig(){ vertexCheckAuth(); }
+function getVertexProjectId(){ return 'gen-lang-client-0682538223'; }
 
 function saveApiKey(){
   const key=$('apiKey').value.trim();
@@ -3636,35 +3716,59 @@ RULES:
 const IG_MODEL=MODEL_IMAGE;
 
 async function igCallGeminiImage(apiKey, optimizedPrompt, refImageBase64, endpoint){
+  // Thử Vertex AI trước nếu đã đăng nhập
+  const vertexToken = await getVertexToken();
+  if(vertexToken){
+    const project=getVertexProjectId();
+    const location='us-central1';
+    const url=`${API_VERTEX}/v1/projects/${project}/locations/${location}/publishers/google/models/${VERTEX_MODEL}:generateContent`;
+
+    const parts=[];
+    if(refImageBase64) parts.push({inlineData:{mimeType:'image/png',data:refImageBase64}});
+    parts.push({text:optimizedPrompt});
+
+    const res=await fetch(url,{
+      method:'POST',
+      headers:{
+        'Content-Type':'application/json',
+        'Authorization':`Bearer ${vertexToken}`
+      },
+      body:JSON.stringify({
+        contents:[{role:'user',parts}],
+        generationConfig:{responseModalities:['IMAGE','TEXT']}
+      })
+    });
+    const data=await res.json();
+    if(!data.error){
+      const resParts=data.candidates?.[0]?.content?.parts||[];
+      for(const part of resParts){
+        if(part.inlineData?.mimeType?.startsWith('image/')) return part.inlineData.data;
+      }
+    }
+    // Nếu Vertex lỗi → fallback AI Studio
+    console.warn('Vertex AI error, fallback to AI Studio:', data.error?.message);
+  }
+
+  // AI Studio fallback
   const base=endpoint||`${API_GOOGLE}/v1beta`;
   const url=`${base}/models/${IG_MODEL}:generateContent?key=${encodeURIComponent(apiKey)}`;
-
   const parts=[];
-  if(refImageBase64){
-    // Pass ref image for character consistency
-    parts.push({inlineData:{mimeType:'image/png',data:refImageBase64}});
-  }
+  if(refImageBase64) parts.push({inlineData:{mimeType:'image/png',data:refImageBase64}});
   parts.push({text:optimizedPrompt});
-
-  const body={
-    contents:[{role:'user',parts}],
-    generationConfig:{responseModalities:['IMAGE','TEXT']}
-  };
 
   const res=await fetch(url,{
     method:'POST',
     headers:{'Content-Type':'application/json'},
-    body:JSON.stringify(body)
+    body:JSON.stringify({
+      contents:[{role:'user',parts}],
+      generationConfig:{responseModalities:['IMAGE','TEXT']}
+    })
   });
   const data=await res.json();
-  if(data.error)throw new Error(data.error.message||JSON.stringify(data.error));
-
-  // Extract image from response parts
+  if(data.error) throw new Error(data.error.message||JSON.stringify(data.error));
   const resParts=data.candidates?.[0]?.content?.parts||[];
   for(const part of resParts){
-    if(part.inlineData?.mimeType?.startsWith('image/')){
-      return part.inlineData.data; // base64
-    }
+    if(part.inlineData?.mimeType?.startsWith('image/')) return part.inlineData.data;
   }
   throw new Error('Gemini không trả về ảnh. Kiểm tra lại model hoặc prompt.');
 }
@@ -4500,6 +4604,7 @@ document.addEventListener('keydown',e=>{
 function openSettings(){
   $('settingsOverlay').classList.add('show');
   $('apiKey').focus();
+  loadVertexConfig();
 }
 function closeSettings(){$('settingsOverlay').classList.remove('show');}
 $('settingsOverlay').addEventListener('click',e=>{if(e.target===$('settingsOverlay'))closeSettings();});

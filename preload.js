@@ -6,4 +6,9 @@ contextBridge.exposeInMainWorld('electronAPI', {
   close:    () => ipcRenderer.send('win-close'),
   renderVideoFFmpeg: (data) => ipcRenderer.invoke('render-video-ffmpeg', data),
   openFile: (filePath) => ipcRenderer.invoke('open-file', filePath),
+  // Google OAuth2 for Vertex AI
+  googleOAuthLogin: () => ipcRenderer.invoke('google-oauth-login'),
+  googleGetToken: () => ipcRenderer.invoke('google-get-token'),
+  googleLogout: () => ipcRenderer.invoke('google-logout'),
+  googleAuthStatus: () => ipcRenderer.invoke('google-auth-status'),
 });
