@@ -1687,11 +1687,60 @@ const ROLE_CLASSES = {main:'role-main',sub:'role-sub',villain:'role-villain',cro
 // ── API ENDPOINT ──
 const API_GOOGLE = 'https://generativelanguage.googleapis.com';
 const API_VERTEX = 'https://us-central1-aiplatform.googleapis.com';
-const VERTEX_PROJECT = ''; // Set by user in settings
-const VERTEX_MODEL = 'gemini-3.1-flash-image'; // Nano Banana 2 trên Vertex AI
+const VERTEX_PROJECT_ID = 'gen-lang-client-0682538223';
+const VERTEX_LOCATION = 'us-central1';
+
+// Vertex AI model mapping
+const VERTEX_MODELS = {
+  [MODEL_TEXT]: 'gemini-3.1-flash-lite',
+  [MODEL_TTS]: 'gemini-3.1-flash-tts',
+  [MODEL_TTS_PREVIEW]: 'gemini-2.5-flash-tts',
+  [MODEL_IMAGE]: 'gemini-3.1-flash-image',
+};
+
+function getVertexUrl(model){
+  const vModel = VERTEX_MODELS[model] || model;
+  return `${API_VERTEX}/v1/projects/${VERTEX_PROJECT_ID}/locations/${VERTEX_LOCATION}/publishers/google/models/${vModel}:generateContent`;
+}
+
+async function getVertexAccessToken(){
+  try{
+    return await window.electronAPI?.googleGetToken();
+  }catch(e){return null;}
+}
+
+async function callVertexOrStudio(model, body, apiKey){
+  const token = await getVertexAccessToken();
+  if(token){
+    const url = getVertexUrl(model);
+    const res = await fetch(url, {
+      method:'POST',
+      headers:{'Content-Type':'application/json','Authorization':`Bearer ${token}`},
+      body: JSON.stringify(body)
+    });
+    const data = await res.json();
+    if(data.error) throw new Error(data.error.message||JSON.stringify(data.error));
+    return data;
+  }
+  // Fallback AI Studio
+  const url = `${API_GOOGLE}/v1beta/models/${model}:generateContent?key=${encodeURIComponent(apiKey)}`;
+  const res = await fetch(url, {
+    method:'POST',
+    headers:{'Content-Type':'application/json'},
+    body: JSON.stringify(body)
+  });
+  const data = await res.json();
+  if(data.error) throw new Error(data.error.message||JSON.stringify(data.error));
+  return data;
+}
 
 // Helper: get endpoint cho key hiện tại
 function getEndpoint(key){ return `${API_GOOGLE}/v1beta`; }
+
+// Smart fetch - dùng Vertex AI nếu đã login, fallback AI Studio
+async function apiFetch(model, body, apiKey){
+  return callVertexOrStudio(model, body, apiKey);
+}
 
 // ── PROVIDER (Google only) ──
 function detectProvider(key){
@@ -1834,28 +1883,24 @@ function showVerify(type,icon,msg){
 
 // ── GEMINI TEXT CALL ──
 async function callGeminiText(parts,apiKey){
-  const p=detectProvider(apiKey);
   let lastErr=null;
   for(const modelId of FREE_TEXT_MODELS){
     try{
-      showStatus(`Đang dùng ${MODEL_LABELS[modelId]}…`,'Phân tích video & thiết kế nhân vật');
-      const url=`${getEndpoint(apiKey)}/models/${modelId}:generateContent?key=${encodeURIComponent(apiKey)}`;
-      const res=await fetch(url,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({
+      showStatus(`Đang dùng ${MODEL_LABELS[modelId]||modelId}…`,'Phân tích video & thiết kế nhân vật');
+      const body={
         contents:[{parts}],
         generationConfig:{temperature:0.5,maxOutputTokens:8192,responseMimeType:'application/json'},
         systemInstruction:{parts:[{text:'You are a professional anime/film character designer and AI prompt engineer. Always respond with ONLY valid JSON. No markdown, no explanation.'}]}
-      })});
-      const data=await res.json();
-      if(data.error)throw new Error(data.error.message);
+      };
+      const data=await callVertexOrStudio(modelId,body,apiKey);
       const text=data.candidates?.[0]?.content?.parts?.map(p=>p.text||'').join('')||'';
       if(!text)throw new Error('Empty response');
       usedModel=modelId;
-      $('topBadgeTxt').textContent=MODEL_LABELS[modelId]+' ✓';
+      $('topBadgeTxt').textContent=(MODEL_LABELS[modelId]||modelId)+' ✓';
       return text;
     }catch(e){
       lastErr=e;
       const m=e.message||'';
-      // Retry nếu: model không tìm thấy, quota, hoặc high demand
       if(!m.match(/not found|404|quota|429|RESOURCE_EXHAUSTED|demand|overload|503|500/i))throw e;
     }
   }
@@ -2858,40 +2903,28 @@ RULES:
 
   const userPrompt=`Generate ${densityMap[peDensity]}.\n\nScenes:\n${scenesText}`;
 
-  const url=`${getEndpoint(apiKey)}/models/${MODEL_TEXT}:generateContent?key=${encodeURIComponent(apiKey)}`;
-
-  let res, data, attempts=0;
+  let data, attempts=0;
   while(attempts<4){
     attempts++;
-    res=await fetch(url,{method:'POST',headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({
+    try{
+      data=await callVertexOrStudio(MODEL_TEXT,{
         contents:[{parts:[{text:userPrompt}]}],
         generationConfig:{temperature:0.6,maxOutputTokens:8192},
         systemInstruction:{parts:[{text:systemPrompt}]}
-      })
-    });
-    data=await res.json();
-    if(!data.error)break;
-    const msg=data.error.message||'';
-    const isRetryable=data.error.code===429
-      ||data.error.code===503
-      ||msg.includes('quota')
-      ||msg.includes('RESOURCE_EXHAUSTED')
-      ||msg.includes('high demand')
-      ||msg.includes('overloaded')
-      ||msg.includes('temporarily')
-      ||msg.includes('try again');
-    if(isRetryable&&attempts<4){
-      const waitSec=attempts*20; // 20s, 40s, 60s
-      for(let s=waitSec;s>0;s--){
-        $('peProgressSub').textContent=`Server bận — tự retry sau ${s}s (lần ${attempts}/4)…`;
-        await new Promise(r=>setTimeout(r,1000));
-      }
-    }else{
-      throw new Error(data.error.message);
+      },apiKey);
+      break;
+    }catch(e){
+      const msg=e.message||'';
+      const isRetryable=msg.match(/quota|429|RESOURCE_EXHAUSTED|high demand|overload|temporarily|try again|503|500/i);
+      if(isRetryable&&attempts<4){
+        const waitSec=attempts*20;
+        for(let s=waitSec;s>0;s--){
+          $('peProgressSub').textContent=`Server bận — tự retry sau ${s}s (lần ${attempts}/4)…`;
+          await new Promise(r=>setTimeout(r,1000));
+        }
+      }else throw e;
     }
   }
-  if(data.error)throw new Error(data.error.message);
   const text=data.candidates?.[0]?.content?.parts?.map(p=>p.text||'').join('')||'';
   if(!text)throw new Error('Empty response from API');
 
@@ -3017,21 +3050,13 @@ async function ttsPreviewVoice(voiceId){
     btn.textContent='⏳';btn.style.color='var(--accent)';
     const sampleText=`Hello, I'm ${voiceId}. This is how I sound when narrating your content.`;
     try{
-      // Dùng Gemini 2.5 Flash TTS riêng cho preview (nhanh hơn)
-      const url=`${API_GOOGLE}/v1beta/models/${MODEL_TTS_PREVIEW}:generateContent?key=${encodeURIComponent(apiKey)}`;
-      const res=await fetch(url,{
-        method:'POST',
-        headers:{'Content-Type':'application/json'},
-        body:JSON.stringify({
-          contents:[{parts:[{text:sampleText}]}],
-          generationConfig:{
-            responseModalities:['AUDIO'],
-            speechConfig:{voiceConfig:{prebuiltVoiceConfig:{voiceName:voiceId}}}
-          }
-        })
-      });
-      const data=await res.json();
-      if(data.error)throw new Error(data.error.message||JSON.stringify(data.error));
+      const data=await callVertexOrStudio(MODEL_TTS_PREVIEW,{
+        contents:[{parts:[{text:sampleText}]}],
+        generationConfig:{
+          responseModalities:['AUDIO'],
+          speechConfig:{voiceConfig:{prebuiltVoiceConfig:{voiceName:voiceId}}}
+        }
+      },apiKey);
       const parts=data.candidates?.[0]?.content?.parts||[];
       let found=false;
       for(const part of parts){
@@ -3225,21 +3250,10 @@ ${subTruncated}`;
   for(const model of REWRITE_MODELS){
     try{
       $('ttsBtnRewrite').textContent=`⏳ Đang viết lại (${model})...`;
-      const res=await fetch(`${getEndpoint(apiKey)}/models/${MODEL_TEXT}:generateContent?key=${encodeURIComponent(apiKey)}`,{
-        method:'POST',headers:{'Content-Type':'application/json'},
-        body:JSON.stringify({
-          contents:[{parts:[{text:prompt}]}],
-          generationConfig:{temperature:0.7,maxOutputTokens:8192}
-        })
-      });
-
-      const ct=res.headers.get('content-type')||'';
-      if(!ct.includes('application/json')){
-        const txt=await res.text();
-        throw new Error(`API lỗi (${res.status}): ${txt.slice(0,200)}`);
-      }
-
-      const data=await res.json();
+      const data=await callVertexOrStudio(MODEL_TEXT,{
+        contents:[{parts:[{text:prompt}]}],
+        generationConfig:{temperature:0.7,maxOutputTokens:8192}
+      },apiKey);
       if(data.error){
         const msg=data.error.message||'';
         // High demand → thử model khác
@@ -3387,14 +3401,10 @@ async function ttsDetectModel(apiKey){
   if(ttsActiveModel)return ttsActiveModel;
   for(const model of TTS_MODELS_PRIORITY){
     try{
-      const res=await fetch(`${getEndpoint(apiKey)}/models/${model}:generateContent?key=${encodeURIComponent(apiKey)}`,{
-        method:'POST',headers:{'Content-Type':'application/json'},
-        body:JSON.stringify({
-          contents:[{parts:[{text:'Hi'}]}],
-          generationConfig:{responseModalities:['AUDIO'],speechConfig:{voiceConfig:{prebuiltVoiceConfig:{voiceName:'Kore'}}}}
-        })
-      });
-      const data=await res.json();
+      const data=await callVertexOrStudio(model,{
+        contents:[{parts:[{text:'Hi'}]}],
+        generationConfig:{responseModalities:['AUDIO'],speechConfig:{voiceConfig:{prebuiltVoiceConfig:{voiceName:'Kore'}}}}
+      },apiKey);
       if(!data.error){
         ttsActiveModel=model;
         console.log('TTS model detected:',model);
@@ -3408,20 +3418,13 @@ async function ttsDetectModel(apiKey){
 async function ttsCallAPI(apiKey,text,voice,stylePrompt){
   const fullText=stylePrompt?`${stylePrompt}\n\nTRANSCRIPT:\n${text}`:text;
   const model=MODEL_TTS;
-  const url=`${API_GOOGLE}/v1beta/models/${model}:generateContent?key=${encodeURIComponent(apiKey)}`;
-  const res=await fetch(url,{
-    method:'POST',
-    headers:{'Content-Type':'application/json'},
-    body:JSON.stringify({
-      contents:[{parts:[{text:fullText}]}],
-      generationConfig:{
-        responseModalities:['AUDIO'],
-        speechConfig:{voiceConfig:{prebuiltVoiceConfig:{voiceName:voice}}}
-      }
-    })
-  });
-  const data=await res.json();
-  if(data.error)throw new Error(data.error.message||JSON.stringify(data.error));
+  const data=await callVertexOrStudio(model,{
+    contents:[{parts:[{text:fullText}]}],
+    generationConfig:{
+      responseModalities:['AUDIO'],
+      speechConfig:{voiceConfig:{prebuiltVoiceConfig:{voiceName:voice}}}
+    }
+  },apiKey);
   const parts=data.candidates?.[0]?.content?.parts||[];
   for(const part of parts){
     if(part.inlineData?.data){
@@ -3619,8 +3622,6 @@ let igDNA_IG='';    // Image Generator
 
 // ── STEP 1: Extract Visual DNA from ref image via Gemini Vision ──
 async function igExtractDNA(imgApiKey, charName, refBase64){
-  const p=detectProvider(imgApiKey);
-  const url=`${getEndpoint(imgApiKey)}/models/${MODEL_TEXT}:generateContent?key=${encodeURIComponent(imgApiKey)}`;
   const prompt=`You are a visual analyst for AI image generation. Analyze this character reference image and extract a precise Visual DNA description.
 
 Return a JSON object with these fields:
@@ -3633,18 +3634,13 @@ Return a JSON object with these fields:
 
 Be extremely specific about colors (not 'dark hair' but 'blue-black hair with subtle navy highlights'). This DNA will be injected into every scene prompt to maintain character consistency.`;
 
-  const res=await fetch(url,{
-    method:'POST',
-    headers:{'Content-Type':'application/json'},
-    body:JSON.stringify({
-      contents:[{parts:[
-        {inlineData:{mimeType:'image/png',data:refBase64}},
-        {text:prompt}
-      ]}],
-      generationConfig:{temperature:0.1,maxOutputTokens:1024,responseMimeType:'application/json'}
-    })
-  });
-  const data=await res.json();
+  const data=await callVertexOrStudio(MODEL_TEXT,{
+    contents:[{parts:[
+      {inlineData:{mimeType:'image/png',data:refBase64}},
+      {text:prompt}
+    ]}],
+    generationConfig:{temperature:0.1,maxOutputTokens:1024,responseMimeType:'application/json'}
+  },imgApiKey);
   if(data.error)throw new Error(data.error.message);
   const raw=data.candidates?.[0]?.content?.parts?.map(p=>p.text||'').join('')||'{}';
   try{
@@ -3655,9 +3651,6 @@ Be extremely specific about colors (not 'dark hair' but 'blue-black hair with su
 
 // ── STEP 2: Optimize prompt for gemini-2.5-flash-image with DNA injection ──
 async function igOptimizePrompt(imgApiKey, rawPrompt, charDNAMap, isEstablishingShot, projectStyleDNA){
-  const p=detectProvider(imgApiKey);
-  const url=`${getEndpoint(imgApiKey)}/models/${MODEL_TEXT}:generateContent?key=${encodeURIComponent(imgApiKey)}`;
-
   // Build DNA context for all characters referenced in this prompt
   let dnaContext='';
   if(!isEstablishingShot && Object.keys(charDNAMap).length>0){
@@ -3697,16 +3690,11 @@ RULES:
 
   const userMsg=`Original scene prompt:\n${rawPrompt}\n\nRewrite this as an optimized Gemini image generation prompt:`;
 
-  const res=await fetch(url,{
-    method:'POST',
-    headers:{'Content-Type':'application/json'},
-    body:JSON.stringify({
-      contents:[{parts:[{text:userMsg}]}],
-      generationConfig:{temperature:0.4,maxOutputTokens:512},
-      systemInstruction:{parts:[{text:systemPrompt}]}
-    })
-  });
-  const data=await res.json();
+  const data=await callVertexOrStudio(MODEL_TEXT,{
+    contents:[{parts:[{text:userMsg}]}],
+    generationConfig:{temperature:0.4,maxOutputTokens:512},
+    systemInstruction:{parts:[{text:systemPrompt}]}
+  },imgApiKey);
   if(data.error)throw new Error(data.error.message);
   return data.candidates?.[0]?.content?.parts?.map(p=>p.text||'').join('').trim()||rawPrompt;
 }
@@ -4837,9 +4825,7 @@ async function asTranscribeAll(){
 
     try{
       // Transcribe từng segment một (xử lý bên trong vòng lặp riêng)
-
-      const url=`${getEndpoint(apiKey)}/models/${MODEL_TEXT}:generateContent?key=${encodeURIComponent(apiKey)}`;
-      let res,data,attempts=0;
+      let attempts=0;
 
       // Transcribe từng segment riêng lẻ trong batch để tránh lỗi multi-audio
       for(let si=start;si<end;si++){
@@ -4881,13 +4867,10 @@ async function asTranscribeAll(){
         while(attempts<3){
           attempts++;
           try{
-            res=await fetch(url,{method:'POST',headers:{'Content-Type':'application/json'},
-              body:JSON.stringify({
-                contents:[{role:'user',parts:singleParts}],
-                generationConfig:{temperature:0,maxOutputTokens:512}
-              })
-            });
-            data=await res.json();
+            const data=await callVertexOrStudio(MODEL_TEXT,{
+              contents:[{role:'user',parts:singleParts}],
+              generationConfig:{temperature:0,maxOutputTokens:512}
+            },apiKey);
             if(data.error){
               const isRetry=data.error.code===429||data.error.code===503||(data.error.message||'').match(/quota|demand|retry/i);
               if(isRetry&&attempts<3){
