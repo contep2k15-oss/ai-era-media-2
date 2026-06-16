@@ -138,6 +138,7 @@ html,body{height:100%;overflow:hidden;background:var(--bg0);color:var(--text);fo
 .content{flex:1;overflow:hidden;display:flex;flex-direction:column;}
 .tab-panel{display:none;flex:1;overflow:hidden;}
 .tab-panel.active{display:flex;flex-direction:column;}
+#panelImg.active{flex-direction:row;overflow:hidden;}
 .panel-inner{flex:1;overflow-y:auto;overflow-x:hidden;padding:20px 24px;}
 .panel-inner::-webkit-scrollbar{width:5px;}
 .panel-inner::-webkit-scrollbar-track{background:transparent;}
@@ -1351,135 +1352,134 @@ html,body{height:100%;overflow:hidden;background:var(--bg0);color:var(--text);fo
 <!-- ══════════════════════════════════════════════════
      TAB 6 — IMAGE GENERATOR
 ══════════════════════════════════════════════════ -->
-<div class="tab-panel" id="panelImg">
-<div class="panel-inner">
+<div class="tab-panel" id="panelImg" style="padding:0;overflow:hidden;">
+<div style="display:flex;height:100%;overflow:hidden;">
 
-  <div class="panel-header">
-    <div class="panel-tag"><span class="panel-tag-dot"></span>gemini-2.5-flash-image · Character Consistency Pipeline</div>
-    <div class="panel-title">Tạo ảnh <em>đồng nhất nhân vật</em></div>
-    <div class="panel-desc">Gen Ref → Gemini extract Visual DNA → Optimize prompt → gemini-2.5-flash-image (pass ref image) → ảnh đồng nhất hoàn toàn.</div>
-  </div>
+  <!-- LEFT: Controls -->
+  <div style="width:340px;min-width:280px;flex-shrink:0;overflow-y:auto;padding:16px 14px;border-right:1px solid var(--border);">
 
-  <!-- PHẦN A: ẢNH THAM CHIẾU NHÂN VẬT -->
-  <div class="block ig-section">
-    <div class="section-head">
-      <div class="section-num">A</div>
-      <div class="section-title">Ảnh tham chiếu nhân vật</div>
-      <div class="section-sub">Generate 1 lần, dùng cho tất cả prompt</div>
+    <div class="panel-header" style="margin-bottom:12px;">
+      <div class="panel-tag"><span class="panel-tag-dot"></span>gemini-2.5-flash-image · Character Consistency Pipeline</div>
+      <div class="panel-title">Tạo ảnh <em>đồng nhất nhân vật</em></div>
     </div>
-    <div class="block-body">
-      <div class="ig-char-grid" id="igCharGrid">
-        <div style="font-size:13px;color:var(--text3);padding:12px;">Chưa có nhân vật. Tạo Character Sheet ở tab 1 trước.</div>
+
+    <!-- A: ẢNH THAM CHIẾU -->
+    <div class="block ig-section" style="margin-bottom:10px;">
+      <div class="section-head">
+        <div class="section-num">A</div>
+        <div class="section-title">Ảnh tham chiếu nhân vật</div>
+        <div class="section-sub">Generate 1 lần, dùng cho tất cả prompt</div>
       </div>
-    </div>
-  </div>
-
-  <!-- PHẦN B: PROMPT INPUT -->
-  <div class="block ig-section">
-    <div class="section-head">
-      <div class="section-num">B</div>
-      <div class="section-title">Prompt ảnh</div>
-      <div class="section-sub">Từ Prompt Engineer hoặc dán tay</div>
-    </div>
-    <div class="block-body">
-      <div class="ig-actions">
-        <button class="btn-sync" onclick="igSyncFromPE()">
-          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
-          Sync từ Prompt Engineer
-        </button>
-      </div>
-      <textarea class="ig-prompt-box" id="igPromptBox" placeholder="[1.A]&#10;An ancient city square of Carthage...&#10;---&#10;[1.B]&#10;[REF: Kore — main character] He raises his sword...&#10;---&#10;[1.C]&#10;[REF: Kore — main character] Close-up on his face..." oninput="igParsePrompts()"></textarea>
-      <div class="ig-parse-info" id="igParseInfo"></div>
-    </div>
-  </div>
-
-  <div class="block" style="display:none;margin-bottom:10px;">
-    <div class="section-head">
-      <span class="section-num">C</span>
-      <span class="section-title">Model tạo ảnh</span>
-      <span class="section-sub">Chọn engine</span>
-    </div>
-    <div class="block-body">
-      <div style="display:flex;align-items:center;gap:10px;padding:4px 0;">
-        <div class="style-card active" id="imgmodel-shopai" style="flex:1;pointer-events:none;">
-          <div class="sc-emoji">🎨</div>
-          <div class="sc-name">gemini-2.5-flash-image</div>
-          <div class="sc-desc">Gemini · native image generation · ref image support</div>
+      <div class="block-body">
+        <div class="ig-char-grid" id="igCharGrid">
+          <div style="font-size:13px;color:var(--text3);padding:12px;">Chưa có nhân vật. Tạo Character Sheet ở tab 1 trước.</div>
         </div>
       </div>
     </div>
-  </div>
 
-  <!-- ASPECT RATIO SELECTOR -->
-  <div style="margin-bottom:10px;">
-    <div style="font-size:11px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:8px;">Tỉ lệ khung hình</div>
-    <div style="display:flex;gap:8px;">
-      <button id="igAspect169" onclick="igSetAspect('16:9')" style="flex:1;padding:8px;border-radius:var(--rs);border:1px solid var(--accent);background:var(--accentbg);color:var(--accent2);font-size:12px;font-weight:700;cursor:pointer;transition:all .15s;">
-        ▬ 16:9 <span style="font-size:10px;font-weight:400;opacity:.7;">Ngang · YouTube</span>
-      </button>
-      <button id="igAspect916" onclick="igSetAspect('9:16')" style="flex:1;padding:8px;border-radius:var(--rs);border:1px solid var(--border2);background:transparent;color:var(--text2);font-size:12px;font-weight:700;cursor:pointer;transition:all .15s;">
-        ▮ 9:16 <span style="font-size:10px;font-weight:400;opacity:.7;">Dọc · TikTok/Reels</span>
-      </button>
-      <button id="igAspect11" onclick="igSetAspect('1:1')" style="flex:1;padding:8px;border-radius:var(--rs);border:1px solid var(--border2);background:transparent;color:var(--text2);font-size:12px;font-weight:700;cursor:pointer;transition:all .15s;">
-        ■ 1:1 <span style="font-size:10px;font-weight:400;opacity:.7;">Vuông</span>
-      </button>
-    </div>
-  </div>
-
-  <!-- PROMPT PER SCENE SELECTOR -->
-  <div style="margin-bottom:12px;">
-    <div style="font-size:11px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:8px;">Số prompt mỗi đoạn <span style="font-size:10px;font-weight:400;color:var(--text3);text-transform:none;letter-spacing:0;">(A, B, C...)</span></div>
-    <div style="display:flex;gap:6px;">
-      <button class="ig-density-btn" id="igDensity1" onclick="igSetDensity(1)" style="flex:1;padding:8px 4px;border-radius:var(--rs);border:1px solid var(--border2);background:transparent;color:var(--text2);font-size:13px;font-weight:700;cursor:pointer;transition:all .15s;text-align:center;">
-        1<div style="font-size:9px;font-weight:400;color:var(--text3);margin-top:2px;">Đơn giản</div>
-      </button>
-      <button class="ig-density-btn" id="igDensity2" onclick="igSetDensity(2)" style="flex:1;padding:8px 4px;border-radius:var(--rs);border:1px solid var(--border2);background:transparent;color:var(--text2);font-size:13px;font-weight:700;cursor:pointer;transition:all .15s;text-align:center;">
-        2<div style="font-size:9px;font-weight:400;color:var(--text3);margin-top:2px;">Vừa</div>
-      </button>
-      <button class="ig-density-btn active" id="igDensity3" onclick="igSetDensity(3)" style="flex:1;padding:8px 4px;border-radius:var(--rs);border:1px solid var(--accent);background:var(--accentbg);color:var(--accent2);font-size:13px;font-weight:700;cursor:pointer;transition:all .15s;text-align:center;">
-        3<div style="font-size:9px;font-weight:400;margin-top:2px;">✅ Mặc định</div>
-      </button>
-      <button class="ig-density-btn" id="igDensity4" onclick="igSetDensity(4)" style="flex:1;padding:8px 4px;border-radius:var(--rs);border:1px solid var(--border2);background:transparent;color:var(--text2);font-size:13px;font-weight:700;cursor:pointer;transition:all .15s;text-align:center;">
-        4<div style="font-size:9px;font-weight:400;color:var(--text3);margin-top:2px;">Nhịp nhanh</div>
-      </button>
-      <button class="ig-density-btn" id="igDensity5" onclick="igSetDensity(5)" style="flex:1;padding:8px 4px;border-radius:var(--rs);border:1px solid var(--border2);background:transparent;color:var(--text2);font-size:13px;font-weight:700;cursor:pointer;transition:all .15s;text-align:center;">
-        5<div style="font-size:9px;font-weight:400;color:var(--text3);margin-top:2px;">Chi tiết</div>
-      </button>
-    </div>
-    <div style="margin-top:6px;font-size:10px;color:var(--text3);" id="igDensityInfo">Mỗi đoạn tạo 3 prompt: [N.A] · [N.B] · [N.C]</div>
-  </div>
-
-  <button class="btn-action-primary" id="igBtnRun" onclick="igRunAll()">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
-        Generate tất cả ảnh
-      </button>
-
-  <!-- PROGRESS -->
-  <div class="ig-prog-wrap" id="igProgWrap">
-    <div class="ig-prog-row">
-      <div style="display:flex;align-items:center;gap:6px;">
-        <span id="igProgLabel">Đang generate...</span>
-        <span class="prog-paused-badge" id="igPausedBadge">⏸ Đang tạm dừng</span>
+    <!-- B: PROMPT INPUT -->
+    <div class="block ig-section" style="margin-bottom:10px;">
+      <div class="section-head">
+        <div class="section-num">B</div>
+        <div class="section-title">Prompt ảnh</div>
+        <div class="section-sub">Từ Prompt Engineer hoặc dán tay</div>
       </div>
-      <span id="igProgPct">0%</span>
+      <div class="block-body">
+        <div class="ig-actions">
+          <button class="btn-sync" onclick="igSyncFromPE()">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
+            Sync từ Prompt Engineer
+          </button>
+        </div>
+        <textarea class="ig-prompt-box" id="igPromptBox" placeholder="[1.A]&#10;An ancient city square...&#10;---&#10;[1.B]&#10;[REF: Kore] He raises his sword..." oninput="igParsePrompts()" style="min-height:120px;"></textarea>
+        <div class="ig-parse-info" id="igParseInfo"></div>
+      </div>
     </div>
-    <div class="ig-prog-track"><div class="ig-prog-bar" id="igProgBar"></div></div>
-    <div class="prog-controls">
-      <button class="prog-ctrl-btn pause" id="igBtnPause" onclick="igTogglePause()">⏸ Tạm dừng</button>
-      <button class="prog-ctrl-btn stop" id="igBtnStop" onclick="igStop()">⏹ Dừng</button>
-      <button class="prog-ctrl-btn restart" id="igBtnRestart" onclick="igRestart()" style="display:none">↺ Bắt đầu lại</button>
-    </div>
-  </div>
 
-  <div class="err" id="igErrEl" style="margin-bottom:12px;"></div>
-
-  <!-- RESULTS GRID -->
-  <div id="igResultsWrap" style="display:none;">
-    <div class="ig-results-head">
-      <span class="ig-results-title" id="igResultsTitle">Ảnh đã tạo</span>
-      <button class="btn-ig-zip" onclick="igDownloadZip()">⬇ Tải ZIP</button>
+    <div class="block" style="display:none;margin-bottom:10px;">
+      <div class="section-head">
+        <span class="section-num">C</span>
+        <span class="section-title">Model tạo ảnh</span>
+        <span class="section-sub">Chọn engine</span>
+      </div>
+      <div class="block-body">
+        <div style="display:flex;align-items:center;gap:10px;padding:4px 0;">
+          <div class="style-card active" id="imgmodel-shopai" style="flex:1;pointer-events:none;">
+            <div class="sc-emoji">🎨</div>
+            <div class="sc-name">gemini-2.5-flash-image</div>
+            <div class="sc-desc">Gemini · native image generation · ref image support</div>
+          </div>
+        </div>
+      </div>
     </div>
-    <div class="ig-grid" id="igGrid"></div>
+
+    <!-- ASPECT RATIO -->
+    <div style="margin-bottom:10px;">
+      <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--text3);margin-bottom:6px;">Tỉ lệ khung hình</div>
+      <div style="display:flex;gap:6px;">
+        <button id="igAspect169" onclick="igSetAspect('16:9')" style="flex:1;padding:7px 4px;border-radius:var(--rs);border:1px solid var(--accent);background:var(--accentbg);color:var(--accent2);font-size:11px;font-weight:700;cursor:pointer;transition:all .15s;text-align:center;">▬ 16:9</button>
+        <button id="igAspect916" onclick="igSetAspect('9:16')" style="flex:1;padding:7px 4px;border-radius:var(--rs);border:1px solid var(--border2);background:transparent;color:var(--text2);font-size:11px;font-weight:700;cursor:pointer;transition:all .15s;text-align:center;">▮ 9:16</button>
+        <button id="igAspect11" onclick="igSetAspect('1:1')" style="flex:1;padding:7px 4px;border-radius:var(--rs);border:1px solid var(--border2);background:transparent;color:var(--text2);font-size:11px;font-weight:700;cursor:pointer;transition:all .15s;text-align:center;">■ 1:1</button>
+      </div>
+    </div>
+
+    <!-- DENSITY -->
+    <div style="margin-bottom:12px;">
+      <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--text3);margin-bottom:6px;">Số prompt mỗi đoạn</div>
+      <div style="display:flex;gap:5px;">
+        <button class="ig-density-btn" id="igDensity1" onclick="igSetDensity(1)" style="flex:1;padding:7px 2px;border-radius:var(--rs);border:1px solid var(--border2);background:transparent;color:var(--text2);font-size:13px;font-weight:700;cursor:pointer;transition:all .15s;text-align:center;">1<div style="font-size:9px;font-weight:400;color:var(--text3);">Đơn</div></button>
+        <button class="ig-density-btn" id="igDensity2" onclick="igSetDensity(2)" style="flex:1;padding:7px 2px;border-radius:var(--rs);border:1px solid var(--border2);background:transparent;color:var(--text2);font-size:13px;font-weight:700;cursor:pointer;transition:all .15s;text-align:center;">2<div style="font-size:9px;font-weight:400;color:var(--text3);">Vừa</div></button>
+        <button class="ig-density-btn active" id="igDensity3" onclick="igSetDensity(3)" style="flex:1;padding:7px 2px;border-radius:var(--rs);border:1px solid var(--accent);background:var(--accentbg);color:var(--accent2);font-size:13px;font-weight:700;cursor:pointer;transition:all .15s;text-align:center;">3<div style="font-size:9px;font-weight:400;">✅</div></button>
+        <button class="ig-density-btn" id="igDensity4" onclick="igSetDensity(4)" style="flex:1;padding:7px 2px;border-radius:var(--rs);border:1px solid var(--border2);background:transparent;color:var(--text2);font-size:13px;font-weight:700;cursor:pointer;transition:all .15s;text-align:center;">4<div style="font-size:9px;font-weight:400;color:var(--text3);">Nhanh</div></button>
+        <button class="ig-density-btn" id="igDensity5" onclick="igSetDensity(5)" style="flex:1;padding:7px 2px;border-radius:var(--rs);border:1px solid var(--border2);background:transparent;color:var(--text2);font-size:13px;font-weight:700;cursor:pointer;transition:all .15s;text-align:center;">5<div style="font-size:9px;font-weight:400;color:var(--text3);">Chi tiết</div></button>
+      </div>
+      <div style="margin-top:5px;font-size:10px;color:var(--text3);" id="igDensityInfo">Mỗi đoạn tạo 3 prompt: [N.A] · [N.B] · [N.C]</div>
+    </div>
+
+    <button class="btn-action-primary" id="igBtnRun" onclick="igRunAll()">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
+      Generate tất cả ảnh
+    </button>
+
+    <!-- PROGRESS -->
+    <div class="ig-prog-wrap" id="igProgWrap">
+      <div class="ig-prog-row">
+        <div style="display:flex;align-items:center;gap:6px;flex:1;min-width:0;">
+          <span id="igProgLabel" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:11px;">Đang generate...</span>
+          <span class="prog-paused-badge" id="igPausedBadge">⏸ Đang tạm dừng</span>
+        </div>
+        <span id="igProgPct" style="flex-shrink:0;">0%</span>
+      </div>
+      <div class="ig-prog-track"><div class="ig-prog-bar" id="igProgBar"></div></div>
+      <div class="prog-controls">
+        <button class="prog-ctrl-btn pause" id="igBtnPause" onclick="igTogglePause()">⏸ Tạm dừng</button>
+        <button class="prog-ctrl-btn stop" id="igBtnStop" onclick="igStop()">⏹ Dừng</button>
+        <button class="prog-ctrl-btn restart" id="igBtnRestart" onclick="igRestart()" style="display:none">↺ Bắt đầu lại</button>
+      </div>
+    </div>
+
+    <div class="err" id="igErrEl"></div>
+
+  </div><!-- end left panel -->
+
+  <!-- RIGHT: Image Grid với scroll riêng -->
+  <div style="flex:1;overflow-y:auto;padding:14px 12px;background:var(--bg0);">
+    <div id="igResultsWrap" style="display:none;">
+      <div class="ig-results-head" style="position:sticky;top:0;background:var(--bg0);z-index:10;padding-bottom:8px;">
+        <span class="ig-results-title" id="igResultsTitle">Ảnh đã tạo</span>
+        <div style="display:flex;gap:6px;">
+          <button class="btn-ig-zip" onclick="igDownloadZip()">⬇ Tải ZIP</button>
+          <button onclick="vsSyncImages();switchTab('panelVideo')" style="padding:4px 10px;background:var(--accentbg);border:1px solid var(--accent);border-radius:var(--rs);color:var(--accent2);font-size:11px;font-weight:600;cursor:pointer;">→ Video Studio</button>
+        </div>
+      </div>
+      <div class="ig-grid" id="igGrid" style="grid-template-columns:repeat(2,1fr);"></div>
+    </div>
+    <!-- Placeholder khi chưa có ảnh -->
+    <div id="igEmptyState" style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;color:var(--text3);text-align:center;gap:10px;">
+      <div style="font-size:48px;opacity:.3;">🖼</div>
+      <div style="font-size:13px;">Ảnh sẽ hiện ở đây khi generate</div>
+      <div style="font-size:11px;opacity:.6;">Parallel 5x — ảnh xuất hiện ngay khi từng ảnh xong</div>
+    </div>
   </div>
 
 </div>
@@ -3414,8 +3414,10 @@ async function igRunAll(){
   $('igBtnRun').disabled=true;
   $('igProgWrap').style.display='block';
   $('igResultsWrap').style.display='block';
+  const emptyEl=$('igEmptyState');
+  if(emptyEl)emptyEl.style.display='none';
   $('igErrEl').classList.remove('show');
-  igGeneratedImages=[];
+  igGeneratedImages=new Array(total).fill(null); // index cố định, tránh race condition
   igResetControls();
   const total=igParsedPrompts.length;
 
@@ -3531,11 +3533,18 @@ async function igRunAll(){
 
     if(imgB64){
       const dataUrl='data:image/png;base64,'+imgB64;
-      igGeneratedImages.push({label:p.label,dataUrl});
-      $(`igimg_${i}`).classList.remove('loading');
-      $(`igimg_${i}`).innerHTML=`<img src="${dataUrl}" style="width:100%;height:100%;object-fit:cover;display:block;">`;
-      $(`iglabel_${i}`).innerHTML=`<span>${esc(p.label)}${p.refName?' · '+esc(p.refName):''}</span><button class="btn-ig-dl" onclick="igDlOne('${dataUrl}','${p.label.replace(/\./g,'_')}.png')" title="Download">⬇</button>`;
-      $('igResultsTitle').textContent=`✅ ${igGeneratedImages.length}/${total} ảnh`;
+      // Dùng index cố định thay vì push để tránh race condition
+      igGeneratedImages[i]={label:p.label,dataUrl};
+      const el=$(`igimg_${i}`);
+      if(el){
+        el.classList.remove('loading');
+        el.innerHTML=`<img src="${dataUrl}" style="width:100%;height:100%;object-fit:cover;display:block;">`;
+      }
+      const labelEl=$(`iglabel_${i}`);
+      if(labelEl) labelEl.innerHTML=`<span>${esc(p.label)}${p.refName?' · '+esc(p.refName):''}</span><button class="btn-ig-dl" onclick="igDlOne('${dataUrl}','${p.label.replace(/\./g,'_')}.png')" title="Download">⬇</button>`;
+      // Count thực tế từ array (bỏ undefined)
+      const doneCount=igGeneratedImages.filter(Boolean).length;
+      $('igResultsTitle').textContent=`✅ ${doneCount}/${total} ảnh`;
     }
   }
 
@@ -3584,7 +3593,7 @@ async function igDownloadZip(){
   const btn=document.querySelector('.btn-ig-zip');
   btn.disabled=true;btn.textContent='Đang nén…';
   const zip=new JSZip();
-  igGeneratedImages.forEach(img=>{zip.file(`${img.label.replace(/\./g,'_')}.png`,img.dataUrl.split(',')[1],{base64:true});});
+  igGeneratedImages.filter(Boolean).forEach(img=>{zip.file(`${img.label.replace(/\./g,'_')}.png`,img.dataUrl.split(',')[1],{base64:true});});
   const blob=await zip.generateAsync({type:'blob'});
   const url=URL.createObjectURL(blob);
   const a=document.createElement('a');a.href=url;a.download='images.zip';
@@ -3622,9 +3631,10 @@ function vsSyncImages(){
   if(!igGeneratedImages||!igGeneratedImages.length){
     alert('Image Generator chưa có ảnh. Hãy generate ở tab Image Generator trước.');return;
   }
-  vsImages=igGeneratedImages.map(img=>({
+  const validImages=igGeneratedImages.filter(Boolean);
+  vsImages=validImages.map(img=>({
     img:null, name:img.label, url:img.dataUrl, dataUrl:img.dataUrl, filePath:null,
-    dur: vsAudioDuration>0 ? vsAudioDuration/igGeneratedImages.length : 5
+    dur: vsAudioDuration>0 ? vsAudioDuration/validImages.length : 5
   }));
   let loaded=0;
   vsImages.forEach((item,i)=>{
