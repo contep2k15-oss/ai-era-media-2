@@ -9,17 +9,18 @@ app.commandLine.appendSwitch('disable-features', 'OutOfBlinkCors');
 
 // ── GOOGLE OAUTH2 CONFIG ──
 // Credentials được load từ file config riêng (không commit lên Git)
-let OAUTH_CLIENT_ID = '';
-let OAUTH_CLIENT_SECRET = '';
+let OAUTH_CLIENT_ID = '738539837274-00os94b9bbn5iid8bkmbhuq647t4qc80.apps.googleusercontent.com';
+let OAUTH_CLIENT_SECRET = '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';
 const OAUTH_SCOPES = 'https://www.googleapis.com/auth/cloud-platform';
+let TOKEN_PATH = '';
 
 // Load credentials từ file config
 function loadOAuthConfig() {
   // Thử các đường dẫn theo thứ tự
   const paths = [
-    path.join(process.resourcesPath || '', 'oauth_config.json'), // production: resources/
-    path.join(__dirname, 'oauth_config.json'),                    // dev: cùng thư mục main.js
-    path.join(app.getPath('userData'), 'oauth_config.json'),      // fallback: userData
+    path.join(process.resourcesPath || '', 'oauth_config.json'),
+    path.join(__dirname, 'oauth_config.json'),
+    path.join(app.getPath('userData'), 'oauth_config.json'),
   ];
   for (const configPath of paths) {
     try {
@@ -32,10 +33,11 @@ function loadOAuthConfig() {
       }
     } catch(e) {}
   }
-  console.warn('oauth_config.json not found in any location');
+  // Fallback: dùng credentials mặc định
+  OAUTH_CLIENT_ID = '738539837274-00os94b9bbn5iid8bkmbhuq647t4qc80.apps.googleusercontent.com';
+  OAUTH_CLIENT_SECRET = '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';
+  console.log('OAuth config: using default credentials');
 }
-const TOKEN_PATH = path.join(app.getPath('userData'), 'vertex_token.json');
-
 let vertexTokenData = null;
 
 // Load saved token on startup
@@ -321,6 +323,11 @@ ipcMain.handle('render-video-ffmpeg', async (event, { imageList, audioData, fps,
   });
 });
 
-app.whenReady().then(() => { loadOAuthConfig(); loadSavedToken(); createWindow(); });
+app.whenReady().then(() => {
+  TOKEN_PATH = path.join(app.getPath('userData'), 'vertex_token.json');
+  loadOAuthConfig();
+  loadSavedToken();
+  createWindow();
+});
 app.on('window-all-closed', () => { if (process.platform !== 'darwin') app.quit(); });
 app.on('activate', () => { if (BrowserWindow.getAllWindows().length === 0) createWindow(); });
