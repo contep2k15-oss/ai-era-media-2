@@ -486,8 +486,9 @@ html,body{height:100%;overflow:hidden;background:var(--bg0);color:var(--text);fo
 .ig-prog-row{display:flex;justify-content:space-between;font-size:11px;color:var(--text2);margin-bottom:4px;}
 .ig-prog-track{height:4px;background:var(--bg3);border-radius:2px;overflow:hidden;}
 .ig-prog-bar{height:100%;background:linear-gradient(90deg,#10b981,#059669);border-radius:2px;transition:width .4s;}
-.ig-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:8px;margin-bottom:10px;}
+.ig-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:8px;margin-bottom:10px;width:100%;}
 .ig-card{background:var(--bg2);border:1px solid var(--border2);border-radius:var(--rs);overflow:hidden;}
+.ig-results-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;flex-wrap:wrap;gap:6px;}
 .ig-card-img{width:100%;aspect-ratio:16/9;background:var(--bg3);display:flex;align-items:center;justify-content:center;font-size:10px;color:var(--text3);position:relative;overflow:hidden;}
 .ig-card-img img{width:100%;height:100%;object-fit:cover;display:block;}
 .ig-card-img.loading::after{content:'';position:absolute;inset:0;background:linear-gradient(90deg,transparent,rgba(16,185,129,.06),transparent);animation:igShimmer 1.2s infinite;}
@@ -1469,7 +1470,7 @@ html,body{height:100%;overflow:hidden;background:var(--bg0);color:var(--text);fo
         <span class="ig-results-title" id="igResultsTitle">Ảnh đã tạo</span>
         <div style="display:flex;gap:6px;">
           <button class="btn-ig-zip" onclick="igDownloadZip()">⬇ Tải ZIP</button>
-          <button onclick="vsSyncImages();switchTab('panelVideo')" style="padding:4px 10px;background:var(--accentbg);border:1px solid var(--accent);border-radius:var(--rs);color:var(--accent2);font-size:11px;font-weight:600;cursor:pointer;">→ Video Studio</button>
+          <button onclick="vsSyncImages();switchTab('video')" style="padding:4px 10px;background:var(--accentbg);border:1px solid var(--accent);border-radius:var(--rs);color:var(--accent2);font-size:11px;font-weight:600;cursor:pointer;">→ Video Studio</button>
         </div>
       </div>
       <div class="ig-grid" id="igGrid" style="grid-template-columns:repeat(2,1fr);"></div>
@@ -3411,17 +3412,20 @@ async function igRunAll(){
   igParsePrompts();
   if(!igParsedPrompts.length){alert('Chưa có prompt. Dán hoặc sync từ Prompt Engineer.');return;}
 
+  const total=igParsedPrompts.length;
+
   $('igBtnRun').disabled=true;
   $('igProgWrap').style.display='block';
+
+  // Show kết quả panel TRƯỚC khi populate grid — để DOM elements tồn tại
   $('igResultsWrap').style.display='block';
   const emptyEl=$('igEmptyState');
   if(emptyEl)emptyEl.style.display='none';
   $('igErrEl').classList.remove('show');
-  igGeneratedImages=new Array(total).fill(null); // index cố định, tránh race condition
+  igGeneratedImages=new Array(total).fill(null);
   igResetControls();
-  const total=igParsedPrompts.length;
 
-  // Pre-populate grid
+  // Pre-populate grid — phải sau khi igResultsWrap đã visible
   $('igGrid').innerHTML=igParsedPrompts.map((p,i)=>`
     <div class="ig-card" id="igcard_${i}">
       <div class="ig-card-img loading" id="igimg_${i}">
@@ -3435,26 +3439,10 @@ async function igRunAll(){
     </div>`).join('');
   $('igResultsTitle').textContent=`Đang khởi động pipeline… 0/${total}`;
 
-  // ── PHASE 1: Extract DNA for all chars that have ref images but no DNA yet ──
-  const charsNeedDNA=Object.keys(igRefImages).filter(name=>!igCharDNA[name]);
-  if(charsNeedDNA.length>0){
-    $('igProgLabel').textContent=`🔬 Phase 1: Extracting Visual DNA cho ${charsNeedDNA.length} nhân vật…`;
-    $('igProgBar').style.width='5%';
-    for(const name of charsNeedDNA){
-      try{
-        $('igProgLabel').textContent=`🔬 Extracting DNA: ${name}…`;
-        const b64=igRefImages[name].split(',')[1];
-        const dna=await igExtractDNA(imgApiKey,name,b64);
-        igCharDNA[name]=dna;
-        if(!igProjectStyleDNA && dna.art_style_dna) igProjectStyleDNA=dna.art_style_dna;
-      }catch(e){
-        console.warn(`DNA extract failed for ${name}:`,e.message);
-        igCharDNA[name]=null;
-      }
-    }
-  }
+  // DNA đã được extract khi user bấm "Tạo lại" cho từng nhân vật
+  // Không cần extract lại ở đây — bắt đầu generate ảnh ngay
 
-  // ── PHASE 2: Generate images in parallel (3 at a time) ──
+  // ── PHASE 2: Generate images in parallel ──
   const PARALLEL=5; // 500 RPM → 5 parallel an toàn
   let completed=0;
 
