@@ -15,16 +15,24 @@ const OAUTH_SCOPES = 'https://www.googleapis.com/auth/cloud-platform';
 
 // Load credentials từ file config
 function loadOAuthConfig() {
-  try {
-    const configPath = path.join(__dirname, 'oauth_config.json');
-    if (fs.existsSync(configPath)) {
-      const config = JSON.parse(fs.readFileSync(configPath, 'utf8'));
-      OAUTH_CLIENT_ID = config.client_id || '';
-      OAUTH_CLIENT_SECRET = config.client_secret || '';
-    }
-  } catch(e) {
-    console.warn('Could not load oauth_config.json:', e.message);
+  // Thử các đường dẫn theo thứ tự
+  const paths = [
+    path.join(process.resourcesPath || '', 'oauth_config.json'), // production: resources/
+    path.join(__dirname, 'oauth_config.json'),                    // dev: cùng thư mục main.js
+    path.join(app.getPath('userData'), 'oauth_config.json'),      // fallback: userData
+  ];
+  for (const configPath of paths) {
+    try {
+      if (fs.existsSync(configPath)) {
+        const config = JSON.parse(fs.readFileSync(configPath, 'utf8'));
+        OAUTH_CLIENT_ID = config.client_id || '';
+        OAUTH_CLIENT_SECRET = config.client_secret || '';
+        console.log('OAuth config loaded from:', configPath);
+        return;
+      }
+    } catch(e) {}
   }
+  console.warn('oauth_config.json not found in any location');
 }
 const TOKEN_PATH = path.join(app.getPath('userData'), 'vertex_token.json');
 

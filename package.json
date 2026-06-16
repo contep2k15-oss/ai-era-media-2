@@ -21,6 +21,12 @@
     "directories": {
       "output": "dist"
     },
+    "extraResources": [
+      {
+        "from": "oauth_config.json",
+        "to": "oauth_config.json"
+      }
+    ],
     "files": [
       "main.js",
       "preload.js",
