@@ -495,7 +495,7 @@ html,body{height:100%;overflow:hidden;background:var(--bg0);color:var(--text);fo
 .btn-ig-regen.loading{background:var(--bg3);color:var(--text2);pointer-events:none;}
 .ig-results-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;flex-wrap:wrap;gap:6px;}
 .ig-card-img{width:100%;aspect-ratio:16/9;background:var(--bg3);display:flex;align-items:center;justify-content:center;font-size:10px;color:var(--text3);position:relative;overflow:hidden;}
-.ig-card-img img{width:100%;height:100%;object-fit:cover;object-position:center;display:block;}
+.ig-card-img img{width:100%;height:100%;object-fit:cover;object-position:center;display:block;transform:scale(1.08);}
 .ig-card-img.loading::after{content:'';position:absolute;inset:0;background:linear-gradient(90deg,transparent,rgba(16,185,129,.06),transparent);animation:igShimmer 1.2s infinite;}
 @keyframes igShimmer{0%{transform:translateX(-100%)}100%{transform:translateX(100%)}}
 .ig-card-label{padding:6px 9px;font-size:10px;font-weight:600;color:var(--text2);display:flex;align-items:center;justify-content:space-between;gap:5px;}
@@ -741,11 +741,19 @@ html,body{height:100%;overflow:hidden;background:var(--bg0);color:var(--text);fo
     </div>
   </div>
 
-  <div class="block">
+  <button class="btn-action-primary" id="analyzeBtn" onclick="analyzeVideoStyle()" style="background:var(--bg3);border:1px solid var(--border2);color:var(--text2);margin-bottom:8px;">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+    Phân tích phong cách video
+  </button>
+
+  <!-- VIDEO ANALYSIS CARD (hiện sau khi phân tích) -->
+  <div id="videoAnalysisCard" style="display:none;background:var(--bg3);border:1px solid var(--border2);border-radius:var(--r);padding:14px;margin-bottom:12px;"></div>
+
+  <div class="block" id="styleBlock">
     <div class="section-head">
       <div class="section-num">3</div>
       <div class="section-title">Phong cách nhân vật</div>
-      <div class="section-sub">Không chọn → tự động theo video</div>
+      <div class="section-sub">Tuỳ chọn — để trống nếu đã áp dụng Visual DNA</div>
     </div>
     <div class="block-body">
       <div class="style-grid">
@@ -759,14 +767,6 @@ html,body{height:100%;overflow:hidden;background:var(--bg0);color:var(--text);fo
       </div>
     </div>
   </div>
-
-  <button class="btn-action-primary" id="analyzeBtn" onclick="analyzeVideoStyle()" style="background:var(--bg3);border:1px solid var(--border2);color:var(--text2);margin-bottom:8px;">
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-    Phân tích phong cách video
-  </button>
-
-  <!-- VIDEO ANALYSIS CARD (hiện sau khi phân tích) -->
-  <div id="videoAnalysisCard" style="display:none;background:var(--bg3);border:1px solid var(--border2);border-radius:var(--r);padding:14px;margin-bottom:12px;"></div>
 
   <button class="btn-action-primary" id="genBtn" onclick="generate()" style="background:var(--bg3);border:1px solid var(--border2);color:var(--text2);opacity:0.7;">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
@@ -2745,7 +2745,7 @@ async function peRunBatch(apiKey,batchIndex,totalBatches){
     ?`Multiple characters available: ${selectedCharList.join(', ')}. For B/C/D shots, include only the REF tag(s) of character(s) present in that scene.`
     :`Single character: ${selectedCharList[0]}.`;
 
-  const aspectConstraint=`MANDATORY: wide 16:9 horizontal cinematic frame, scene and environment fill ALL edges including left and right sides, NO white borders, NO black bars, NO letterbox, NO pillarbox, full bleed image`;
+  const compositionRule=`wide cinematic composition, environment fills both sides of frame, NO tight portrait framing`;
 
   const systemPrompt=`You are Imagen Prompt Engineer v4. ${multiCharNote}
 
@@ -2753,13 +2753,13 @@ CHARACTER REFERENCE TAGS: ${refTags}
 These tags reference uploaded character images for appearance consistency. Place at start of B/C/D shots only.
 ${refNoteInstruction}
 ${igDNA_PE?`\nVISUAL DNA (apply to ALL prompts): ${igDNA_PE}\n`:''}
-ASPECT RATIO RULE (CRITICAL): ALL prompts MUST produce wide 16:9 horizontal images. Even for close-up shots, include wide environmental context on both sides. NEVER describe a tight/portrait composition.
+COMPOSITION RULE: ALL shots must use wide cinematic framing. Even close-up shots must show environmental context on both sides. NEVER use tight portrait framing.
 
 PROMPT STRUCTURE:
-- [N.A] Establishing Shot: wide environment/location ONLY, camera pulls back far to show full setting. No REF tags. No character names or appearance. 50-70 words. End with: "${styleMatchNote} ${aspectConstraint}. No text. No watermarks."
-- [N.B] Action Shot: REF tag(s) first, then exact action/pose/expression from the audio, wide shot showing character in environment context. 40-60 words. End with: "${styleAnchor}. ${aspectConstraint}. [add refer note ONLY for characters tagged in this prompt] No text. No watermarks."
-- [N.C] Emotion/Detail Shot: REF tag(s) first, medium close-up showing character face AND surrounding environment visible on both sides of frame (NOT tight crop). 40-60 words. End with: "${styleAnchor}. ${aspectConstraint}. [add refer note ONLY for characters tagged in this prompt] No text. No watermarks."
-- [N.D] Bonus Angle: REF tag(s) first, creative angle (overhead/low/silhouette) in wide 16:9 frame. 40-60 words. End with: "${styleAnchor}. ${aspectConstraint}. [add refer note ONLY for characters tagged in this prompt] No text. No watermarks."
+- [N.A] Establishing Shot: wide environment/location ONLY, camera pulls back far to show full setting. No REF tags. No character names or appearance. 50-70 words. End with: "${styleMatchNote} No text. No watermarks."
+- [N.B] Action Shot: REF tag(s) first, then exact action/pose/expression from the audio, wide shot showing character in environment context. 40-60 words. End with: "${styleAnchor}. ${compositionRule}. [add refer note ONLY for characters tagged in this prompt] No text. No watermarks."
+- [N.C] Emotion/Detail Shot: REF tag(s) first, medium close-up showing character face AND surrounding environment visible on both sides (NOT tight crop). 40-60 words. End with: "${styleAnchor}. ${compositionRule}. [add refer note ONLY for characters tagged in this prompt] No text. No watermarks."
+- [N.D] Bonus Angle: REF tag(s) first, creative angle (overhead/low/silhouette) in wide cinematic frame. 40-60 words. End with: "${styleAnchor}. ${compositionRule}. [add refer note ONLY for characters tagged in this prompt] No text. No watermarks."
 
 RULES:
 1. [N.A] — NO REF tags, NO character appearance description whatsoever
@@ -3326,68 +3326,32 @@ async function ttsDetectModel(apiKey){
 }
 
 async function ttsCallAPI(apiKey,text,voice,stylePrompt){
-  const p=detectProvider(apiKey);
   const fullText=stylePrompt?`${stylePrompt}\n\nTRANSCRIPT:\n${text}`:text;
-
-  // Google Gemini TTS API
-  const isGoogle=p?.name==='Google AI Studio';
   const model=MODEL_TTS;
-  const base=`${API_GOOGLE}/v1beta`;
-
-  if(isGoogle){
-    // Google API: generateContent với responseModalities audio
-    const url=`${API_GOOGLE}/v1beta/models/${model}:generateContent?key=${encodeURIComponent(apiKey)}`;
-    const res=await fetch(url,{
-      method:'POST',
-      headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({
-        contents:[{parts:[{text:fullText}]}],
-        generationConfig:{
-          responseModalities:['AUDIO'],
-          speechConfig:{voiceConfig:{prebuiltVoiceConfig:{voiceName:voice}}}
-        }
-      })
-    });
-    const data=await res.json();
-    if(data.error)throw new Error(data.error.message||JSON.stringify(data.error));
-    // Trả về base64 audio inline
-    const parts=data.candidates?.[0]?.content?.parts||[];
-    for(const part of parts){
-      if(part.inlineData?.data){
-        const raw=atob(part.inlineData.data);
-        const buf=new Uint8Array(raw.length);
-        for(let i=0;i<raw.length;i++)buf[i]=raw.charCodeAt(i);
-        return buf; // PCM/WAV bytes
+  const url=`${API_GOOGLE}/v1beta/models/${model}:generateContent?key=${encodeURIComponent(apiKey)}`;
+  const res=await fetch(url,{
+    method:'POST',
+    headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({
+      contents:[{parts:[{text:fullText}]}],
+      generationConfig:{
+        responseModalities:['AUDIO'],
+        speechConfig:{voiceConfig:{prebuiltVoiceConfig:{voiceName:voice}}}
       }
+    })
+  });
+  const data=await res.json();
+  if(data.error)throw new Error(data.error.message||JSON.stringify(data.error));
+  const parts=data.candidates?.[0]?.content?.parts||[];
+  for(const part of parts){
+    if(part.inlineData?.data){
+      const raw=atob(part.inlineData.data);
+      const buf=new Uint8Array(raw.length);
+      for(let i=0;i<raw.length;i++)buf[i]=raw.charCodeAt(i);
+      return buf;
     }
-    throw new Error('Google TTS không trả về audio data');
-  } else {
-    // Fallback - Google TTS format
-    const url=`${getEndpoint(apiKey)}/models/${MODEL_TTS}:generateContent?key=${encodeURIComponent(apiKey)}`;
-    const res=await fetch(url,{
-      method:'POST',
-      headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({
-        contents:[{parts:[{text:fullText}]}],
-        generationConfig:{
-          responseModalities:['AUDIO'],
-          speechConfig:{voiceConfig:{prebuiltVoiceConfig:{voiceName:voice}}}
-        }
-      })
-    });
-    const data=await res.json();
-    if(data.error)throw new Error(data.error.message||JSON.stringify(data.error));
-    const parts=data.candidates?.[0]?.content?.parts||[];
-    for(const part of parts){
-      if(part.inlineData?.data){
-        const raw=atob(part.inlineData.data);
-        const buf=new Uint8Array(raw.length);
-        for(let i=0;i<raw.length;i++)buf[i]=raw.charCodeAt(i);
-        return buf;
-      }
-    }
-    throw new Error('TTS không trả về audio data');
   }
+  throw new Error('Google TTS không trả về audio data');
 }
 
 // Thêm WAV header cho PCM raw data từ Google TTS
@@ -3481,6 +3445,7 @@ function selectImgModel(m){
 let igRefImages={}; // {charName: base64DataUrl}
 let igParsedPrompts=[]; // [{label, text, refName}]
 let igAspectRatio='16:9'; // default
+let igCurrentAspectRatio='16/9'; // CSS format
 let igDensityPerScene=3; // default, set by Prompt Engineer tab
 
 function igSetAspect(ratio){
@@ -3499,6 +3464,14 @@ function igSetAspect(ratio){
     active.style.background='var(--accentbg)';
     active.style.color='var(--accent2)';
   }
+  // Cập nhật aspect-ratio của tất cả card trong grid
+  const arMap={'16:9':'16/9','9:16':'9/16','1:1':'1/1'};
+  const ar=arMap[ratio]||'16/9';
+  document.querySelectorAll('.ig-card-img').forEach(el=>{
+    el.style.aspectRatio=ar;
+  });
+  // Lưu để áp dụng khi populate grid mới
+  igCurrentAspectRatio=ar;
 }
 
 function igGetAspectPrompt(){
@@ -3507,8 +3480,8 @@ function igGetAspectPrompt(){
     '9:16':'VERTICAL PORTRAIT 9:16 FRAME — camera frames vertically, scene fills entire height, NO empty space on top or bottom, NO borders, NO white margins, full bleed',
     '1:1':'SQUARE 1:1 FRAME — scene fills entire frame equally, NO empty space, NO borders, NO white margins, full bleed'
   };
-  const noWhite='ABSOLUTELY NO white background, NO gray background, NO plain background, NO border of any kind, background scene fills EVERY SINGLE PIXEL';
-  return `${map[igAspectRatio]||map['16:9']}. ${noWhite}`;
+  const noWhite='ABSOLUTELY NO white background, NO white padding, NO white margin, NO gray background, NO plain background, NO border of any kind, NO frame around image, background scene fills EVERY SINGLE PIXEL to all 4 edges';
+  return `${noWhite}. ${map[igAspectRatio]||map['16:9']}`;
 }
 let igGeneratedImages=[]; // [{label, dataUrl}]
 
@@ -3840,7 +3813,7 @@ async function igRunAll(){
       <div class="ig-card-overlay" id="igoverlay_${i}">
         <button class="btn-ig-regen" id="igregenBtn_${i}" onclick="igRegenOne(${i})">🔄 Tạo lại</button>
       </div>
-      <div class="ig-card-img loading" id="igimg_${i}">
+      <div class="ig-card-img loading" id="igimg_${i}" style="aspect-ratio:${igCurrentAspectRatio};">
         <div style="text-align:center;padding:16px;">
           <div style="font-size:22px;margin-bottom:6px;">⏳</div>
           <div style="font-size:11px;font-weight:600;">${esc(p.label)}</div>
@@ -3886,9 +3859,9 @@ async function igRunAll(){
       const dnaSnippet=Object.entries(charDNAMap).map(([name,dna])=>
         `[${name}: ${dna.visual_summary||dna.hair||''}]`
       ).join(' ');
-      finalPrompt=`[${aspectStr}]\n\n${p.text}\n\nCharacter DNA: ${dnaSnippet}\nMaintain character consistency.`;
+      finalPrompt=`[${aspectStr}]\n\n${p.text}\n\nCharacter DNA: ${dnaSnippet}\nMaintain character consistency.\n\nREMINDER: NO white margins, NO white padding, full bleed to all edges.`;
     } else {
-      finalPrompt=`[${aspectStr}]\n\n${p.text}${styleDNA}`;
+      finalPrompt=`[${aspectStr}]\n\n${p.text}${styleDNA}\n\nREMINDER: NO white margins, NO white padding, full bleed to all edges.`;
     }
 
     $(`igimg_${i}`).querySelector('div').innerHTML=`<div style="font-size:10px;color:var(--accent2)">🎨 Generating...</div>`;
@@ -3931,8 +3904,9 @@ async function igRunAll(){
     }
 
     completed++;
-    $('igProgBar').style.width=(10+completed/total*88)+'%';
-    $('igProgPct').textContent=Math.round(completed/total*100)+'%';
+    const pct=Math.min(Math.round(completed/total*100),100);
+    $('igProgBar').style.width=(10+Math.min(completed,total)/total*88)+'%';
+    $('igProgPct').textContent=pct+'%';
     $('igProgLabel').textContent=`🎨 ${completed}/${total} ảnh xong (parallel ${PARALLEL}x)…`;
 
     if(imgB64){
@@ -3942,7 +3916,7 @@ async function igRunAll(){
       const el=$(`igimg_${i}`);
       if(el){
         el.classList.remove('loading');
-        el.innerHTML=`<div class="img-bg" style="background-image:url('${dataUrl}')"></div><img src="${dataUrl}" style="position:relative;z-index:1;width:100%;height:100%;object-fit:contain;object-position:center;display:block;">`;
+        el.innerHTML=`<img src="${dataUrl}" style="width:100%;height:100%;object-fit:cover;object-position:center;display:block;transform:scale(1.08);">`;
       }
       const labelEl=$(`iglabel_${i}`);
       if(labelEl) labelEl.innerHTML=`<span>${esc(p.label)}${p.refName?' · '+esc(p.refName):''}</span><button class="btn-ig-dl" onclick="igDlOne('${dataUrl}','${p.label.replace(/\./g,'_')}.png')" title="Download">⬇</button>`;
@@ -3959,17 +3933,6 @@ async function igRunAll(){
     const batch=[];
     for(let j=i;j<Math.min(i+PARALLEL,total);j++) batch.push(generateOne(j));
     await Promise.all(batch);
-    if(i+PARALLEL<total&&!igStopped) await new Promise(r=>setTimeout(r,100));
-  }
-
-  // Chạy song song theo batch PARALLEL ảnh
-  for(let i=0;i<total;i+=PARALLEL){
-    if(igStopped)break;
-    while(igPaused){await new Promise(r=>setTimeout(r,200));if(igStopped)break;}
-    const batch=[];
-    for(let j=i;j<Math.min(i+PARALLEL,total);j++) batch.push(generateOne(j));
-    await Promise.all(batch);
-    // Delay nhỏ giữa các batch để tránh rate limit
     if(i+PARALLEL<total&&!igStopped) await new Promise(r=>setTimeout(r,300));
   }
 
@@ -4019,9 +3982,9 @@ async function igRegenOne(i){
   let finalPrompt=p.text;
   if(Object.keys(charDNAMap).length>0){
     const dnaSnippet=Object.entries(charDNAMap).map(([name,dna])=>`[${name}: ${dna?.visual_summary||dna?.hair||''}]`).join(' ');
-    finalPrompt=`[${aspectStr}]\n\n${p.text}\n\nCharacter DNA: ${dnaSnippet}\nMaintain character consistency.`;
+    finalPrompt=`[${aspectStr}]\n\n${p.text}\n\nCharacter DNA: ${dnaSnippet}\nMaintain character consistency.\n\nREMINDER: NO white margins, NO white padding, full bleed to all edges.`;
   } else {
-    finalPrompt=`[${aspectStr}]\n\n${p.text}${styleDNA}`;
+    finalPrompt=`[${aspectStr}]\n\n${p.text}${styleDNA}\n\nREMINDER: NO white margins, NO white padding, full bleed to all edges.`;
   }
 
   try{
@@ -4029,7 +3992,7 @@ async function igRegenOne(i){
     if(imgB64){
       const dataUrl='data:image/png;base64,'+imgB64;
       igGeneratedImages[i]={label:p.label,dataUrl};
-      if(imgEl){imgEl.classList.remove('loading');imgEl.innerHTML=`<div class="img-bg" style="background-image:url('${dataUrl}')"></div><img src="${dataUrl}" style="position:relative;z-index:1;width:100%;height:100%;object-fit:contain;object-position:center;display:block;">`;}
+      if(imgEl){imgEl.classList.remove('loading');imgEl.innerHTML=`<img src="${dataUrl}" style="width:100%;height:100%;object-fit:cover;object-position:center;display:block;transform:scale(1.08);">`;}
       const labelEl=$(`iglabel_${i}`);
       if(labelEl)labelEl.innerHTML=`<span>${esc(p.label)}${p.refName?' · '+esc(p.refName):''}</span><button class="btn-ig-dl" onclick="igDlOne('${dataUrl}','${p.label.replace(/\./g,'_')}.png')" title="Download">⬇</button>`;
     }
