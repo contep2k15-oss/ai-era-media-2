@@ -676,28 +676,28 @@ html,body{height:100%;overflow:hidden;background:var(--bg0);color:var(--text);fo
   <div class="sidebar-nav">
     <button class="sb-btn active" id="tabBtnSheet" onclick="switchTab('sheet')" title="">
       <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
-      <span class="sb-tooltip">Character Sheet</span>
+      <span class="sb-tooltip">Script & Style · Phân tích video & Nhân vật</span>
     </button>
     <button class="sb-btn" id="tabBtnTts" onclick="switchTab('tts')" title="">
       <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M15.54 8.46a5 5 0 0 1 0 7.07"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14"/></svg>
-      <span class="sb-tooltip">Text to Speech</span>
+      <span class="sb-tooltip">Voiceover · Viết kịch bản & giọng đọc</span>
     </button>
     <button class="sb-btn" id="tabBtnAudio" onclick="switchTab('audio')" title="">
       <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>
-      <span class="sb-tooltip">Audio Splitter</span>
+      <span class="sb-tooltip">Audio Cutter · Cắt ghép audio</span>
     </button>
     <div class="sidebar-sep"></div>
     <button class="sb-btn" id="tabBtnPrompt" onclick="switchTab('prompt')" title="">
       <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
-      <span class="sb-tooltip">Prompt Engineer</span>
+      <span class="sb-tooltip">Storyboard · Tạo prompt ảnh từng cảnh</span>
     </button>
     <button class="sb-btn" id="tabBtnImg" onclick="switchTab('img')" title="">
       <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
-      <span class="sb-tooltip">Image Generator</span>
+      <span class="sb-tooltip">Image Gen · Tạo ảnh AI hàng loạt</span>
     </button>
     <button class="sb-btn" id="tabBtnVideo" onclick="switchTab('video')" title="">
       <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><polygon points="23 7 16 12 23 17 23 7"/><rect x="1" y="5" width="15" height="14" rx="2"/></svg>
-      <span class="sb-tooltip">Video Studio</span>
+      <span class="sb-tooltip">Video Studio · Ghép ảnh & audio → MP4</span>
     </button>
   </div>
 </div>
@@ -708,9 +708,9 @@ html,body{height:100%;overflow:hidden;background:var(--bg0);color:var(--text);fo
 <div class="tab-panel active" id="panelSheet">
 <div class="panel-inner">
   <div class="panel-header">
-    <div class="panel-tag"><span class="panel-tag-dot"></span>AI Character Sheet Builder</div>
-    <div class="panel-title">Tạo <em>nhân vật tham chiếu</em> từ video YouTube</div>
-    <div class="panel-desc">Dán link YouTube → Gemini phân tích → sinh AI prompt cho toàn bộ nhân vật.</div>
+    <div class="panel-tag"><span class="panel-tag-dot"></span>Script & Style · Phân tích video · Xây dựng nhân vật</div>
+    <div class="panel-title">Script & Style — <em>Phân tích video & Nhân vật</em></div>
+    <div class="panel-desc">Phân tích phong cách video → Áp dụng Visual DNA → Tạo nhân vật tham chiếu.</div>
   </div>
 
   
@@ -760,19 +760,27 @@ html,body{height:100%;overflow:hidden;background:var(--bg0);color:var(--text);fo
     </div>
   </div>
 
-  <button class="btn-action-primary" id="genBtn" onclick="generate()">
+  <button class="btn-action-primary" id="analyzeBtn" onclick="analyzeVideoStyle()" style="background:var(--bg3);border:1px solid var(--border2);color:var(--text2);margin-bottom:8px;">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+    Phân tích phong cách video
+  </button>
+
+  <!-- VIDEO ANALYSIS CARD (hiện sau khi phân tích) -->
+  <div id="videoAnalysisCard" style="display:none;background:var(--bg3);border:1px solid var(--border2);border-radius:var(--r);padding:14px;margin-bottom:12px;"></div>
+
+  <button class="btn-action-primary" id="genBtn" onclick="generate()" style="background:var(--bg3);border:1px solid var(--border2);color:var(--text2);opacity:0.7;">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
     Tạo Character Reference Sheet
   </button>
+  <div id="genBtnHint" style="font-size:10px;color:var(--text3);text-align:center;margin-top:4px;margin-bottom:4px;">
+    Áp dụng Visual DNA trước để nhân vật thừa hưởng phong cách video
+  </div>
 
   <div class="status" id="statusEl">
     <div class="spin-lg"></div>
     <div><div class="status-main" id="statusMain">Đang phân tích…</div><div class="status-sub" id="statusSub"></div></div>
   </div>
   <div class="err" id="errEl"></div>
-
-  <!-- VIDEO ANALYSIS CARD (hiện sau khi generate) -->
-  <div id="videoAnalysisCard" style="display:none;background:var(--bg3);border:1px solid var(--border2);border-radius:var(--r);padding:14px;margin-bottom:12px;"></div>
 
   <div class="results" id="results">
     <div class="result-header">
@@ -932,9 +940,9 @@ html,body{height:100%;overflow:hidden;background:var(--bg0);color:var(--text);fo
 <div class="panel-inner">
 
   <div class="panel-header">
-    <div class="panel-tag"><span class="panel-tag-dot"></span>Imagen Prompt Engineer v4</div>
-    <div class="panel-title">Tạo <em>prompt ảnh</em> từ kịch bản audio</div>
-    <div class="panel-desc">Chọn nhân vật → nhập kịch bản → Gemini sinh prompt A/B/C theo từng cảnh.</div>
+    <div class="panel-tag"><span class="panel-tag-dot"></span>Storyboard · Tạo prompt ảnh từng cảnh</div>
+    <div class="panel-title">Storyboard — <em>Prompt ảnh từng cảnh</em></div>
+    <div class="panel-desc">Chọn nhân vật → nhập kịch bản → Gemini sinh prompt A/B/C/D/E theo từng cảnh.</div>
   </div>
 
   <!-- STEP 1: CHỌN NHÂN VẬT -->
@@ -1080,9 +1088,9 @@ html,body{height:100%;overflow:hidden;background:var(--bg0);color:var(--text);fo
 <div class="panel-inner">
 
   <div class="panel-header">
-    <div class="panel-tag"><span class="panel-tag-dot"></span>Audio Splitter Pro</div>
-    <div class="panel-title">Cắt audio thành <em>từng đoạn</em></div>
-    <div class="panel-desc">Upload audio → cắt theo thời gian → nghe thử → tải ZIP hoặc dùng làm kịch bản.</div>
+    <div class="panel-tag"><span class="panel-tag-dot"></span>Audio Cutter · Cắt ghép audio</div>
+    <div class="panel-title">Audio Cutter — <em>Cắt ghép audio</em></div>
+    <div class="panel-desc">Upload audio → cắt theo thời gian → nghe thử từng đoạn → tải ZIP.</div>
   </div>
 
   <!-- DROP ZONE -->
@@ -1192,9 +1200,9 @@ html,body{height:100%;overflow:hidden;background:var(--bg0);color:var(--text);fo
 <div class="panel-inner">
 
   <div class="panel-header">
-    <div class="panel-tag"><span class="panel-tag-dot"></span>Gemini 3.1 Flash TTS</div>
-    <div class="panel-title">Sub YouTube → <em>Voice hoàn chỉnh</em></div>
-    <div class="panel-desc">Dán phụ đề → AI viết lại theo phong cách chọn → tạo voice → download WAV.</div>
+    <div class="panel-tag"><span class="panel-tag-dot"></span>Voiceover · Viết kịch bản · Tạo giọng đọc</div>
+    <div class="panel-title">Voiceover — <em>Kịch bản & Giọng đọc</em></div>
+    <div class="panel-desc">Dán phụ đề → AI viết lại kịch bản → chọn giọng đọc → tạo voice WAV.</div>
   </div>
 
   <!-- STEP 1: DÁN SUB -->
@@ -1304,19 +1312,27 @@ html,body{height:100%;overflow:hidden;background:var(--bg0);color:var(--text);fo
     </div>
   </div>
 
-  <!-- STEP 3/4: CHỌN GIỌNG -->
+  <!-- STEP 3/4: CHỌN GIỌNG — dropdown -->
   <div class="block tts-step" id="ttsVoiceBlock" style="display:none;">
     <div class="section-head">
       <div class="section-num">4</div>
       <div class="section-title">Chọn giọng nói</div>
-      <div class="section-sub">5 giọng đại diện có nút ▶ nghe thử (cache sau lần đầu)</div>
+      <div class="section-sub">Bấm ▶ nghe thử · cache sau lần đầu</div>
     </div>
     <div class="block-body">
-      <div style="display:flex;gap:6px;margin-bottom:8px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--text3);">
-        <span style="flex:1;text-align:center;padding:4px;background:var(--bg3);border-radius:var(--rs);">👩 Giọng nữ: Callirrhoe · Kore</span>
-        <span style="flex:1;text-align:center;padding:4px;background:var(--bg3);border-radius:var(--rs);">👨 Giọng nam: Alnilam · Schedar · Charon</span>
+      <!-- Trigger button -->
+      <div id="ttsVoiceTrigger" onclick="ttsToggleVoiceDropdown()" style="display:flex;align-items:center;justify-content:space-between;padding:10px 14px;background:var(--bg3);border:1px solid var(--border2);border-radius:var(--rs);cursor:pointer;transition:border-color .15s;">
+        <div style="display:flex;align-items:center;gap:10px;">
+          <span id="ttsVoiceAvatar" style="font-size:18px;">👨</span>
+          <div>
+            <div id="ttsVoiceName" style="font-size:13px;font-weight:700;color:var(--text);">Charon</div>
+            <div id="ttsVoiceDesc" style="font-size:11px;color:var(--text3);">Nam · Informative</div>
+          </div>
+        </div>
+        <svg id="ttsVoiceChevron" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="transition:transform .2s;color:var(--text3);"><polyline points="6 9 12 15 18 9"/></svg>
       </div>
-      <div class="tts-voice-grid" id="ttsVoiceGrid"></div>
+      <!-- Dropdown list -->
+      <div id="ttsVoiceGrid" style="display:none;flex-direction:column;gap:4px;margin-top:4px;background:var(--bg3);border:1px solid var(--border2);border-radius:var(--rs);overflow:hidden;"></div>
     </div>
   </div>
 
@@ -1350,7 +1366,7 @@ html,body{height:100%;overflow:hidden;background:var(--bg0);color:var(--text);fo
       <span class="tts-result-title">✅ Voice hoàn chỉnh</span>
       <div style="display:flex;gap:8px;">
         <a class="btn-tts-dl" id="ttsDlBtn" download="voice.wav">⬇ Download WAV</a>
-        <button class="btn-tts-send" onclick="ttsSendToAudioSplitter()">→ Gửi sang Audio Splitter</button>
+        <button class="btn-tts-send" onclick="ttsSendToAudioSplitter()">→ Gửi sang Audio Cutter</button>
       </div>
     </div>
     <audio class="tts-player" id="ttsPlayer" controls></audio>
@@ -1369,8 +1385,8 @@ html,body{height:100%;overflow:hidden;background:var(--bg0);color:var(--text);fo
   <div style="width:340px;min-width:280px;flex-shrink:0;overflow-y:auto;padding:16px 14px;border-right:1px solid var(--border);">
 
     <div class="panel-header" style="margin-bottom:12px;">
-      <div class="panel-tag"><span class="panel-tag-dot"></span>gemini-2.5-flash-image · Character Consistency Pipeline</div>
-      <div class="panel-title">Tạo ảnh <em>đồng nhất nhân vật</em></div>
+      <div class="panel-tag"><span class="panel-tag-dot"></span>Image Gen · Tạo ảnh AI hàng loạt</div>
+      <div class="panel-title">Image Gen — <em>Tạo ảnh AI hàng loạt</em></div>
     </div>
 
     <!-- A: ẢNH THAM CHIẾU -->
@@ -1404,13 +1420,13 @@ html,body{height:100%;overflow:hidden;background:var(--bg0);color:var(--text);fo
       <div class="section-head">
         <div class="section-num">B</div>
         <div class="section-title">Prompt ảnh</div>
-        <div class="section-sub">Từ Prompt Engineer hoặc dán tay</div>
+        <div class="section-sub">Từ Storyboard hoặc dán tay</div>
       </div>
       <div class="block-body">
         <div class="ig-actions">
           <button class="btn-sync" onclick="igSyncFromPE()">
             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
-            Sync từ Prompt Engineer
+            Sync từ Storyboard
           </button>
         </div>
         <textarea class="ig-prompt-box" id="igPromptBox" placeholder="[1.A]&#10;An ancient city square...&#10;---&#10;[1.B]&#10;[REF: Kore] He raises his sword..." oninput="igParsePrompts()" style="min-height:120px;"></textarea>
@@ -1670,7 +1686,7 @@ function showProviderBadge(elId, key){
   el.innerHTML=`<span style="font-size:10px;padding:2px 8px;border-radius:99px;background:#4285f422;color:#4285f4;border:1px solid #4285f444;">⚡ Google AI Studio</span>`;
 }
 
-let selectedStyle='auto', usedModel='', lastChars=[], lastProject={};
+let selectedStyle='auto', usedModel='', lastChars=[], lastProject={}, lastAnalyzedDNA='';
 const $=id=>document.getElementById(id);
 
 function saveApiKey(){
@@ -1764,6 +1780,132 @@ async function callGeminiText(parts,apiKey){
 
 
 
+// ── PHÂN TÍCH PHONG CÁCH VIDEO (bước 1) ──
+
+async function analyzeVideoStyle(){
+  hideErr();
+  const url=$('urlInput').value.trim();
+  const apiKey=$('apiKey').value.trim();
+  if(!apiKey){showErr('Vui lòng nhập API key trước.');return;}
+  if(!url){showErr('Vui lòng dán link YouTube vào ô trên.');return;}
+  const vid=getVideoId(url);
+  if(!vid){showErr('Không nhận ra video ID từ URL này.');return;}
+
+  const btn=$('analyzeBtn');
+  btn.disabled=true;
+  btn.innerHTML='<div class="spin-sm"></div> Đang phân tích...';
+  showStatus('Gemini đang phân tích phong cách video…','Medium · Genre · Style · Niche · Visual DNA');
+
+  const thumbB64=await loadThumb(vid);
+
+  const schema=`{"style_analysis":{"medium":"string","genre":"string","style":"string","niche":"string","visual_dna":"string — 20-40 từ keyword cho AI image generation"},"project":{"title":"string","tone":"string","target_audience":"string","setting":"string","time_period":"string","pacing":"fast|medium|slow","cinematography":"string"}}`;
+
+  const promptText=`Analyze this YouTube video (URL: ${url}) and its thumbnail.
+
+Perform a DEEP 5-LAYER STYLE ANALYSIS:
+1. medium: Overall format (Anime / Live Action / 2D Animation / Documentary / etc)
+2. genre: Specific genre (Action Shonen / Historical Drama / Political Thriller / etc)
+3. style: Named visual style (Dark Military Dystopia / Ghibli Pastoral / Neo-noir / etc)
+4. niche: Specific niche within that style (Titan horror / Palace intrigue / Samurai revenge / etc)
+5. visual_dna: 20-40 AI image generation keywords capturing the EXACT visual language of this video
+
+Return ONLY valid JSON: ${schema}`;
+
+  const parts=[{text:promptText}];
+  if(thumbB64) parts.unshift({inlineData:{mimeType:'image/jpeg',data:thumbB64}});
+
+  try{
+    const raw=await callGeminiText(parts,apiKey);
+    const cleaned=raw.replace(/```json\n?|\n?```/g,'').trim();
+    const parsed=JSON.parse(cleaned);
+    const sa=parsed.style_analysis||{};
+    const proj=parsed.project||{};
+
+    // Chỉ lưu lastAnalyzedDNA — KHÔNG tự set igProjectStyleDNA
+    // User phải bấm "Áp dụng Visual DNA" thì mới apply
+    lastAnalyzedDNA=sa.visual_dna||'';
+
+    // Render card phân tích
+    renderStyleAnalysisCard(sa, proj);
+
+    // Highlight nút Tạo Character
+    const genBtn=$('genBtn');
+    if(genBtn){
+      genBtn.style.borderColor='var(--accent)';
+      genBtn.style.background='var(--accentbg)';
+    }
+  }catch(e){
+    showErr('Phân tích thất bại: '+e.message);
+  }
+
+  hideStatus();
+  btn.disabled=false;
+  btn.innerHTML='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg> Phân tích lại';
+}
+
+function renderStyleAnalysisCard(sa, proj){
+  const el=$('videoAnalysisCard');
+  if(!el)return;
+  el.style.display='block';
+  const dnaApplied=!!igProjectStyleDNA;
+  el.innerHTML=`
+    <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--accent);margin-bottom:10px;">📊 Phân tích phong cách video</div>
+    <div style="display:flex;flex-direction:column;gap:4px;margin-bottom:10px;">
+      ${sa.medium?`<div style="display:flex;align-items:center;gap:8px;padding:6px 10px;background:var(--bg2);border-radius:var(--rs);border-left:3px solid #6366f1;">
+        <span style="font-size:10px;font-weight:700;color:#818cf8;min-width:60px;">MEDIUM</span>
+        <span style="font-size:12px;color:var(--text);">${esc(sa.medium)}</span>
+      </div>`:''}
+      ${sa.genre?`<div style="display:flex;align-items:center;gap:8px;padding:6px 10px;background:var(--bg2);border-radius:var(--rs);border-left:3px solid #06b6d4;">
+        <span style="font-size:10px;font-weight:700;color:#67e8f9;min-width:60px;">GENRE</span>
+        <span style="font-size:12px;color:var(--text);">${esc(sa.genre)}</span>
+      </div>`:''}
+      ${sa.style?`<div style="display:flex;align-items:center;gap:8px;padding:6px 10px;background:var(--bg2);border-radius:var(--rs);border-left:3px solid #10b981;">
+        <span style="font-size:10px;font-weight:700;color:#6ee7b7;min-width:60px;">STYLE</span>
+        <span style="font-size:12px;color:var(--text);">${esc(sa.style)}</span>
+      </div>`:''}
+      ${sa.niche?`<div style="display:flex;align-items:center;gap:8px;padding:6px 10px;background:var(--bg2);border-radius:var(--rs);border-left:3px solid #f59e0b;">
+        <span style="font-size:10px;font-weight:700;color:#fcd34d;min-width:60px;">NICHE</span>
+        <span style="font-size:12px;color:var(--text);">${esc(sa.niche)}</span>
+      </div>`:''}
+      ${sa.visual_dna?`<div style="padding:8px 10px;background:rgba(16,185,129,0.08);border-radius:var(--rs);border:1px solid rgba(16,185,129,0.25);">
+        <div style="font-size:9px;font-weight:700;color:var(--accent);margin-bottom:4px;">✦ VISUAL DNA</div>
+        <div style="font-size:11px;color:var(--text2);line-height:1.5;">${esc(sa.visual_dna)}</div>
+      </div>`:''}
+    </div>
+    ${proj.tone||proj.setting||proj.pacing?`
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:5px;margin-bottom:10px;">
+      ${proj.tone?`<div class="va-item"><span class="va-label">Tone</span><span class="va-val">${esc(proj.tone)}</span></div>`:''}
+      ${proj.pacing?`<div class="va-item"><span class="va-label">Nhịp độ</span><span class="va-val">${esc(proj.pacing)}</span></div>`:''}
+      ${proj.target_audience?`<div class="va-item"><span class="va-label">Đối tượng</span><span class="va-val">${esc(proj.target_audience)}</span></div>`:''}
+      ${proj.time_period?`<div class="va-item"><span class="va-label">Thời đại</span><span class="va-val">${esc(proj.time_period)}</span></div>`:''}
+    </div>`:''}
+    <div id="dnaApplyStatus" style="padding:8px 12px;background:${dnaApplied?'rgba(16,185,129,0.1)':'rgba(245,158,11,0.1)'};border:1px solid ${dnaApplied?'rgba(16,185,129,0.3)':'rgba(245,158,11,0.3)'};border-radius:var(--rs);font-size:11px;color:${dnaApplied?'var(--green)':'var(--amber)'};text-align:center;margin-bottom:8px;">
+      ${dnaApplied?'✅ Visual DNA đã áp dụng':'⚡ Chọn tab muốn áp dụng Visual DNA'}
+    </div>
+    ${sa.visual_dna?`
+    <div style="background:var(--bg2);border:1px solid var(--border2);border-radius:var(--rs);padding:10px;margin-bottom:8px;">
+      <div style="font-size:10px;font-weight:700;color:var(--text3);text-transform:uppercase;margin-bottom:8px;">Áp dụng vào:</div>
+      <div style="display:flex;flex-direction:column;gap:6px;margin-bottom:10px;">
+        <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:12px;color:var(--text2);">
+          <input type="checkbox" id="dnaChkChar" checked style="width:14px;height:14px;accent-color:var(--accent);cursor:pointer;">
+          Character Sheet <span style="font-size:10px;color:var(--text3);">— prompt nhân vật</span>
+        </label>
+        <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:12px;color:var(--text2);">
+          <input type="checkbox" id="dnaChkPE" checked style="width:14px;height:14px;accent-color:var(--accent);cursor:pointer;">
+          Prompt Engineer <span style="font-size:10px;color:var(--text3);">— tạo prompt ảnh</span>
+        </label>
+        <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:12px;color:var(--text2);">
+          <input type="checkbox" id="dnaChkIG" checked style="width:14px;height:14px;accent-color:var(--accent);cursor:pointer;">
+          Image Generator <span style="font-size:10px;color:var(--text3);">— generate ảnh</span>
+        </label>
+      </div>
+      <button onclick="igApplyStyle('${esc(sa.visual_dna).replace(/'/g,'\\\'')}',event)" style="width:100%;padding:9px;background:#10b981;border:none;border-radius:var(--rs);color:#0a0f0e;font-size:12px;font-weight:700;cursor:pointer;">
+        ✦ Áp dụng Visual DNA
+      </button>
+    </div>`:''}
+  `;
+}
+
 // ── THUMBNAIL ──
 function getVideoId(url){const m=url.match(/(?:v=|youtu\.be\/|shorts\/)([a-zA-Z0-9_-]{11})/);return m?m[1]:null;}
 async function loadThumb(vid){
@@ -1805,6 +1947,11 @@ async function generate(){
     ?'Automatically detect the most appropriate character art style from the video thumbnail and context. Apply that detected style consistently to all characters.'
     :`Apply this specific art style to ALL character prompts: ${styleStr}`;
 
+  // Thêm Visual DNA nếu đã phân tích
+  const visualDNAInject=igDNA_CHAR
+    ?`\n\nVISUAL DNA (MUST apply to ALL character ai_prompt fields): ${igDNA_CHAR}`
+    :'';
+
   const schema=`{"project":{"title":"string","genre":"string","video_genre":"documentary|drama|action|comedy|horror|romance|sci-fi|historical|educational|vlog|other","content_style":"string","tone":"string","target_audience":"string","setting":"string","time_period":"string","art_style":"string","color_palette":"string","cinematography":"string","pacing":"fast|medium|slow","style_analysis":{"medium":"string — Anime|Live Action|Animation|Motion Graphics|Documentary|Mixed","genre":"string — thể loại cụ thể: Action/Shonen/Historical Drama/etc","style":"string — phong cách cụ thể: Dark Military/Ghibli Pastoral/Neo-noir/etc","niche":"string — ngách cụ thể: Dystopian horror/Titan threat/Political thriller/etc","visual_dna":"string — 20-40 từ keyword cho AI image generation, VD: dark shonen anime, military dystopia, high contrast shadows, muted earth tones, dramatic Dutch angles, speed lines, intense facial expressions"}},"characters":[{"id":1,"role":"main|sub|villain|crowd|soldier|support|other","name":"string","archetype":"string","gender":"male|female|unknown","age_range":"string","appearance":{"hair":"string","eyes":"string","skin":"string","build":"string","height":"string"},"outfit":"string","personality_tags":["string"],"role_in_story":"string","ai_prompt":"Full 80-120 word AI image generation prompt. MUST include: full body standing pose, complete limbs visible (both arms and hands, both legs and feet), character standing alone, white or simple background, character name label written at the bottom of the image. Self-contained paste-ready for Midjourney/SDXL/Gemini Imagen","negative_prompt":"string — MUST include: cropped body, missing limbs, missing hands, missing feet, cut-off legs, multiple characters, group shot, partial body"}]}`;
 
   const promptText=`Analyze this YouTube video (URL: ${url}) thumbnail and context.
@@ -1832,6 +1979,7 @@ RULES:
 9. For video_genre: analyze the actual content type (documentary/drama/action/etc)
 10. For content_style: how the video is made (cinematic narration/talking head/animation/etc)
 11. For tone: emotional register (dark/epic/comedic/etc)
+${visualDNAInject}
 
 Return ONLY valid JSON matching this schema: ${schema}`;
 
@@ -1872,21 +2020,50 @@ Return ONLY valid JSON matching this schema: ${schema}`;
 }
 
 // ── ÁP DỤNG VISUAL DNA VÀO DỰ ÁN ──
-function igApplyStyle(visualDna){
+function igApplyStyle(visualDna,evt){
   if(!visualDna)return;
-  // Lưu vào project style DNA để dùng trong image gen
-  igProjectStyleDNA=visualDna;
-  // Hiện thông báo
-  const btn=event.target;
-  const orig=btn.textContent;
-  btn.textContent='✅ Đã áp dụng!';
-  btn.style.background='var(--accentbg)';
-  btn.style.color='var(--accent2)';
-  setTimeout(()=>{
-    btn.textContent=orig;
-    btn.style.background='#10b981';
-    btn.style.color='#0a0f0e';
-  },2000);
+
+  const chkChar=$('dnaChkChar')?.checked;
+  const chkPE=$('dnaChkPE')?.checked;
+  const chkIG=$('dnaChkIG')?.checked;
+
+  if(chkChar){igDNA_CHAR=visualDna;igProjectStyleDNA=visualDna;}
+  else igDNA_CHAR='';
+
+  if(chkPE) igDNA_PE=visualDna;
+  else igDNA_PE='';
+
+  if(chkIG) igDNA_IG=visualDna;
+  else igDNA_IG='';
+
+  lastAnalyzedDNA=visualDna;
+
+  // Update status
+  const status=$('dnaApplyStatus');
+  if(status){
+    const applied=[];
+    if(chkChar)applied.push('Character Sheet');
+    if(chkPE)applied.push('Prompt Engineer');
+    if(chkIG)applied.push('Image Generator');
+    status.style.background='rgba(16,185,129,0.1)';
+    status.style.borderColor='rgba(16,185,129,0.3)';
+    status.style.color='var(--green)';
+    status.textContent=applied.length
+      ?`✅ Đã áp dụng vào: ${applied.join(' · ')}`
+      :'⚠ Chưa chọn tab nào';
+  }
+
+  if(chkChar){
+    const genBtn=$('genBtn');
+    if(genBtn){
+      genBtn.style.background='';
+      genBtn.style.border='';
+      genBtn.style.color='';
+      genBtn.style.opacity='1';
+    }
+    const hint=$('genBtnHint');
+    if(hint)hint.style.display='none';
+  }
 }
 
 function getRoleClass(role){return ROLE_CLASSES[role]||'role-other';}
@@ -2562,7 +2739,7 @@ async function peRunBatch(apiKey,batchIndex,totalBatches){
 
 CHARACTER REFERENCE TAGS: ${refTags}
 These tags reference uploaded character images for appearance consistency. Place at start of B/C/D shots only.
-
+${igDNA_PE?`\nVISUAL DNA (apply to ALL prompts): ${igDNA_PE}\n`:''}
 PROMPT STRUCTURE:
 - [N.A] Establishing Shot: environment/location ONLY. No REF tags. No character names or appearance. 50-70 words. End with: "${styleMatchNote} No text. No watermarks."
 - [N.B] Action Shot: REF tag(s) first, then exact action/pose/expression from the audio. 40-60 words. End with: "${styleAnchor}. ${refNote} No text. No watermarks."
@@ -2658,36 +2835,11 @@ const TTS_MODELS_PRIORITY=[
 let ttsActiveModel=null; // set after auto-detect
 
 const TTS_VOICES=[
-  {id:'Zephyr',    desc:'Bright'},
-  {id:'Puck',      desc:'Upbeat'},
-  {id:'Charon',    desc:'Informative'},
-  {id:'Kore',      desc:'Firm'},
-  {id:'Fenrir',    desc:'Excitable'},
-  {id:'Leda',      desc:'Youthful'},
-  {id:'Orus',      desc:'Firm'},
-  {id:'Aoede',     desc:'Breezy'},
-  {id:'Callirrhoe',desc:'Easy-going'},
-  {id:'Autonoe',   desc:'Bright'},
-  {id:'Enceladus', desc:'Breathy'},
-  {id:'Iapetus',   desc:'Clear'},
-  {id:'Umbriel',   desc:'Easy-going'},
-  {id:'Algieba',   desc:'Smooth'},
-  {id:'Despina',   desc:'Smooth'},
-  {id:'Erinome',   desc:'Clear'},
-  {id:'Algenib',   desc:'Gravelly'},
-  {id:'Rasalgethi',desc:'Informative'},
-  {id:'Laomedeia', desc:'Upbeat'},
-  {id:'Achernar',  desc:'Soft'},
-  {id:'Alnilam',   desc:'Firm'},
-  {id:'Schedar',   desc:'Even'},
-  {id:'Gacrux',    desc:'Mature'},
-  {id:'Pulcherrima',desc:'Forward'},
-  {id:'Achird',    desc:'Friendly'},
-  {id:'Zubenelgenubi',desc:'Casual'},
-  {id:'Vindemiatrix',desc:'Gentle'},
-  {id:'Sadachbia', desc:'Lively'},
-  {id:'Sadaltager',desc:'Knowledgeable'},
-  {id:'Sulafat',   desc:'Warm'},
+  {id:'Callirrhoe', desc:'Nữ · Easy-going',  gender:'female'},
+  {id:'Kore',       desc:'Nữ · Firm',         gender:'female'},
+  {id:'Alnilam',    desc:'Nam · Firm',         gender:'male'},
+  {id:'Schedar',    desc:'Nam · Even',         gender:'male'},
+  {id:'Charon',     desc:'Nam · Informative',  gender:'male'},
 ];
 
 const TTS_STYLE_PROMPTS={
@@ -2747,31 +2899,35 @@ async function ttsPreviewVoice(voiceId){
   // Nếu đang play → stop
   if(ttsPreviewAudio){
     ttsPreviewAudio.pause();
+    URL.revokeObjectURL(ttsPreviewAudio._url||'');
     ttsPreviewAudio=null;
     document.querySelectorAll('.btn-tts-preview').forEach(b=>{b.textContent='▶';b.style.color='';});
     return;
   }
 
-  // Check cache trong localStorage
+  // Check cache
   const cacheKey=TTS_CACHE_PREFIX+voiceId;
-  let audioB64=null;
+  let pcmBuf=null;
   try{
     const cached=localStorage.getItem(cacheKey);
-    if(cached){audioB64=cached;}
+    if(cached){
+      const bin=atob(cached);
+      pcmBuf=new Uint8Array(bin.length);
+      for(let i=0;i<bin.length;i++)pcmBuf[i]=bin.charCodeAt(i);
+    }
   }catch(e){}
 
-  if(!audioB64){
-    // Gọi API lần đầu
+  if(!pcmBuf){
     btn.textContent='⏳';btn.style.color='var(--accent)';
-    const sampleText='Hello! This is a preview of my voice. I hope you enjoy listening to it.';
+    const sampleText=`Hello, I'm ${voiceId}. This is how I sound when narrating your content.`;
     try{
-      const wavBuf=await ttsCallAPI(apiKey,sampleText,voiceId,null);
-      // Convert Uint8Array → base64
-      let binary='';
-      wavBuf.forEach(b=>binary+=String.fromCharCode(b));
-      audioB64=btoa(binary);
-      // Lưu cache
-      try{localStorage.setItem(cacheKey,audioB64);}catch(e){console.warn('Cache full:',e);}
+      pcmBuf=await ttsCallAPI(apiKey,sampleText,voiceId,null);
+      // Cache — lưu dưới dạng base64
+      try{
+        let binary='';
+        pcmBuf.forEach(b=>binary+=String.fromCharCode(b));
+        localStorage.setItem(cacheKey,btoa(binary));
+      }catch(e){console.warn('Cache full:',e);}
     }catch(e){
       btn.textContent='▶';btn.style.color='';
       alert('Lỗi nghe thử: '+e.message.slice(0,100));
@@ -2779,33 +2935,70 @@ async function ttsPreviewVoice(voiceId){
     }
   }
 
-  // Play audio từ base64
+  // Thêm WAV header nếu chưa có (Google TTS trả về PCM raw)
+  const wavBuf=pcmBuf[0]===0x52&&pcmBuf[1]===0x49&&pcmBuf[2]===0x46&&pcmBuf[3]===0x46
+    ? pcmBuf  // đã là WAV
+    : addWavHeader(pcmBuf, 24000, 1, 16); // PCM → WAV (24kHz, mono, 16bit)
+
+  const blob=new Blob([wavBuf],{type:'audio/wav'});
+  const url=URL.createObjectURL(blob);
+  ttsPreviewAudio=new Audio(url);
+  ttsPreviewAudio._url=url;
   btn.textContent='⏹';btn.style.color='var(--accent)';
-  const audioUrl='data:audio/wav;base64,'+audioB64;
-  ttsPreviewAudio=new Audio(audioUrl);
-  ttsPreviewAudio.play();
+  ttsPreviewAudio.play().catch(e=>alert('Không play được: '+e.message));
   ttsPreviewAudio.onended=()=>{
     ttsPreviewAudio=null;
     btn.textContent='▶';btn.style.color='';
+    URL.revokeObjectURL(url);
+    // Update cache indicator
+    const nameEl=btn.previousElementSibling?.querySelector('div');
+    if(nameEl&&!nameEl.querySelector('.cache-dot')){
+      nameEl.innerHTML+=`<span class="cache-dot" style="font-size:9px;color:var(--green);margin-left:4px;">●</span>`;
+    }
   };
 }
 
-// Init voice grid
+// Init voice dropdown
 function ttsInitVoices(){
   const grid=$('ttsVoiceGrid');
   if(!grid||grid.children.length>0)return;
   grid.innerHTML=TTS_VOICES.map(v=>{
-    const isPreview=TTS_PREVIEW_VOICES.includes(v.id);
-    const previewLabel=TTS_PREVIEW_LABELS[v.id]||v.desc;
-    const cached=(() => {try{return !!localStorage.getItem(TTS_CACHE_PREFIX+v.id);}catch(e){return false;}})();
+    const cached=(()=>{try{return !!localStorage.getItem(TTS_CACHE_PREFIX+v.id);}catch(e){return false;}})();
     return `
-    <div class="tts-voice-card${v.id===ttsSelectedVoice?' active':''}" id="ttsv_${v.id}" onclick="ttsSelectVoice('${v.id}')">
+    <div class="tts-voice-card${v.id===ttsSelectedVoice?' active':''}" id="ttsv_${v.id}" onclick="ttsSelectVoice('${v.id}')" style="display:flex;align-items:center;gap:10px;padding:10px 12px;cursor:pointer;">
+      <div style="width:30px;height:30px;border-radius:50%;background:${v.gender==='female'?'rgba(236,72,153,0.15)':'rgba(59,130,246,0.15)'};display:flex;align-items:center;justify-content:center;font-size:15px;flex-shrink:0;">${v.gender==='female'?'👩':'👨'}</div>
       <div style="flex:1;min-width:0;">
-        <div class="tts-voice-name">${v.id}${isPreview?`<span style="font-size:9px;color:var(--text3);font-weight:400;margin-left:5px;">${previewLabel}</span>`:''}${cached?'<span style="font-size:9px;color:var(--green);margin-left:4px;">●</span>':''}</div>
-        <div class="tts-voice-desc">${v.desc}</div>
+        <div style="font-size:12px;font-weight:700;color:var(--text);">${v.id} ${cached?'<span style="font-size:9px;color:var(--green);">●</span>':''}</div>
+        <div style="font-size:10px;color:var(--text3);">${v.desc}</div>
       </div>
-      ${isPreview?`<button class="btn-tts-preview" id="ttsplay_${v.id}" onclick="event.stopPropagation();ttsPreviewVoice('${v.id}')" title="Nghe thử">▶</button>`:''}
-    </div>`}).join('');
+      <button class="btn-tts-preview" id="ttsplay_${v.id}" onclick="event.stopPropagation();ttsPreviewVoice('${v.id}')" title="Nghe thử" style="width:28px;height:28px;border-radius:50%;border:1px solid var(--border2);background:var(--bg2);color:var(--text2);font-size:12px;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;">▶</button>
+    </div>`;
+  }).join('');
+  // Update trigger display
+  ttsUpdateTrigger();
+}
+
+function ttsToggleVoiceDropdown(){
+  const grid=$('ttsVoiceGrid');
+  const chevron=$('ttsVoiceChevron');
+  const trigger=$('ttsVoiceTrigger');
+  if(!grid)return;
+  const open=grid.style.display==='flex'||grid.style.display==='block';
+  grid.style.display=open?'none':'flex';
+  grid.style.flexDirection='column';
+  if(chevron)chevron.style.transform=open?'':'rotate(180deg)';
+  if(trigger)trigger.style.borderColor=open?'var(--border2)':'var(--accent)';
+}
+
+function ttsUpdateTrigger(){
+  const v=TTS_VOICES.find(x=>x.id===ttsSelectedVoice)||TTS_VOICES[4];
+  if(!v)return;
+  const avatar=$('ttsVoiceAvatar');
+  const name=$('ttsVoiceName');
+  const desc=$('ttsVoiceDesc');
+  if(avatar)avatar.textContent=v.gender==='female'?'👩':'👨';
+  if(name)name.textContent=v.id;
+  if(desc)desc.textContent=v.desc;
 }
 
 function ttsSelectStyle(el,style){
@@ -2842,6 +3035,15 @@ function ttsSelectVoice(id){
   ttsSelectedVoice=id;
   document.querySelectorAll('.tts-voice-card').forEach(c=>c.classList.remove('active'));
   $(`ttsv_${id}`)?.classList.add('active');
+  // Đóng dropdown
+  const grid=$('ttsVoiceGrid');
+  const chevron=$('ttsVoiceChevron');
+  const trigger=$('ttsVoiceTrigger');
+  if(grid)grid.style.display='none';
+  if(chevron)chevron.style.transform='';
+  if(trigger)trigger.style.borderColor='var(--border2)';
+  // Update trigger display
+  ttsUpdateTrigger();
 }
 
 $('ttsSubInput').addEventListener('input',()=>{
@@ -2954,36 +3156,6 @@ ${subTruncated}`;
   }
   $('ttsBtnRewrite').disabled=false;
   $('ttsBtnRewrite').innerHTML='<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg> Viết lại kịch bản';
-}
-
-// ── PREVIEW VOICE ──
-async function ttsPreviewVoice(voiceId){
-  const apiKey=$('apiKey').value.trim();
-  if(!apiKey){alert('Cần API key để nghe thử.');return;}
-
-  // Stop previous
-  if(ttsPreviewAudio){ttsPreviewAudio.pause();ttsPreviewAudio=null;
-    document.querySelectorAll('.btn-tts-preview').forEach(b=>{b.textContent='▶';b.classList.remove('playing');});
-  }
-
-  const btn=$(`ttsplay_${voiceId}`);
-  btn.textContent='⏳';
-
-  const sampleText=`Hello, I'm ${voiceId}. This is how I sound when narrating your content.`;
-  const stylePrompt=TTS_STYLE_PROMPTS[ttsSelectedStyle];
-
-  try{
-    const wavBuf=await ttsCallAPI(apiKey,sampleText,voiceId,stylePrompt);
-    // WAV data — use as-is
-    const url=URL.createObjectURL(new Blob([wavBuf],{type:'audio/wav'}));
-    ttsPreviewAudio=new Audio(url);
-    ttsPreviewAudio.play();
-    btn.textContent='⏸';btn.classList.add('playing');
-    ttsPreviewAudio.addEventListener('ended',()=>{btn.textContent='▶';btn.classList.remove('playing');ttsPreviewAudio=null;});
-  }catch(e){
-    btn.textContent='▶';
-    alert('Preview thất bại: '+e.message);
-  }
 }
 
 // ── GENERATE FULL VOICE ──
@@ -3177,6 +3349,31 @@ async function ttsCallAPI(apiKey,text,voice,stylePrompt){
   }
 }
 
+// Thêm WAV header cho PCM raw data từ Google TTS
+function addWavHeader(pcmData, sampleRate=24000, numChannels=1, bitsPerSample=16){
+  const byteRate=sampleRate*numChannels*bitsPerSample/8;
+  const blockAlign=numChannels*bitsPerSample/8;
+  const dataSize=pcmData.length;
+  const buf=new ArrayBuffer(44+dataSize);
+  const view=new DataView(buf);
+  const write=(off,str)=>{for(let i=0;i<str.length;i++)view.setUint8(off+i,str.charCodeAt(i));};
+  write(0,'RIFF');
+  view.setUint32(4,36+dataSize,true);
+  write(8,'WAVE');
+  write(12,'fmt ');
+  view.setUint32(16,16,true);
+  view.setUint16(20,1,true);
+  view.setUint16(22,numChannels,true);
+  view.setUint32(24,sampleRate,true);
+  view.setUint32(28,byteRate,true);
+  view.setUint16(32,blockAlign,true);
+  view.setUint16(34,bitsPerSample,true);
+  write(36,'data');
+  view.setUint32(40,dataSize,true);
+  new Uint8Array(buf).set(pcmData,44);
+  return new Uint8Array(buf);
+}
+
 const TTS_SENTENCES_PER_CHUNK=16; // 16 câu/chunk → 6 phút ≈ 2-3 chunks
 
 function ttsChunkText(text){
@@ -3321,7 +3518,10 @@ function igRefreshCharGrid(){
 // ── VISUAL DNA CACHE: {charName → dnaString} ──
 let igCharDNA={};
 // ── PROJECT STYLE DNA (extracted from first ref image) ──
-let igProjectStyleDNA='';
+let igProjectStyleDNA=''; // flag tổng (backward compat)
+let igDNA_CHAR='';  // Character Sheet
+let igDNA_PE='';    // Prompt Engineer
+let igDNA_IG='';    // Image Generator
 
 // ── STEP 1: Extract Visual DNA from ref image via Gemini Vision ──
 async function igExtractDNA(imgApiKey, charName, refBase64){
@@ -3576,7 +3776,7 @@ async function igRunAll(){
 
     let finalPrompt=p.text;
     const aspectStr=igGetAspectPrompt();
-    const styleDNA=igProjectStyleDNA?`\nVisual Style: ${igProjectStyleDNA}`:'';
+    const styleDNA=igDNA_IG?`\nVisual Style: ${igDNA_IG}`:'';
     if(Object.keys(charDNAMap).length>0){
       const dnaSnippet=Object.entries(charDNAMap).map(([name,dna])=>
         `[${name}: ${dna.visual_summary||dna.hair||''}]`
@@ -3709,7 +3909,7 @@ async function igRegenOne(i){
     }
   }
   const aspectStr=igGetAspectPrompt();
-  const styleDNA=igProjectStyleDNA?`\nVisual Style: ${igProjectStyleDNA}`:'';
+  const styleDNA=igDNA_IG?`\nVisual Style: ${igDNA_IG}`:'';
   let finalPrompt=p.text;
   if(Object.keys(charDNAMap).length>0){
     const dnaSnippet=Object.entries(charDNAMap).map(([name,dna])=>`[${name}: ${dna?.visual_summary||dna?.hair||''}]`).join(' ');
