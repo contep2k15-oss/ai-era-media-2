@@ -487,7 +487,12 @@ html,body{height:100%;overflow:hidden;background:var(--bg0);color:var(--text);fo
 .ig-prog-track{height:4px;background:var(--bg3);border-radius:2px;overflow:hidden;}
 .ig-prog-bar{height:100%;background:linear-gradient(90deg,#10b981,#059669);border-radius:2px;transition:width .4s;}
 .ig-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:8px;margin-bottom:10px;width:100%;}
-.ig-card{background:var(--bg2);border:1px solid var(--border2);border-radius:var(--rs);overflow:hidden;}
+.ig-card{background:var(--bg2);border:1px solid var(--border2);border-radius:var(--rs);overflow:hidden;position:relative;}
+.ig-card-overlay{position:absolute;top:0;left:0;right:0;bottom:28px;background:rgba(0,0,0,0);display:flex;align-items:center;justify-content:center;opacity:0;transition:all .2s;pointer-events:none;z-index:5;}
+.ig-card:hover .ig-card-overlay{opacity:1;background:rgba(0,0,0,0.55);pointer-events:auto;}
+.btn-ig-regen{padding:8px 16px;background:#10b981;border:none;border-radius:var(--rs);color:#0a0f0e;font-size:12px;font-weight:700;cursor:pointer;display:flex;align-items:center;gap:6px;}
+.btn-ig-regen:hover{background:#34d399;}
+.btn-ig-regen.loading{background:var(--bg3);color:var(--text2);pointer-events:none;}
 .ig-results-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;flex-wrap:wrap;gap:6px;}
 .ig-card-img{width:100%;aspect-ratio:16/9;background:var(--bg3);display:flex;align-items:center;justify-content:center;font-size:10px;color:var(--text3);position:relative;overflow:hidden;}
 .ig-card-img img{width:100%;height:100%;object-fit:cover;display:block;}
@@ -1304,9 +1309,13 @@ html,body{height:100%;overflow:hidden;background:var(--bg0);color:var(--text);fo
     <div class="section-head">
       <div class="section-num">4</div>
       <div class="section-title">Chọn giọng nói</div>
-      <div class="section-sub">Bấm ▶ để nghe thử từng giọng</div>
+      <div class="section-sub">5 giọng đại diện có nút ▶ nghe thử (cache sau lần đầu)</div>
     </div>
     <div class="block-body">
+      <div style="display:flex;gap:6px;margin-bottom:8px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--text3);">
+        <span style="flex:1;text-align:center;padding:4px;background:var(--bg3);border-radius:var(--rs);">👩 Giọng nữ: Callirrhoe · Kore</span>
+        <span style="flex:1;text-align:center;padding:4px;background:var(--bg3);border-radius:var(--rs);">👨 Giọng nam: Alnilam · Schedar · Charon</span>
+      </div>
       <div class="tts-voice-grid" id="ttsVoiceGrid"></div>
     </div>
   </div>
@@ -1372,6 +1381,18 @@ html,body{height:100%;overflow:hidden;background:var(--bg0);color:var(--text);fo
         <div class="section-sub">Generate 1 lần, dùng cho tất cả prompt</div>
       </div>
       <div class="block-body">
+        <!-- Export / Import -->
+        <div style="display:flex;gap:6px;margin-bottom:8px;">
+          <button onclick="igExportChars()" style="flex:1;padding:6px 8px;background:var(--bg3);border:1px solid var(--border2);border-radius:var(--rs);color:var(--text2);font-size:11px;font-weight:600;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:4px;">
+            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+            Export JSON
+          </button>
+          <button onclick="document.getElementById('igImportFile').click()" style="flex:1;padding:6px 8px;background:var(--bg3);border:1px solid var(--border2);border-radius:var(--rs);color:var(--text2);font-size:11px;font-weight:600;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:4px;">
+            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+            Import JSON
+          </button>
+          <input type="file" id="igImportFile" accept=".json" style="display:none" onchange="igImportChars(this)">
+        </div>
         <div class="ig-char-grid" id="igCharGrid">
           <div style="font-size:13px;color:var(--text3);padding:12px;">Chưa có nhân vật. Tạo Character Sheet ở tab 1 trước.</div>
         </div>
@@ -1422,19 +1443,6 @@ html,body{height:100%;overflow:hidden;background:var(--bg0);color:var(--text);fo
         <button id="igAspect916" onclick="igSetAspect('9:16')" style="flex:1;padding:7px 4px;border-radius:var(--rs);border:1px solid var(--border2);background:transparent;color:var(--text2);font-size:11px;font-weight:700;cursor:pointer;transition:all .15s;text-align:center;">▮ 9:16</button>
         <button id="igAspect11" onclick="igSetAspect('1:1')" style="flex:1;padding:7px 4px;border-radius:var(--rs);border:1px solid var(--border2);background:transparent;color:var(--text2);font-size:11px;font-weight:700;cursor:pointer;transition:all .15s;text-align:center;">■ 1:1</button>
       </div>
-    </div>
-
-    <!-- DENSITY -->
-    <div style="margin-bottom:12px;">
-      <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--text3);margin-bottom:6px;">Số prompt mỗi đoạn</div>
-      <div style="display:flex;gap:5px;">
-        <button class="ig-density-btn" id="igDensity1" onclick="igSetDensity(1)" style="flex:1;padding:7px 2px;border-radius:var(--rs);border:1px solid var(--border2);background:transparent;color:var(--text2);font-size:13px;font-weight:700;cursor:pointer;transition:all .15s;text-align:center;">1<div style="font-size:9px;font-weight:400;color:var(--text3);">Đơn</div></button>
-        <button class="ig-density-btn" id="igDensity2" onclick="igSetDensity(2)" style="flex:1;padding:7px 2px;border-radius:var(--rs);border:1px solid var(--border2);background:transparent;color:var(--text2);font-size:13px;font-weight:700;cursor:pointer;transition:all .15s;text-align:center;">2<div style="font-size:9px;font-weight:400;color:var(--text3);">Vừa</div></button>
-        <button class="ig-density-btn active" id="igDensity3" onclick="igSetDensity(3)" style="flex:1;padding:7px 2px;border-radius:var(--rs);border:1px solid var(--accent);background:var(--accentbg);color:var(--accent2);font-size:13px;font-weight:700;cursor:pointer;transition:all .15s;text-align:center;">3<div style="font-size:9px;font-weight:400;">✅</div></button>
-        <button class="ig-density-btn" id="igDensity4" onclick="igSetDensity(4)" style="flex:1;padding:7px 2px;border-radius:var(--rs);border:1px solid var(--border2);background:transparent;color:var(--text2);font-size:13px;font-weight:700;cursor:pointer;transition:all .15s;text-align:center;">4<div style="font-size:9px;font-weight:400;color:var(--text3);">Nhanh</div></button>
-        <button class="ig-density-btn" id="igDensity5" onclick="igSetDensity(5)" style="flex:1;padding:7px 2px;border-radius:var(--rs);border:1px solid var(--border2);background:transparent;color:var(--text2);font-size:13px;font-weight:700;cursor:pointer;transition:all .15s;text-align:center;">5<div style="font-size:9px;font-weight:400;color:var(--text3);">Chi tiết</div></button>
-      </div>
-      <div style="margin-top:5px;font-size:10px;color:var(--text3);" id="igDensityInfo">Mỗi đoạn tạo 3 prompt: [N.A] · [N.B] · [N.C]</div>
     </div>
 
     <button class="btn-action-primary" id="igBtnRun" onclick="igRunAll()">
@@ -1520,7 +1528,7 @@ html,body{height:100%;overflow:hidden;background:var(--bg0);color:var(--text);fo
         </button>
         <button class="btn-sync" style="background:transparent;color:var(--text3);border-color:var(--border2);" onclick="document.getElementById('vsImgInput').click()">⬆ Upload ảnh tay</button>
         <input type="file" id="vsImgInput" accept="image/*" multiple style="display:none" onchange="vsHandleImgUpload(this.files)">
-        <button class="btn-sync" style="background:transparent;color:var(--text3);border-color:var(--border2);" onclick="vsSortByName()" title="Sắp xếp theo tên file">🔤 Sắp theo tên</button>
+        <button class="btn-sync" style="background:transparent;color:var(--text3);border-color:var(--border2);" onclick="vsNaturalSort();vsRebuildSegs();vsRenderPairList();" title="Sắp xếp theo tên file">🔤 Sắp theo tên</button>
         <button class="btn-sync" style="background:transparent;color:var(--red);border-color:var(--redbg);" onclick="vsImages=[];vsRenderPairList();vsCheckReady();" title="Xóa tất cả ảnh">✕ Xóa tất cả</button>
       </div>
       <div id="vsPairList" class="vs-pair-list"></div>
@@ -1797,12 +1805,17 @@ async function generate(){
     ?'Automatically detect the most appropriate character art style from the video thumbnail and context. Apply that detected style consistently to all characters.'
     :`Apply this specific art style to ALL character prompts: ${styleStr}`;
 
-  const schema=`{"project":{"title":"string","genre":"string","video_genre":"documentary|drama|action|comedy|horror|romance|sci-fi|historical|educational|vlog|other","content_style":"string — mô tả phong cách làm video: cinematic/talking-head/animation/b-roll/etc","tone":"string — dark/light/neutral/epic/emotional/comedic/suspenseful/etc","target_audience":"string","setting":"string","time_period":"string — hiện đại/cổ đại/tương lai/etc","art_style":"string","color_palette":"string","cinematography":"string — wide shots/close-ups/handheld/static/etc","pacing":"fast/medium/slow"},"characters":[{"id":1,"role":"main|sub|villain|crowd|soldier|support|other","name":"string","archetype":"string","gender":"male|female|unknown","age_range":"string","appearance":{"hair":"string","eyes":"string","skin":"string","build":"string","height":"string"},"outfit":"string","personality_tags":["string"],"role_in_story":"string","ai_prompt":"Full 80-120 word AI image generation prompt. MUST include: full body standing pose, complete limbs visible (both arms and hands, both legs and feet), character standing alone, white or simple background, character name label written at the bottom of the image. Self-contained paste-ready for Midjourney/SDXL/Gemini Imagen","negative_prompt":"string — MUST include: cropped body, missing limbs, missing hands, missing feet, cut-off legs, multiple characters, group shot, partial body"}]}`;
+  const schema=`{"project":{"title":"string","genre":"string","video_genre":"documentary|drama|action|comedy|horror|romance|sci-fi|historical|educational|vlog|other","content_style":"string","tone":"string","target_audience":"string","setting":"string","time_period":"string","art_style":"string","color_palette":"string","cinematography":"string","pacing":"fast|medium|slow","style_analysis":{"medium":"string — Anime|Live Action|Animation|Motion Graphics|Documentary|Mixed","genre":"string — thể loại cụ thể: Action/Shonen/Historical Drama/etc","style":"string — phong cách cụ thể: Dark Military/Ghibli Pastoral/Neo-noir/etc","niche":"string — ngách cụ thể: Dystopian horror/Titan threat/Political thriller/etc","visual_dna":"string — 20-40 từ keyword cho AI image generation, VD: dark shonen anime, military dystopia, high contrast shadows, muted earth tones, dramatic Dutch angles, speed lines, intense facial expressions"}},"characters":[{"id":1,"role":"main|sub|villain|crowd|soldier|support|other","name":"string","archetype":"string","gender":"male|female|unknown","age_range":"string","appearance":{"hair":"string","eyes":"string","skin":"string","build":"string","height":"string"},"outfit":"string","personality_tags":["string"],"role_in_story":"string","ai_prompt":"Full 80-120 word AI image generation prompt. MUST include: full body standing pose, complete limbs visible (both arms and hands, both legs and feet), character standing alone, white or simple background, character name label written at the bottom of the image. Self-contained paste-ready for Midjourney/SDXL/Gemini Imagen","negative_prompt":"string — MUST include: cropped body, missing limbs, missing hands, missing feet, cut-off legs, multiple characters, group shot, partial body"}]}`;
 
   const promptText=`Analyze this YouTube video (URL: ${url}) thumbnail and context.
 
-TASK 1 — VIDEO ANALYSIS:
-Analyze the video's visual style, genre, tone, cinematography and target audience from the thumbnail and URL context.
+TASK 1 — VIDEO STYLE ANALYSIS (5 layers):
+Analyze deeply:
+- medium: overall format (Anime/Live Action/Animation/Documentary/etc)
+- genre: specific genre (Action Shonen/Historical Drama/Political Thriller/etc)  
+- style: named visual style (Dark Military/Ghibli Pastoral/Neo-noir/etc)
+- niche: specific niche (Dystopian horror/Titan threat/Palace intrigue/etc)
+- visual_dna: 20-40 keyword string for AI image generation that captures the EXACT visual language of this video
 
 TASK 2 — CHARACTER SHEET:
 Generate a complete Character Reference Sheet for ALL character types in this video's universe.
@@ -1858,7 +1871,24 @@ Return ONLY valid JSON matching this schema: ${schema}`;
   $('genBtn').disabled=false;
 }
 
-// ── RENDER ──
+// ── ÁP DỤNG VISUAL DNA VÀO DỰ ÁN ──
+function igApplyStyle(visualDna){
+  if(!visualDna)return;
+  // Lưu vào project style DNA để dùng trong image gen
+  igProjectStyleDNA=visualDna;
+  // Hiện thông báo
+  const btn=event.target;
+  const orig=btn.textContent;
+  btn.textContent='✅ Đã áp dụng!';
+  btn.style.background='var(--accentbg)';
+  btn.style.color='var(--accent2)';
+  setTimeout(()=>{
+    btn.textContent=orig;
+    btn.style.background='#10b981';
+    btn.style.color='#0a0f0e';
+  },2000);
+}
+
 function getRoleClass(role){return ROLE_CLASSES[role]||'role-other';}
 function getRoleLabel(role){
   const map={main:'Nhân vật chính',sub:'Nhân vật phụ',villain:'Phản diện',crowd:'Quần chúng',soldier:'Lính / Guard',support:'Hỗ trợ',other:'Khác'};
@@ -1886,23 +1916,54 @@ function renderResults(data,url,styleName){
   ].filter(Boolean);
   $('resultMeta').textContent=metaParts.join(' · ');
 
-  // Show video analysis card if we have the data
+  // Show video analysis card - 5 lớp phong cách
   const analysisEl=$('videoAnalysisCard');
   if(analysisEl){
-    if(proj.video_genre||proj.content_style||proj.tone){
+    const sa=proj.style_analysis||{};
+    const hasStyle=sa.medium||sa.genre||sa.style||sa.niche||sa.visual_dna;
+    const hasBasic=proj.video_genre||proj.content_style||proj.tone;
+    if(hasStyle||hasBasic){
       analysisEl.style.display='block';
       analysisEl.innerHTML=`
-        <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--accent);margin-bottom:8px;">📊 Phân tích video</div>
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;">
-          ${proj.video_genre?`<div class="va-item"><span class="va-label">Thể loại</span><span class="va-val">${esc(proj.video_genre)}</span></div>`:''}
+        <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--accent);margin-bottom:10px;">📊 Phân tích phong cách video</div>
+        ${hasStyle?`
+        <div style="margin-bottom:10px;">
+          <div style="display:flex;flex-direction:column;gap:4px;">
+            ${sa.medium?`<div style="display:flex;align-items:center;gap:8px;padding:6px 10px;background:var(--bg2);border-radius:var(--rs);border-left:3px solid #6366f1;">
+              <span style="font-size:10px;font-weight:700;color:#818cf8;min-width:60px;">MEDIUM</span>
+              <span style="font-size:12px;color:var(--text);">${esc(sa.medium)}</span>
+            </div>`:''}
+            ${sa.genre?`<div style="display:flex;align-items:center;gap:8px;padding:6px 10px;background:var(--bg2);border-radius:var(--rs);border-left:3px solid #06b6d4;">
+              <span style="font-size:10px;font-weight:700;color:#67e8f9;min-width:60px;">GENRE</span>
+              <span style="font-size:12px;color:var(--text);">${esc(sa.genre)}</span>
+            </div>`:''}
+            ${sa.style?`<div style="display:flex;align-items:center;gap:8px;padding:6px 10px;background:var(--bg2);border-radius:var(--rs);border-left:3px solid #10b981;">
+              <span style="font-size:10px;font-weight:700;color:#6ee7b7;min-width:60px;">STYLE</span>
+              <span style="font-size:12px;color:var(--text);">${esc(sa.style)}</span>
+            </div>`:''}
+            ${sa.niche?`<div style="display:flex;align-items:center;gap:8px;padding:6px 10px;background:var(--bg2);border-radius:var(--rs);border-left:3px solid #f59e0b;">
+              <span style="font-size:10px;font-weight:700;color:#fcd34d;min-width:60px;">NICHE</span>
+              <span style="font-size:12px;color:var(--text);">${esc(sa.niche)}</span>
+            </div>`:''}
+            ${sa.visual_dna?`<div style="padding:8px 10px;background:rgba(16,185,129,0.08);border-radius:var(--rs);border:1px solid rgba(16,185,129,0.25);">
+              <div style="font-size:9px;font-weight:700;color:var(--accent);margin-bottom:4px;">✦ VISUAL DNA</div>
+              <div style="font-size:11px;color:var(--text2);line-height:1.5;">${esc(sa.visual_dna)}</div>
+            </div>`:''}
+          </div>
+          ${sa.visual_dna?`
+          <button onclick="igApplyStyle(${JSON.stringify(sa.visual_dna).replace(/"/g,'&quot;')})" style="width:100%;margin-top:8px;padding:8px;background:#10b981;border:none;border-radius:var(--rs);color:#0a0f0e;font-size:12px;font-weight:700;cursor:pointer;">
+            ✦ Áp dụng Visual DNA vào toàn bộ dự án
+          </button>`:''}
+        </div>`:''}
+        ${hasBasic?`
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:5px;margin-top:6px;">
           ${proj.tone?`<div class="va-item"><span class="va-label">Tone</span><span class="va-val">${esc(proj.tone)}</span></div>`:''}
-          ${proj.content_style?`<div class="va-item"><span class="va-label">Phong cách</span><span class="va-val">${esc(proj.content_style)}</span></div>`:''}
           ${proj.pacing?`<div class="va-item"><span class="va-label">Nhịp độ</span><span class="va-val">${esc(proj.pacing)}</span></div>`:''}
           ${proj.target_audience?`<div class="va-item"><span class="va-label">Đối tượng</span><span class="va-val">${esc(proj.target_audience)}</span></div>`:''}
           ${proj.cinematography?`<div class="va-item"><span class="va-label">Quay phim</span><span class="va-val">${esc(proj.cinematography)}</span></div>`:''}
           ${proj.time_period?`<div class="va-item"><span class="va-label">Thời đại</span><span class="va-val">${esc(proj.time_period)}</span></div>`:''}
           ${proj.setting?`<div class="va-item"><span class="va-label">Bối cảnh</span><span class="va-val">${esc(proj.setting)}</span></div>`:''}
-        </div>
+        </div>`:''}
       `;
     } else {
       analysisEl.style.display='none';
@@ -2663,18 +2724,88 @@ let ttsSelectedVoice='Charon';
 let ttsPreviewAudio=null;
 let ttsAudioUrl=null;
 
+// 5 giọng đại diện có thể nghe thử (cache vào localStorage)
+const TTS_PREVIEW_VOICES=['Callirrhoe','Kore','Alnilam','Schedar','Charon'];
+const TTS_PREVIEW_LABELS={
+  'Callirrhoe':'Nữ · Easy-going',
+  'Kore':'Nữ · Firm',
+  'Alnilam':'Nam · Firm',
+  'Schedar':'Nam · Even',
+  'Charon':'Nam · Informative'
+};
+
+// Cache key prefix
+const TTS_CACHE_PREFIX='aiera_tts_preview_';
+
+async function ttsPreviewVoice(voiceId){
+  const apiKey=$('apiKey').value.trim();
+  if(!apiKey){alert('Vui lòng nhập API key trước.');return;}
+
+  const btn=$(`ttsplay_${voiceId}`);
+  if(!btn)return;
+
+  // Nếu đang play → stop
+  if(ttsPreviewAudio){
+    ttsPreviewAudio.pause();
+    ttsPreviewAudio=null;
+    document.querySelectorAll('.btn-tts-preview').forEach(b=>{b.textContent='▶';b.style.color='';});
+    return;
+  }
+
+  // Check cache trong localStorage
+  const cacheKey=TTS_CACHE_PREFIX+voiceId;
+  let audioB64=null;
+  try{
+    const cached=localStorage.getItem(cacheKey);
+    if(cached){audioB64=cached;}
+  }catch(e){}
+
+  if(!audioB64){
+    // Gọi API lần đầu
+    btn.textContent='⏳';btn.style.color='var(--accent)';
+    const sampleText='Hello! This is a preview of my voice. I hope you enjoy listening to it.';
+    try{
+      const wavBuf=await ttsCallAPI(apiKey,sampleText,voiceId,null);
+      // Convert Uint8Array → base64
+      let binary='';
+      wavBuf.forEach(b=>binary+=String.fromCharCode(b));
+      audioB64=btoa(binary);
+      // Lưu cache
+      try{localStorage.setItem(cacheKey,audioB64);}catch(e){console.warn('Cache full:',e);}
+    }catch(e){
+      btn.textContent='▶';btn.style.color='';
+      alert('Lỗi nghe thử: '+e.message.slice(0,100));
+      return;
+    }
+  }
+
+  // Play audio từ base64
+  btn.textContent='⏹';btn.style.color='var(--accent)';
+  const audioUrl='data:audio/wav;base64,'+audioB64;
+  ttsPreviewAudio=new Audio(audioUrl);
+  ttsPreviewAudio.play();
+  ttsPreviewAudio.onended=()=>{
+    ttsPreviewAudio=null;
+    btn.textContent='▶';btn.style.color='';
+  };
+}
+
 // Init voice grid
 function ttsInitVoices(){
   const grid=$('ttsVoiceGrid');
   if(!grid||grid.children.length>0)return;
-  grid.innerHTML=TTS_VOICES.map(v=>`
+  grid.innerHTML=TTS_VOICES.map(v=>{
+    const isPreview=TTS_PREVIEW_VOICES.includes(v.id);
+    const previewLabel=TTS_PREVIEW_LABELS[v.id]||v.desc;
+    const cached=(() => {try{return !!localStorage.getItem(TTS_CACHE_PREFIX+v.id);}catch(e){return false;}})();
+    return `
     <div class="tts-voice-card${v.id===ttsSelectedVoice?' active':''}" id="ttsv_${v.id}" onclick="ttsSelectVoice('${v.id}')">
-      <div>
-        <div class="tts-voice-name">${v.id}</div>
+      <div style="flex:1;min-width:0;">
+        <div class="tts-voice-name">${v.id}${isPreview?`<span style="font-size:9px;color:var(--text3);font-weight:400;margin-left:5px;">${previewLabel}</span>`:''}${cached?'<span style="font-size:9px;color:var(--green);margin-left:4px;">●</span>':''}</div>
         <div class="tts-voice-desc">${v.desc}</div>
       </div>
-      <button class="btn-tts-preview" id="ttsplay_${v.id}" onclick="event.stopPropagation();ttsPreviewVoice('${v.id}')" title="Nghe thử">▶</button>
-    </div>`).join('');
+      ${isPreview?`<button class="btn-tts-preview" id="ttsplay_${v.id}" onclick="event.stopPropagation();ttsPreviewVoice('${v.id}')" title="Nghe thử">▶</button>`:''}
+    </div>`}).join('');
 }
 
 function ttsSelectStyle(el,style){
@@ -3112,32 +3243,7 @@ function selectImgModel(m){
 let igRefImages={}; // {charName: base64DataUrl}
 let igParsedPrompts=[]; // [{label, text, refName}]
 let igAspectRatio='16:9'; // default
-let igDensityPerScene=3;  // default 3 prompts per scene
-
-function igSetDensity(n){
-  igDensityPerScene=n;
-  [1,2,3,4,5].forEach(i=>{
-    const btn=$('igDensity'+i);
-    if(!btn)return;
-    btn.style.border='1px solid var(--border2)';
-    btn.style.background='transparent';
-    btn.style.color='var(--text2)';
-    btn.querySelector('div').style.color='var(--text3)';
-  });
-  const active=$('igDensity'+n);
-  if(active){
-    active.style.border='1px solid var(--accent)';
-    active.style.background='var(--accentbg)';
-    active.style.color='var(--accent2)';
-    active.querySelector('div').style.color='';
-  }
-  const labels=['A','B','C','D','E'];
-  const names=labels.slice(0,n).map(l=>`[N.${l}]`).join(' · ');
-  const info=$('igDensityInfo');
-  if(info)info.textContent=`Mỗi đoạn tạo ${n} prompt: ${names}`;
-  // Re-parse prompts nếu có
-  if(igParsedPrompts.length)igParsePrompts();
-}
+let igDensityPerScene=3; // default, set by Prompt Engineer tab
 
 function igSetAspect(ratio){
   igAspectRatio=ratio;
@@ -3158,10 +3264,11 @@ function igSetAspect(ratio){
 }
 
 function igGetAspectPrompt(){
+  const noFrame='ABSOLUTELY NO white background, NO plain background, NO blank background, NO white border, NO black border, NO border of any kind, NO frame, NO letterbox, NO pillarbox, NO vignette, NO watermark, NO overlay, full bleed image edge to edge, rich detailed scene background fills entire image';
   const map={
-    '16:9':'wide landscape 16:9 aspect ratio, cinematic horizontal frame, no borders, no letterbox, no vignette, no frame overlay, full bleed image',
-    '9:16':'vertical portrait 9:16 aspect ratio, mobile format, no borders, no frame overlay, full bleed image',
-    '1:1':'square 1:1 aspect ratio, no borders, no frame overlay, full bleed image'
+    '16:9':`wide landscape 16:9 aspect ratio, cinematic horizontal frame, ${noFrame}`,
+    '9:16':`vertical portrait 9:16 aspect ratio, mobile format, ${noFrame}`,
+    '1:1':`square 1:1 aspect ratio, ${noFrame}`
   };
   return map[igAspectRatio]||map['16:9'];
 }
@@ -3428,6 +3535,9 @@ async function igRunAll(){
   // Pre-populate grid — phải sau khi igResultsWrap đã visible
   $('igGrid').innerHTML=igParsedPrompts.map((p,i)=>`
     <div class="ig-card" id="igcard_${i}">
+      <div class="ig-card-overlay" id="igoverlay_${i}">
+        <button class="btn-ig-regen" id="igregenBtn_${i}" onclick="igRegenOne(${i})">🔄 Tạo lại</button>
+      </div>
       <div class="ig-card-img loading" id="igimg_${i}">
         <div style="text-align:center;padding:16px;">
           <div style="font-size:22px;margin-bottom:6px;">⏳</div>
@@ -3466,13 +3576,14 @@ async function igRunAll(){
 
     let finalPrompt=p.text;
     const aspectStr=igGetAspectPrompt();
+    const styleDNA=igProjectStyleDNA?`\nVisual Style: ${igProjectStyleDNA}`:'';
     if(Object.keys(charDNAMap).length>0){
       const dnaSnippet=Object.entries(charDNAMap).map(([name,dna])=>
         `[${name}: ${dna.visual_summary||dna.hair||''}]`
       ).join(' ');
-      finalPrompt=`${p.text}\n\nCharacter DNA: ${dnaSnippet}\nMaintain character consistency. ${aspectStr}.`;
+      finalPrompt=`${p.text}${styleDNA}\n\nCharacter DNA: ${dnaSnippet}\nMaintain character consistency. ${aspectStr}.`;
     } else {
-      finalPrompt=`${p.text}\n\n${aspectStr}.`;
+      finalPrompt=`${p.text}${styleDNA}\n\n${aspectStr}.`;
     }
 
     $(`igimg_${i}`).querySelector('div').innerHTML=`<div style="font-size:10px;color:var(--accent2)">🎨 Generating...</div>`;
@@ -3569,6 +3680,108 @@ async function igRunAll(){
   $('igProgLabel').textContent=`✅ Pipeline hoàn tất! ${igGeneratedImages.length}/${total} ảnh`;
   $('igBtnRun').disabled=false;
   igResetControls();
+}
+
+// ── TẠO LẠI 1 ẢNH CỤ THỂ ──
+async function igRegenOne(i){
+  const apiKey=$('apiKey').value.trim();
+  if(!apiKey){alert('Vui lòng nhập API key.');return;}
+  const p=igParsedPrompts[i];
+  if(!p)return;
+
+  const imgApiKey=apiKey;
+  const imgEndpoint=`${API_GOOGLE}/v1beta`;
+
+  const btn=$(`igregenBtn_${i}`);
+  const imgEl=$(`igimg_${i}`);
+  if(btn){btn.textContent='⏳ Đang tạo...';btn.classList.add('loading');}
+  if(imgEl){imgEl.classList.add('loading');imgEl.innerHTML=`<div style="text-align:center;padding:16px;"><div style="font-size:20px;">🎨</div><div style="font-size:10px;color:var(--accent2);margin-top:4px;">Đang tạo lại...</div></div>`;}
+
+  // Build prompt
+  const refMatches=[...p.text.matchAll(/\[REF:\s*([^—\]]+)/gi)].map(m=>m[1].trim());
+  let primaryRefB64=null;
+  const charDNAMap={};
+  for(const rname of refMatches){
+    const matchKey=Object.keys(igCharDNA).find(k=>k.toLowerCase().includes(rname.toLowerCase())||rname.toLowerCase().includes(k.toLowerCase()));
+    if(matchKey){
+      if(igCharDNA[matchKey])charDNAMap[matchKey]=igCharDNA[matchKey];
+      if(!primaryRefB64&&igRefImages[matchKey])primaryRefB64=igRefImages[matchKey].split(',')[1];
+    }
+  }
+  const aspectStr=igGetAspectPrompt();
+  const styleDNA=igProjectStyleDNA?`\nVisual Style: ${igProjectStyleDNA}`:'';
+  let finalPrompt=p.text;
+  if(Object.keys(charDNAMap).length>0){
+    const dnaSnippet=Object.entries(charDNAMap).map(([name,dna])=>`[${name}: ${dna?.visual_summary||dna?.hair||''}]`).join(' ');
+    finalPrompt=`${p.text}${styleDNA}\n\nCharacter DNA: ${dnaSnippet}\nMaintain character consistency. ${aspectStr}.`;
+  } else {
+    finalPrompt=`${p.text}${styleDNA}\n\n${aspectStr}.`;
+  }
+
+  try{
+    const imgB64=await igCallGeminiImage(imgApiKey,finalPrompt,primaryRefB64,imgEndpoint);
+    if(imgB64){
+      const dataUrl='data:image/png;base64,'+imgB64;
+      igGeneratedImages[i]={label:p.label,dataUrl};
+      if(imgEl){imgEl.classList.remove('loading');imgEl.innerHTML=`<img src="${dataUrl}" style="width:100%;height:100%;object-fit:cover;display:block;">`;}
+      const labelEl=$(`iglabel_${i}`);
+      if(labelEl)labelEl.innerHTML=`<span>${esc(p.label)}${p.refName?' · '+esc(p.refName):''}</span><button class="btn-ig-dl" onclick="igDlOne('${dataUrl}','${p.label.replace(/\./g,'_')}.png')" title="Download">⬇</button>`;
+    }
+  }catch(e){
+    if(imgEl){imgEl.classList.remove('loading');imgEl.innerHTML=`<div style="text-align:center;padding:12px;color:var(--red);font-size:11px;">❌ ${esc(e.message.slice(0,80))}</div>`;}
+  }
+  if(btn){btn.textContent='🔄 Tạo lại';btn.classList.remove('loading');}
+}
+
+// ── EXPORT / IMPORT NHÂN VẬT ──
+function igExportChars(){
+  const chars=Object.keys(igRefImages);
+  if(!chars.length){alert('Chưa có ảnh tham chiếu nào để export.');return;}
+  const data={
+    version:'1.0',
+    exportedAt:new Date().toISOString(),
+    projectTitle:lastProject?.title||'AI Era Media Project',
+    characters:chars.map(name=>({
+      name,
+      refImage: igRefImages[name]||null,
+      dna: igCharDNA[name]||null
+    }))
+  };
+  const json=JSON.stringify(data,null,2);
+  const blob=new Blob([json],{type:'application/json'});
+  const url=URL.createObjectURL(blob);
+  const a=document.createElement('a');
+  a.href=url;
+  a.download=`characters_${(lastProject?.title||'project').replace(/\s+/g,'_')}_${new Date().toISOString().slice(0,10)}.json`;
+  document.body.appendChild(a);a.click();document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
+function igImportChars(input){
+  const file=input.files[0];
+  if(!file)return;
+  const reader=new FileReader();
+  reader.onload=e=>{
+    try{
+      const data=JSON.parse(e.target.result);
+      if(!data.characters||!Array.isArray(data.characters)){
+        alert('File JSON không đúng định dạng.');return;
+      }
+      let loaded=0;
+      data.characters.forEach(char=>{
+        if(!char.name)return;
+        if(char.refImage) igRefImages[char.name]=char.refImage;
+        if(char.dna)      igCharDNA[char.name]=char.dna;
+        loaded++;
+      });
+      igRefreshCharGrid();
+      alert(`✅ Đã import ${loaded} nhân vật từ "${data.projectTitle||file.name}"`);
+    }catch(err){
+      alert('Lỗi đọc file JSON: '+err.message);
+    }
+  };
+  reader.readAsText(file);
+  input.value=''; // reset để có thể import lại cùng file
 }
 
 function igDlOne(dataUrl,filename){
