@@ -3,3 +3,5 @@ dist/
 *.log
 .DS_Store
 Thumbs.db
+oauth_config.json
+vertex_token.json

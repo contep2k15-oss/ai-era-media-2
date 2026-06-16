@@ -26,6 +26,7 @@
       "preload.js",
       "src/**/*",
       "assets/**/*",
+      "oauth_config.json",
       "node_modules/ffmpeg-static/**/*"
     ],
     "win": {

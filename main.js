@@ -8,10 +8,24 @@ const { URL } = require('url');
 app.commandLine.appendSwitch('disable-features', 'OutOfBlinkCors');
 
 // ── GOOGLE OAUTH2 CONFIG ──
-// Dùng Google's OAuth2 for installed apps (localhost redirect)
-const OAUTH_CLIENT_ID = '738539837274-00os94b9bbn5iid8bkmbhuq647t4qc80.apps.googleusercontent.com';
-const OAUTH_CLIENT_SECRET = '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';
+// Credentials được load từ file config riêng (không commit lên Git)
+let OAUTH_CLIENT_ID = '';
+let OAUTH_CLIENT_SECRET = '';
 const OAUTH_SCOPES = 'https://www.googleapis.com/auth/cloud-platform';
+
+// Load credentials từ file config
+function loadOAuthConfig() {
+  try {
+    const configPath = path.join(__dirname, 'oauth_config.json');
+    if (fs.existsSync(configPath)) {
+      const config = JSON.parse(fs.readFileSync(configPath, 'utf8'));
+      OAUTH_CLIENT_ID = config.client_id || '';
+      OAUTH_CLIENT_SECRET = config.client_secret || '';
+    }
+  } catch(e) {
+    console.warn('Could not load oauth_config.json:', e.message);
+  }
+}
 const TOKEN_PATH = path.join(app.getPath('userData'), 'vertex_token.json');
 
 let vertexTokenData = null;
@@ -299,6 +313,6 @@ ipcMain.handle('render-video-ffmpeg', async (event, { imageList, audioData, fps,
   });
 });
 
-app.whenReady().then(() => { loadSavedToken(); createWindow(); });
+app.whenReady().then(() => { loadOAuthConfig(); loadSavedToken(); createWindow(); });
 app.on('window-all-closed', () => { if (process.platform !== 'darwin') app.quit(); });
 app.on('activate', () => { if (BrowserWindow.getAllWindows().length === 0) createWindow(); });
