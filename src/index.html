@@ -245,6 +245,9 @@ html,body{height:100%;overflow:hidden;background:var(--bg0);color:var(--text);fo
 .result-header{display:flex;align-items:flex-start;justify-content:space-between;gap:10px;margin-bottom:12px;}
 .result-title{font-size:15px;font-weight:700;}
 .result-meta{font-size:11px;color:var(--text3);margin-top:3px;}
+.va-item{background:var(--bg2);border-radius:var(--rs);padding:6px 10px;display:flex;flex-direction:column;gap:2px;}
+.va-label{font-size:9px;font-weight:600;text-transform:uppercase;letter-spacing:.05em;color:var(--text3);}
+.va-val{font-size:11px;color:var(--text);font-weight:500;}
 .result-actions{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px;}
 .warn-banner{padding:9px 12px;border-radius:var(--rs);background:var(--amberbg);border:1px solid rgba(251,191,36,.2);color:var(--amber);font-size:11px;margin-bottom:10px;display:none;}
 .warn-banner.show{display:block;}
@@ -760,6 +763,9 @@ html,body{height:100%;overflow:hidden;background:var(--bg0);color:var(--text);fo
     <div><div class="status-main" id="statusMain">Đang phân tích…</div><div class="status-sub" id="statusSub"></div></div>
   </div>
   <div class="err" id="errEl"></div>
+
+  <!-- VIDEO ANALYSIS CARD (hiện sau khi generate) -->
+  <div id="videoAnalysisCard" style="display:none;background:var(--bg3);border:1px solid var(--border2);border-radius:var(--r);padding:14px;margin-bottom:12px;"></div>
 
   <div class="results" id="results">
     <div class="result-header">
@@ -1349,9 +1355,9 @@ html,body{height:100%;overflow:hidden;background:var(--bg0);color:var(--text);fo
 <div class="panel-inner">
 
   <div class="panel-header">
-    <div class="panel-tag"><span class="panel-tag-dot"></span>gemini-2.5-flash-image-preview · Character Consistency Pipeline</div>
+    <div class="panel-tag"><span class="panel-tag-dot"></span>gemini-2.5-flash-image · Character Consistency Pipeline</div>
     <div class="panel-title">Tạo ảnh <em>đồng nhất nhân vật</em></div>
-    <div class="panel-desc">Gen Ref → Gemini extract Visual DNA → Optimize prompt → gemini-2.5-flash-image-preview (pass ref image) → ảnh đồng nhất hoàn toàn.</div>
+    <div class="panel-desc">Gen Ref → Gemini extract Visual DNA → Optimize prompt → gemini-2.5-flash-image (pass ref image) → ảnh đồng nhất hoàn toàn.</div>
   </div>
 
   <!-- PHẦN A: ẢNH THAM CHIẾU NHÂN VẬT -->
@@ -1397,7 +1403,7 @@ html,body{height:100%;overflow:hidden;background:var(--bg0);color:var(--text);fo
       <div style="display:flex;align-items:center;gap:10px;padding:4px 0;">
         <div class="style-card active" id="imgmodel-shopai" style="flex:1;pointer-events:none;">
           <div class="sc-emoji">🎨</div>
-          <div class="sc-name">gemini-2.5-flash-image-preview</div>
+          <div class="sc-name">gemini-2.5-flash-image</div>
           <div class="sc-desc">Gemini · native image generation · ref image support</div>
         </div>
       </div>
@@ -1615,7 +1621,11 @@ html,body{height:100%;overflow:hidden;background:var(--bg0);color:var(--text);fo
 </div>
 
 <script>
-const FREE_TEXT_MODELS = ['gemini-3.1-flash-lite'];
+// ── MODEL ASSIGNMENT ──
+const MODEL_TEXT    = 'gemini-3.1-flash-lite';  // Character Sheet, Prompt Engineer, Rewrite, DNA, mọi tác vụ text
+const MODEL_TTS     = 'gemini-3.1-flash-tts-preview'; // TTS voice generation
+const MODEL_IMAGE   = 'gemini-2.5-flash-image'; // Nano Banana - tạo ảnh (tên mới)
+const FREE_TEXT_MODELS = [MODEL_TEXT];
 const MODEL_LABELS = {'gemini-3.1-flash-lite':'3.1 Flash-Lite'};
 const STYLE_PROMPTS = {
   auto:'',
@@ -1651,7 +1661,7 @@ function showProviderBadge(elId, key){
   el.innerHTML=`<span style="font-size:10px;padding:2px 8px;border-radius:99px;background:#4285f422;color:#4285f4;border:1px solid #4285f444;">⚡ Google AI Studio</span>`;
 }
 
-let selectedStyle='auto', usedModel='', lastChars=[];
+let selectedStyle='auto', usedModel='', lastChars=[], lastProject={};
 const $=id=>document.getElementById(id);
 
 function saveApiKey(){
@@ -1734,7 +1744,8 @@ async function callGeminiText(parts,apiKey){
     }catch(e){
       lastErr=e;
       const m=e.message||'';
-      if(!m.includes('not found')&&!m.includes('404')&&!m.includes('quota')&&!m.includes('429')&&!m.includes('RESOURCE_EXHAUSTED'))throw e;
+      // Retry nếu: model không tìm thấy, quota, hoặc high demand
+      if(!m.match(/not found|404|quota|429|RESOURCE_EXHAUSTED|demand|overload|503|500/i))throw e;
     }
   }
   throw lastErr;
@@ -1785,19 +1796,29 @@ async function generate(){
     ?'Automatically detect the most appropriate character art style from the video thumbnail and context. Apply that detected style consistently to all characters.'
     :`Apply this specific art style to ALL character prompts: ${styleStr}`;
 
-  const schema=`{"project":{"title":"string","genre":"string","setting":"string","art_style":"string","color_palette":"string"},"characters":[{"id":1,"role":"main|sub|villain|crowd|soldier|support|other","name":"string","archetype":"string","gender":"male|female|unknown","age_range":"string","appearance":{"hair":"string","eyes":"string","skin":"string","build":"string","height":"string"},"outfit":"string","personality_tags":["string"],"role_in_story":"string","ai_prompt":"Full 80-120 word AI image generation prompt. MUST include: full body standing pose, complete limbs visible (both arms and hands, both legs and feet), character standing alone, white or simple background, character name label written at the bottom of the image. Self-contained paste-ready for Midjourney/SDXL/Gemini Imagen","negative_prompt":"string — MUST include: cropped body, missing limbs, missing hands, missing feet, cut-off legs, multiple characters, group shot, partial body"}]}`;
+  const schema=`{"project":{"title":"string","genre":"string","video_genre":"documentary|drama|action|comedy|horror|romance|sci-fi|historical|educational|vlog|other","content_style":"string — mô tả phong cách làm video: cinematic/talking-head/animation/b-roll/etc","tone":"string — dark/light/neutral/epic/emotional/comedic/suspenseful/etc","target_audience":"string","setting":"string","time_period":"string — hiện đại/cổ đại/tương lai/etc","art_style":"string","color_palette":"string","cinematography":"string — wide shots/close-ups/handheld/static/etc","pacing":"fast/medium/slow"},"characters":[{"id":1,"role":"main|sub|villain|crowd|soldier|support|other","name":"string","archetype":"string","gender":"male|female|unknown","age_range":"string","appearance":{"hair":"string","eyes":"string","skin":"string","build":"string","height":"string"},"outfit":"string","personality_tags":["string"],"role_in_story":"string","ai_prompt":"Full 80-120 word AI image generation prompt. MUST include: full body standing pose, complete limbs visible (both arms and hands, both legs and feet), character standing alone, white or simple background, character name label written at the bottom of the image. Self-contained paste-ready for Midjourney/SDXL/Gemini Imagen","negative_prompt":"string — MUST include: cropped body, missing limbs, missing hands, missing feet, cut-off legs, multiple characters, group shot, partial body"}]}`;
 
   const promptText=`Analyze this YouTube video (URL: ${url}) thumbnail and context.
-TASK: Generate a complete Character Reference Sheet for ALL character types in this video's universe.
+
+TASK 1 — VIDEO ANALYSIS:
+Analyze the video's visual style, genre, tone, cinematography and target audience from the thumbnail and URL context.
+
+TASK 2 — CHARACTER SHEET:
+Generate a complete Character Reference Sheet for ALL character types in this video's universe.
+
 RULES:
 1. Auto-determine character types from genre/setting/visual cues
-2. MANDATORY: You MUST include AT LEAST ONE character with role="main" (nhân vật chính) and AT LEAST ONE with role="sub" (nhân vật phụ). This is non-negotiable.
-3. Also include: villain(s), crowd rep (1 generic), soldier/guard rep (1 generic), and other relevant types
+2. MANDATORY: AT LEAST ONE role="main" and AT LEAST ONE role="sub". Non-negotiable.
+3. Also include: villain(s), crowd rep, soldier/guard rep if relevant
 4. Give names or descriptive titles to unnamed characters
 5. ${styleInstructions}
 6. Each character must be visually distinct and memorable
-7. IMPORTANT for ai_prompt: Every character must be described as FULL BODY standing pose, complete with both arms/hands and both legs/feet visible, character standing ALONE, with their name written as a label at the bottom of the image.
+7. IMPORTANT for ai_prompt: Full body standing pose, complete arms/hands/legs/feet visible, character standing ALONE, name label at bottom of image.
 8. ai_prompt must be self-contained, optimized for image generation
+9. For video_genre: analyze the actual content type (documentary/drama/action/etc)
+10. For content_style: how the video is made (cinematic narration/talking head/animation/etc)
+11. For tone: emotional register (dark/epic/comedic/etc)
+
 Return ONLY valid JSON matching this schema: ${schema}`;
 
   const parts=thumbB64
@@ -1847,13 +1868,45 @@ function getRoleLabelEN(role){
   return map[role]||'character';
 }
 
-let lastProject={};
-
 function renderResults(data,url,styleName){
   const proj=data.project||{};
-  lastProject=proj; // store for Prompt Engineer tab
+  lastProject=proj;
   $('resultTitle').textContent=proj.title||'Character Reference Sheet';
-  $('resultMeta').textContent=`${proj.genre||''} · ${proj.setting||''} · ${proj.art_style||styleName} · ${lastChars.length} nhân vật · ${MODEL_LABELS[usedModel]||usedModel}`;
+
+  // Build meta tags
+  const metaParts=[
+    proj.video_genre||proj.genre,
+    proj.tone,
+    proj.content_style,
+    proj.time_period,
+    proj.art_style||styleName,
+    `${lastChars.length} nhân vật`,
+    MODEL_LABELS[usedModel]||usedModel
+  ].filter(Boolean);
+  $('resultMeta').textContent=metaParts.join(' · ');
+
+  // Show video analysis card if we have the data
+  const analysisEl=$('videoAnalysisCard');
+  if(analysisEl){
+    if(proj.video_genre||proj.content_style||proj.tone){
+      analysisEl.style.display='block';
+      analysisEl.innerHTML=`
+        <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--accent);margin-bottom:8px;">📊 Phân tích video</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;">
+          ${proj.video_genre?`<div class="va-item"><span class="va-label">Thể loại</span><span class="va-val">${esc(proj.video_genre)}</span></div>`:''}
+          ${proj.tone?`<div class="va-item"><span class="va-label">Tone</span><span class="va-val">${esc(proj.tone)}</span></div>`:''}
+          ${proj.content_style?`<div class="va-item"><span class="va-label">Phong cách</span><span class="va-val">${esc(proj.content_style)}</span></div>`:''}
+          ${proj.pacing?`<div class="va-item"><span class="va-label">Nhịp độ</span><span class="va-val">${esc(proj.pacing)}</span></div>`:''}
+          ${proj.target_audience?`<div class="va-item"><span class="va-label">Đối tượng</span><span class="va-val">${esc(proj.target_audience)}</span></div>`:''}
+          ${proj.cinematography?`<div class="va-item"><span class="va-label">Quay phim</span><span class="va-val">${esc(proj.cinematography)}</span></div>`:''}
+          ${proj.time_period?`<div class="va-item"><span class="va-label">Thời đại</span><span class="va-val">${esc(proj.time_period)}</span></div>`:''}
+          ${proj.setting?`<div class="va-item"><span class="va-label">Bối cảnh</span><span class="va-val">${esc(proj.setting)}</span></div>`:''}
+        </div>
+      `;
+    } else {
+      analysisEl.style.display='none';
+    }
+  }
 
   $('charsGrid').innerHTML=lastChars.map((c,i)=>{
     const roleClass=getRoleClass(c.role);
@@ -2470,7 +2523,7 @@ RULES:
 
   const userPrompt=`Generate ${densityMap[peDensity]}.\n\nScenes:\n${scenesText}`;
 
-  const url=`${getEndpoint(apiKey)}/models/gemini-3.1-flash-lite:generateContent?key=${encodeURIComponent(apiKey)}`;
+  const url=`${getEndpoint(apiKey)}/models/${MODEL_TEXT}:generateContent?key=${encodeURIComponent(apiKey)}`;
 
   let res, data, attempts=0;
   while(attempts<4){
@@ -2535,13 +2588,11 @@ function peHideErr(){$('peErrEl').classList.remove('show');}
 
 
 // ── TTS MODEL ──
-const TTS_MODEL='gemini-2.5-flash-preview-tts';
+const TTS_MODEL=MODEL_TTS;
 
 async function ttsDetectModel(){ return TTS_MODEL; } // no-op, model is fixed // will be overridden by auto-detect
 const TTS_MODELS_PRIORITY=[
-  'gemini-3.1-flash-tts-preview',
-  'gemini-2.5-pro-preview-tts',
-  'gemini-2.5-flash-preview-tts',
+  MODEL_TTS,
 ];
 let ttsActiveModel=null; // set after auto-detect
 
@@ -2713,39 +2764,62 @@ CRITICAL RULES:
 SOURCE SUBTITLE:
 ${subTruncated}`;
 
-  try{
-    // Dùng Gemini API trực tiếp
-    const res=await fetch(`${getEndpoint(apiKey)}/models/gemini-3.1-flash-lite:generateContent?key=${encodeURIComponent(apiKey)}`,{
-      method:'POST',headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({
-        contents:[{parts:[{text:prompt}]}],
-        generationConfig:{temperature:0.7,maxOutputTokens:8192}
-      })
-    });
+  // Danh sách model fallback khi high demand
+  const REWRITE_MODELS=[MODEL_TEXT];
 
-    // Kiểm tra content-type trước khi parse JSON
-    const ct=res.headers.get('content-type')||'';
-    if(!ct.includes('application/json')){
-      const txt=await res.text();
-      throw new Error(`API trả về không phải JSON (${res.status}): ${txt.slice(0,200)}`);
+  let lastErr='';
+  for(const model of REWRITE_MODELS){
+    try{
+      $('ttsBtnRewrite').textContent=`⏳ Đang viết lại (${model})...`;
+      const res=await fetch(`${getEndpoint(apiKey)}/models/${MODEL_TEXT}:generateContent?key=${encodeURIComponent(apiKey)}`,{
+        method:'POST',headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({
+          contents:[{parts:[{text:prompt}]}],
+          generationConfig:{temperature:0.7,maxOutputTokens:8192}
+        })
+      });
+
+      const ct=res.headers.get('content-type')||'';
+      if(!ct.includes('application/json')){
+        const txt=await res.text();
+        throw new Error(`API lỗi (${res.status}): ${txt.slice(0,200)}`);
+      }
+
+      const data=await res.json();
+      if(data.error){
+        const msg=data.error.message||'';
+        // High demand → thử model khác
+        if(msg.match(/demand|quota|overload|503|500/i)){
+          lastErr=msg;
+          continue;
+        }
+        throw new Error(msg);
+      }
+
+      const text=data.candidates?.[0]?.content?.parts?.map(p=>p.text||'').join('')||'';
+      if(!text) throw new Error('API trả về nội dung trống');
+
+      $('ttsScriptOut').value=text.trim();
+      ttsCountScript();
+      $('ttsRewriteBlock').style.display='block';
+      $('ttsVoiceBlock').style.display='block';
+      $('ttsGenerateBlock').style.display='block';
+      ttsInitVoices();
+      const words=text.trim().split(/\s+/).length;
+      $('ttsRewriteMeta').textContent=`${words} từ · ${model} · phong cách: ${ttsSelectedStyle}${sub.length>MAX_INPUT?' (đã cắt bớt input)':''} · chỉnh sửa nếu cần`;
+      $('ttsRewriteBlock').scrollIntoView({behavior:'smooth',block:'start'});
+      lastErr=''; // success
+      break;
+
+    }catch(e){
+      lastErr=e.message;
+      const isRetry=(e.message||'').match(/demand|quota|overload|503|500/i);
+      if(!isRetry) break; // lỗi khác → không retry
     }
+  }
 
-    const data=await res.json();
-    if(data.error)throw new Error(data.error.message||JSON.stringify(data.error));
-    const text=data.candidates?.[0]?.content?.parts?.map(p=>p.text||'').join('')||'';
-    if(!text)throw new Error('API trả về nội dung trống');
-
-    $('ttsScriptOut').value=text.trim();
-    ttsCountScript();
-    $('ttsRewriteBlock').style.display='block';
-    $('ttsVoiceBlock').style.display='block';
-    $('ttsGenerateBlock').style.display='block';
-    ttsInitVoices();
-    const words=text.trim().split(/\s+/).length;
-    $('ttsRewriteMeta').textContent=`${words} từ · phong cách: ${ttsSelectedStyle}${sub.length>MAX_INPUT?' (đã cắt bớt input)':''} · chỉnh sửa nếu cần`;
-    $('ttsRewriteBlock').scrollIntoView({behavior:'smooth',block:'start'});
-  }catch(e){
-    alert('Viết lại thất bại: '+e.message);
+  if(lastErr){
+    alert('Viết lại thất bại sau khi thử tất cả model: '+lastErr);
   }
   $('ttsBtnRewrite').disabled=false;
   $('ttsBtnRewrite').innerHTML='<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg> Viết lại kịch bản';
@@ -2883,7 +2957,7 @@ async function ttsDetectModel(apiKey){
   if(ttsActiveModel)return ttsActiveModel;
   for(const model of TTS_MODELS_PRIORITY){
     try{
-      const res=await fetch(`${getEndpoint(apiKey)}/models/${model}:generateContent?key=${encodeURIComponent(apiKey)}`,{
+      const res=await fetch(`${getEndpoint(apiKey)}/models/${MODEL_TEXT}:generateContent?key=${encodeURIComponent(apiKey)}`,{
         method:'POST',headers:{'Content-Type':'application/json'},
         body:JSON.stringify({
           contents:[{parts:[{text:'Hi'}]}],
@@ -2907,7 +2981,7 @@ async function ttsCallAPI(apiKey,text,voice,stylePrompt){
 
   // Google Gemini TTS API
   const isGoogle=p?.name==='Google AI Studio';
-  const model=isGoogle?'gemini-2.5-flash-preview-tts':TTS_MODEL;
+  const model=MODEL_TTS;
   const base=`${API_GOOGLE}/v1beta`;
 
   if(isGoogle){
@@ -2939,7 +3013,7 @@ async function ttsCallAPI(apiKey,text,voice,stylePrompt){
     throw new Error('Google TTS không trả về audio data');
   } else {
     // Fallback - Google TTS format
-    const url=`${getEndpoint(apiKey)}/models/gemini-2.5-flash-preview-tts:generateContent?key=${encodeURIComponent(apiKey)}`;
+    const url=`${getEndpoint(apiKey)}/models/${MODEL_TTS}:generateContent?key=${encodeURIComponent(apiKey)}`;
     const res=await fetch(url,{
       method:'POST',
       headers:{'Content-Type':'application/json'},
@@ -3141,7 +3215,7 @@ let igProjectStyleDNA='';
 // ── STEP 1: Extract Visual DNA from ref image via Gemini Vision ──
 async function igExtractDNA(imgApiKey, charName, refBase64){
   const p=detectProvider(imgApiKey);
-  const url=`${getEndpoint(imgApiKey)}/models/gemini-2.0-flash-lite:generateContent?key=${encodeURIComponent(imgApiKey)}`;
+  const url=`${getEndpoint(imgApiKey)}/models/${MODEL_TEXT}:generateContent?key=${encodeURIComponent(imgApiKey)}`;
   const prompt=`You are a visual analyst for AI image generation. Analyze this character reference image and extract a precise Visual DNA description.
 
 Return a JSON object with these fields:
@@ -3174,10 +3248,10 @@ Be extremely specific about colors (not 'dark hair' but 'blue-black hair with su
   }catch(e){return {character_dna:raw,outfit_dna:'',art_style_dna:'',consistency_anchor:''};}
 }
 
-// ── STEP 2: Optimize prompt for gemini-2.5-flash-image-preview with DNA injection ──
+// ── STEP 2: Optimize prompt for gemini-2.5-flash-image with DNA injection ──
 async function igOptimizePrompt(imgApiKey, rawPrompt, charDNAMap, isEstablishingShot, projectStyleDNA){
   const p=detectProvider(imgApiKey);
-  const url=`${getEndpoint(imgApiKey)}/models/gemini-2.0-flash-lite:generateContent?key=${encodeURIComponent(imgApiKey)}`;
+  const url=`${getEndpoint(imgApiKey)}/models/${MODEL_TEXT}:generateContent?key=${encodeURIComponent(imgApiKey)}`;
 
   // Build DNA context for all characters referenced in this prompt
   let dnaContext='';
@@ -3232,9 +3306,9 @@ RULES:
   return data.candidates?.[0]?.content?.parts?.map(p=>p.text||'').join('').trim()||rawPrompt;
 }
 
-// ── STEP 3: Generate image via gemini-2.5-flash-image-preview ──
+// ── STEP 3: Generate image via gemini-2.5-flash-image ──
 // Supports both text-only and image+text (ref image) inputs
-const IG_MODEL='gemini-2.5-flash-image-preview';
+const IG_MODEL=MODEL_IMAGE;
 
 async function igCallGeminiImage(apiKey, optimizedPrompt, refImageBase64, endpoint){
   const base=endpoint||`${API_GOOGLE}/v1beta`;
@@ -3290,7 +3364,7 @@ async function igGenerateRef(idx){
   const btn=$(`igrefbtn_${idx}`);
   btn.disabled=true;btn.textContent='⏳ Generating…';
 
-  // Optimized ref prompt for gemini-2.5-flash-image-preview
+  // Optimized ref prompt for gemini-2.5-flash-image
   const refPrompt=`Character reference sheet of ${name}. ${c.ai_prompt||''}
 Full body standing pose, facing forward, arms slightly away from body so all limbs clearly visible. Plain white background. Studio lighting, even and flat. Complete figure from head to toe, no cropping. High quality character illustration. Small name label "${name}" at the very bottom center.`;
 
@@ -3380,7 +3454,7 @@ async function igRunAll(){
   }
 
   // ── PHASE 2: Generate images in parallel (3 at a time) ──
-  const PARALLEL=3;
+  const PARALLEL=5; // 500 RPM → 5 parallel an toàn
   let completed=0;
 
   async function generateOne(i){
@@ -3401,8 +3475,6 @@ async function igRunAll(){
       }
     }
 
-    // Build prompt — dùng thẳng prompt từ Prompt Engineer, không optimize riêng từng ảnh
-    // Chỉ append DNA nếu có ref
     let finalPrompt=p.text;
     const aspectStr=igGetAspectPrompt();
     if(Object.keys(charDNAMap).length>0){
@@ -3425,23 +3497,24 @@ async function igRunAll(){
       }catch(e){
         const msg=e.message||'';
         const isLimit=msg.match(/quota|limit|429|resource.*exhausted/i);
-        const isRetry=msg.match(/demand|retry|500|503|overload/i);
+        const isHighDemand=msg.match(/demand|retry|500|503|overload/i);
 
         if(isLimit){
-          // Google key hết limit → dừng toàn bộ pipeline
           igStopped=true;
           $(`igimg_${i}`).classList.remove('loading');
           $(`igimg_${i}`).innerHTML=`<div style="text-align:center;padding:12px;color:var(--amber);font-size:11px;">⏸ Dừng do limit</div>`;
-          $('igProgLabel').textContent=`⚠ Google AI Studio đã hết quota hôm nay (500 ảnh/ngày). Thử lại vào ngày mai.`;
+          $('igProgLabel').textContent=`⚠ Hết quota hôm nay. Thử lại vào ngày mai.`;
           $('igProgBar').style.background='var(--amber)';
-          alert('⚠ Google AI Studio key đã hết quota hôm nay!\n\nGiới hạn miễn phí: 500 ảnh/ngày.\nVui lòng thử lại vào ngày mai.');
+          alert('⚠ Google AI Studio key đã hết quota hôm nay!\n\nGiới hạn: 2.000 ảnh/ngày.\nVui lòng thử lại vào ngày mai.');
           return;
         }
 
-        if(isRetry&&attempts<3){
-          for(let s=15;s>0;s--){
+        if(isHighDemand&&attempts<3){
+          // High demand → chờ ngắn rồi retry, không block cả batch
+          const wait=attempts*3; // 3s, 6s
+          for(let s=wait;s>0;s--){
             if(igStopped)break;
-            $(`igimg_${i}`).querySelector('div').innerHTML=`<div style="font-size:10px;color:var(--amber)">⏳ Retry ${attempts}/3 sau ${s}s...</div>`;
+            $(`igimg_${i}`).querySelector('div').innerHTML=`<div style="font-size:10px;color:var(--amber)">⏳ High demand, retry ${attempts}/3 sau ${s}s</div>`;
             await new Promise(r=>setTimeout(r,1000));
           }
         }else{
@@ -3455,7 +3528,7 @@ async function igRunAll(){
     completed++;
     $('igProgBar').style.width=(10+completed/total*88)+'%';
     $('igProgPct').textContent=Math.round(completed/total*100)+'%';
-    $('igProgLabel').textContent=`🎨 ${completed}/${total} ảnh xong — đang chạy song song…`;
+    $('igProgLabel').textContent=`🎨 ${completed}/${total} ảnh xong (parallel ${PARALLEL}x)…`;
 
     if(imgB64){
       const dataUrl='data:image/png;base64,'+imgB64;
@@ -3465,6 +3538,16 @@ async function igRunAll(){
       $(`iglabel_${i}`).innerHTML=`<span>${esc(p.label)}${p.refName?' · '+esc(p.refName):''}</span><button class="btn-ig-dl" onclick="igDlOne('${dataUrl}','${p.label.replace(/\./g,'_')}.png')" title="Download">⬇</button>`;
       $('igResultsTitle').textContent=`✅ ${igGeneratedImages.length}/${total} ảnh`;
     }
+  }
+
+  // Chạy song song PARALLEL ảnh/batch, delay 100ms giữa batch
+  for(let i=0;i<total;i+=PARALLEL){
+    if(igStopped)break;
+    while(igPaused){await new Promise(r=>setTimeout(r,200));if(igStopped)break;}
+    const batch=[];
+    for(let j=i;j<Math.min(i+PARALLEL,total);j++) batch.push(generateOne(j));
+    await Promise.all(batch);
+    if(i+PARALLEL<total&&!igStopped) await new Promise(r=>setTimeout(r,100));
   }
 
   // Chạy song song theo batch PARALLEL ảnh
@@ -4171,7 +4254,7 @@ async function asTranscribeAll(){
     try{
       // Transcribe từng segment một (xử lý bên trong vòng lặp riêng)
 
-      const url=`${getEndpoint(apiKey)}/models/gemini-3.1-flash-lite:generateContent?key=${encodeURIComponent(apiKey)}`;
+      const url=`${getEndpoint(apiKey)}/models/${MODEL_TEXT}:generateContent?key=${encodeURIComponent(apiKey)}`;
       let res,data,attempts=0;
 
       // Transcribe từng segment riêng lẻ trong batch để tránh lỗi multi-audio
