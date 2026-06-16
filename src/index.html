@@ -642,10 +642,7 @@ html,body{height:100%;overflow:hidden;background:var(--bg0);color:var(--text);fo
     <div class="titlebar-dot" id="topBadgeDot"></div>
     <span id="topBadgeTxt">Gemini</span>
   </div>
-  <div class="titlebar-badge" id="googleBadge" style="display:none;margin-left:4px;border-color:rgba(66,133,244,.3);background:rgba(66,133,244,.08);">
-    <div class="titlebar-dot" style="background:#4285f4;"></div>
-    <span style="color:#7baaf7;">Google Free</span>
-  </div>
+
   <button class="btn-settings" id="btnInstall" onclick="installPWA()" title="Cài app ra Desktop" style="display:none;color:var(--accent2);border-color:rgba(16,185,129,.3);">
     <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
   </button>
@@ -800,9 +797,8 @@ html,body{height:100%;overflow:hidden;background:var(--bg0);color:var(--text);fo
       <button class="settings-close" onclick="closeSettings()">✕</button>
     </div>
     <div class="settings-body">
-      <!-- API chính -->
       <div class="settings-section">
-        <div class="settings-label">API <span style="font-size:10px;font-weight:400;color:var(--text3);">— Character · TTS · Rewrite · Prompt Engineer</span></div>
+        <div class="settings-label">API Key <span style="font-size:10px;font-weight:400;color:var(--text3);">— Xử lý toàn bộ tính năng</span></div>
         <div class="api-row">
           <div class="api-field">
             <input class="api-input" id="apiKey" type="password" placeholder="Dán API key vào đây" autocomplete="off" style="padding-left:12px;" oninput="showProviderBadge('apiProviderBadge',this.value)"/>
@@ -817,26 +813,6 @@ html,body{height:100%;overflow:hidden;background:var(--bg0);color:var(--text);fo
         <div style="margin-top:8px;display:flex;align-items:center;gap:8px;">
           <button onclick="saveApiKey()" style="padding:6px 14px;background:#10b981;border:none;border-radius:7px;color:#0a0f0e;font-size:12px;font-weight:700;cursor:pointer;">💾 Lưu</button>
           <span id="saveStatus" style="font-size:11px;color:#10b981;display:none;">✓ Đã lưu!</span>
-        </div>
-      </div>
-
-      <!-- API Image -->
-      <div class="settings-section" style="margin-top:10px;">
-        <div class="settings-label">API Image <span style="font-size:10px;font-weight:400;color:var(--text3);">— Tạo ảnh</span></div>
-        <div class="api-row">
-          <div class="api-field">
-            <input class="api-input" id="googleApiKey" type="password" placeholder="Dán API Image key vào đây" autocomplete="off" style="padding-left:12px;" oninput="showProviderBadge('imageProviderBadge',this.value)"/>
-          </div>
-          <button class="btn-verify" onclick="verifyGoogleKey()">
-            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/></svg>
-            Xác nhận
-          </button>
-        </div>
-        <div class="api-status" id="googleApiStatus"></div>
-        <div id="imageProviderBadge" style="margin-top:4px;"></div>
-        <div style="margin-top:8px;display:flex;align-items:center;gap:8px;">
-          <button onclick="saveGoogleApiKey()" style="padding:6px 14px;background:#10b981;border:none;border-radius:7px;color:#0a0f0e;font-size:12px;font-weight:700;cursor:pointer;">💾 Lưu</button>
-          <span id="googleSaveStatus" style="font-size:11px;color:#10b981;display:none;">✓ Đã lưu!</span>
         </div>
       </div>
     </div>
@@ -1423,6 +1399,22 @@ html,body{height:100%;overflow:hidden;background:var(--bg0);color:var(--text);fo
     </div>
   </div>
 
+  <!-- ASPECT RATIO SELECTOR -->
+  <div style="margin-bottom:10px;">
+    <div style="font-size:11px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:8px;">Tỉ lệ khung hình</div>
+    <div style="display:flex;gap:8px;">
+      <button id="igAspect169" onclick="igSetAspect('16:9')" style="flex:1;padding:8px;border-radius:var(--rs);border:1px solid var(--accent);background:var(--accentbg);color:var(--accent2);font-size:12px;font-weight:700;cursor:pointer;transition:all .15s;">
+        ▬ 16:9 <span style="font-size:10px;font-weight:400;opacity:.7;">Ngang · YouTube</span>
+      </button>
+      <button id="igAspect916" onclick="igSetAspect('9:16')" style="flex:1;padding:8px;border-radius:var(--rs);border:1px solid var(--border2);background:transparent;color:var(--text2);font-size:12px;font-weight:700;cursor:pointer;transition:all .15s;">
+        ▮ 9:16 <span style="font-size:10px;font-weight:400;opacity:.7;">Dọc · TikTok/Reels</span>
+      </button>
+      <button id="igAspect11" onclick="igSetAspect('1:1')" style="flex:1;padding:8px;border-radius:var(--rs);border:1px solid var(--border2);background:transparent;color:var(--text2);font-size:12px;font-weight:700;cursor:pointer;transition:all .15s;">
+        ■ 1:1 <span style="font-size:10px;font-weight:400;opacity:.7;">Vuông</span>
+      </button>
+    </div>
+  </div>
+
   <button class="btn-action-primary" id="igBtnRun" onclick="igRunAll()">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
         Generate tất cả ảnh
@@ -1609,34 +1601,26 @@ const STYLE_PROMPTS = {
 const STYLE_NAMES = {auto:'Tự động theo video',anime:'Anime / Manga',ghibli:'Ghibli / Watercolor',cyberpunk:'Cyberpunk / Sci-fi',darkfantasy:'Dark Fantasy / Gothic',chibi:'Chibi / Cute',realistic:'Realistic'};
 const ROLE_CLASSES = {main:'role-main',sub:'role-sub',villain:'role-villain',crowd:'role-crowd',soldier:'role-soldier',support:'role-support'};
 
-// ── API ENDPOINTS ──
-const API_FAST   = 'https://api.shopaikey.com';
-const API_DIRECT = 'https://direct.shopaikey.com';
+// ── API ENDPOINT ──
 const API_GOOGLE = 'https://generativelanguage.googleapis.com';
 
-// ── PROVIDER AUTO-DETECT ──
+// Helper: get endpoint cho key hiện tại
+function getEndpoint(key){ return `${API_GOOGLE}/v1beta`; }
+
+// ── PROVIDER (Google only) ──
 function detectProvider(key){
   if(!key) return null;
-  if(key.startsWith('AIza'))          return {name:'Google AI Studio', fast:`${API_GOOGLE}/v1beta`, direct:`${API_GOOGLE}/v1beta`, tts:null};
-  if(key.match(/^sk-jnT|^sk-[a-zA-Z0-9]{6,}/)) return {name:'ShopAIKey',        fast:`${API_FAST}/v1beta`,    direct:`${API_DIRECT}/v1beta`,   tts:`${API_DIRECT}/tts/google/generations`};
-  // Generic fallback — thử dùng như ShopAIKey
-  return {name:'Custom',             fast:`${API_FAST}/v1beta`,    direct:`${API_DIRECT}/v1beta`,   tts:`${API_DIRECT}/tts/google/generations`};
+  return {name:'Google AI Studio', fast:`${API_GOOGLE}/v1beta`, direct:`${API_GOOGLE}/v1beta`, tts:`${API_GOOGLE}/v1beta`};
 }
 
 function getMainProvider(){ return detectProvider($('apiKey')?.value?.trim()); }
-function getImageProvider(){ return detectProvider($('googleApiKey')?.value?.trim()); }
 
 // Hiện badge provider trong settings
 function showProviderBadge(elId, key){
   const p=detectProvider(key);
   const el=$(elId);
   if(!el||!p)return;
-  const colors={
-    'Google AI Studio':'#4285f4',
-    'ShopAIKey':'#10b981',
-    'Custom':'#f59e0b'
-  };
-  el.innerHTML=`<span style="font-size:10px;padding:2px 8px;border-radius:99px;background:${colors[p.name]||'#666'}22;color:${colors[p.name]||'#999'};border:1px solid ${colors[p.name]||'#666'}44;">⚡ ${p.name}</span>`;
+  el.innerHTML=`<span style="font-size:10px;padding:2px 8px;border-radius:99px;background:#4285f422;color:#4285f4;border:1px solid #4285f444;">⚡ Google AI Studio</span>`;
 }
 
 let selectedStyle='auto', usedModel='', lastChars=[];
@@ -1650,52 +1634,15 @@ function saveApiKey(){
   setTimeout(()=>s.style.display='none',2000);
 }
 
-function saveGoogleApiKey(){
-  const key=$('googleApiKey').value.trim();
-  if(!key){alert('Vui lòng nhập Google AI Studio key trước.');return;}
-  localStorage.setItem('aiera_google_apikey', key);
-  const s=$('googleSaveStatus');s.style.display='inline';
-  setTimeout(()=>s.style.display='none',2000);
-}
 
-async function verifyGoogleKey(){
-  const key=$('googleApiKey').value.trim();
-  if(!key){alert('Vui lòng nhập key trước.');return;}
-  const p=detectProvider(key);
-  const el=$('googleApiStatus');
-  el.textContent='⏳ Đang xác nhận...';el.style.color='var(--text3)';
-  showProviderBadge('imageProviderBadge',key);
-  try{
-    const res=await fetch(`${p.fast}/models/gemini-2.0-flash:generateContent?key=${encodeURIComponent(key)}`,{
-      method:'POST',headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({contents:[{parts:[{text:'hi'}]}],generationConfig:{maxOutputTokens:5}})
-    });
-    const data=await res.json();
-    if(data.error)throw new Error(data.error.message);
-    el.textContent=`✅ ${p.name} key hợp lệ!`;
-    el.style.color='var(--green)';
-    updateTopBadge();
-  }catch(e){
-    el.textContent='❌ Key không hợp lệ: '+e.message.slice(0,80);
-    el.style.color='var(--red)';
-  }
-}
 
-function getGoogleApiKey(){
-  return $('googleApiKey')?.value?.trim() || localStorage.getItem('aiera_google_apikey') || '';
-}
+function getGoogleApiKey(){ return $('apiKey')?.value?.trim() || ''; }
 
-function updateTopBadge(){
-  const gkey=getGoogleApiKey();
-  const badge=$('googleBadge');
-  if(badge)badge.style.display=gkey?'flex':'none';
-}
+function updateTopBadge(){ /* no-op */ }
 
 window.addEventListener('DOMContentLoaded',()=>{
   const saved=localStorage.getItem('aiera_apikey');
   if(saved){$('apiKey').value=saved;showProviderBadge('apiProviderBadge',saved);}
-  const savedGoogle=localStorage.getItem('aiera_google_apikey');
-  if(savedGoogle&&$('googleApiKey')){$('googleApiKey').value=savedGoogle;showProviderBadge('imageProviderBadge',savedGoogle);}
   updateTopBadge();
 });
 
@@ -1714,7 +1661,7 @@ async function verifyKey(){
   $('verifyBtn').disabled=true;
   showVerify('checking',null,`Đang xác minh (${p?.name||'Unknown'})…`);
   try{
-    const res=await fetch(`${p?.fast||API_FAST}/v1beta/models?key=${encodeURIComponent(key)}&pageSize=5`);
+    const res=await fetch(`${getEndpoint(key)}/models?key=${encodeURIComponent(key)}&pageSize=5`);
     const data=await res.json();
     if(data.error)throw new Error(data.error.message);
     const names=(data.models||[]).map(m=>m.name?.replace('models/','')).filter(n=>n?.includes('flash')).slice(0,3).join(', ');
@@ -1743,7 +1690,7 @@ async function callGeminiText(parts,apiKey){
   for(const modelId of FREE_TEXT_MODELS){
     try{
       showStatus(`Đang dùng ${MODEL_LABELS[modelId]}…`,'Phân tích video & thiết kế nhân vật');
-      const url=`${p?.direct||API_DIRECT+'/v1beta'}/models/${modelId}:generateContent?key=${encodeURIComponent(apiKey)}`;
+      const url=`${getEndpoint(apiKey)}/models/${modelId}:generateContent?key=${encodeURIComponent(apiKey)}`;
       const res=await fetch(url,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({
         contents:[{parts}],
         generationConfig:{temperature:0.5,maxOutputTokens:8192,responseMimeType:'application/json'},
@@ -2495,7 +2442,7 @@ RULES:
 
   const userPrompt=`Generate ${densityMap[peDensity]}.\n\nScenes:\n${scenesText}`;
 
-  const url=`${API_DIRECT}/v1beta/models/gemini-3.1-flash-lite:generateContent?key=${encodeURIComponent(apiKey)}`;
+  const url=`${getEndpoint(apiKey)}/models/gemini-3.1-flash-lite:generateContent?key=${encodeURIComponent(apiKey)}`;
 
   let res, data, attempts=0;
   while(attempts<4){
@@ -2569,7 +2516,7 @@ const TTS_MODELS_PRIORITY=[
   'gemini-2.5-flash-preview-tts',
 ];
 let ttsActiveModel=null; // set after auto-detect
-const TTS_CHUNK_SIZE=4500; // chars per API call
+const TTS_SENTENCES_PER_CHUNK=4;
 
 const TTS_VOICES=[
   {id:'Zephyr',    desc:'Bright'},
@@ -2741,7 +2688,7 @@ ${subTruncated}`;
 
   try{
     // Dùng Gemini API trực tiếp
-    const res=await fetch(`${API_DIRECT}/v1beta/models/gemini-3.1-flash-lite:generateContent?key=${encodeURIComponent(apiKey)}`,{
+    const res=await fetch(`${getEndpoint(apiKey)}/models/gemini-3.1-flash-lite:generateContent?key=${encodeURIComponent(apiKey)}`,{
       method:'POST',headers:{'Content-Type':'application/json'},
       body:JSON.stringify({
         contents:[{parts:[{text:prompt}]}],
@@ -2795,7 +2742,7 @@ async function ttsPreviewVoice(voiceId){
 
   try{
     const wavBuf=await ttsCallAPI(apiKey,sampleText,voiceId,stylePrompt);
-    // ShopAIKey returns WAV directly — use as-is
+    // WAV data — use as-is
     const url=URL.createObjectURL(new Blob([wavBuf],{type:'audio/wav'}));
     ttsPreviewAudio=new Audio(url);
     ttsPreviewAudio.play();
@@ -2822,7 +2769,7 @@ async function ttsGenerate(){
   ttsResetControls();
 
   // Split into chunks
-  const chunks=ttsChunkText(script,TTS_CHUNK_SIZE);
+  const chunks=ttsChunkText(script);
   const stylePrompt=TTS_STYLE_PROMPTS[ttsSelectedStyle];
   const allWavBuffers=[];
 
@@ -2879,7 +2826,7 @@ async function ttsGenerate(){
 
   $('ttsProgLabel').textContent='Ghép audio…';$('ttsProgBar').style.width='95%';
 
-  // ShopAIKey returns WAV files directly — if single chunk use as-is, else merge PCM data
+  // WAV/PCM data — if single chunk use as-is, else merge
   let blob;
   if(allWavBuffers.length===1){
     blob=new Blob([allWavBuffers[0]],{type:'audio/wav'});
@@ -2909,7 +2856,7 @@ async function ttsDetectModel(apiKey){
   if(ttsActiveModel)return ttsActiveModel;
   for(const model of TTS_MODELS_PRIORITY){
     try{
-      const res=await fetch(`${API_FAST}/v1beta/models/${model}:generateContent?key=${encodeURIComponent(apiKey)}`,{
+      const res=await fetch(`${getEndpoint(apiKey)}/models/${model}:generateContent?key=${encodeURIComponent(apiKey)}`,{
         method:'POST',headers:{'Content-Type':'application/json'},
         body:JSON.stringify({
           contents:[{parts:[{text:'Hi'}]}],
@@ -2928,42 +2875,89 @@ async function ttsDetectModel(apiKey){
 }
 
 async function ttsCallAPI(apiKey,text,voice,stylePrompt){
-  // Use ShopAIKey's dedicated Gemini TTS endpoint
-  // POST /tts/google/generations — Auth: Bearer, returns {url} WAV file
+  const p=detectProvider(apiKey);
   const fullText=stylePrompt?`${stylePrompt}\n\nTRANSCRIPT:\n${text}`:text;
-  const res=await fetch(`${API_DIRECT}/tts/google/generations`,{
-    method:'POST',
-    headers:{'Authorization':'Bearer '+apiKey,'Content-Type':'application/json'},
-    body:JSON.stringify({text:fullText,model:TTS_MODEL,voice:voice})
-  });
-  const data=await res.json();
-  if(data.error)throw new Error(data.error.message||JSON.stringify(data.error));
-  if(!data.url)throw new Error('No audio URL: '+JSON.stringify(data));
 
-  // Server returns a WAV file URL — fetch raw bytes
-  const audioRes=await fetch(data.url);
-  const arrayBuf=await audioRes.arrayBuffer();
-  return new Uint8Array(arrayBuf); // Already WAV, mark for caller
+  // Google Gemini TTS API
+  const isGoogle=p?.name==='Google AI Studio';
+  const model=isGoogle?'gemini-2.5-flash-preview-tts':TTS_MODEL;
+  const base=`${API_GOOGLE}/v1beta`;
+
+  if(isGoogle){
+    // Google API: generateContent với responseModalities audio
+    const url=`${API_GOOGLE}/v1beta/models/${model}:generateContent?key=${encodeURIComponent(apiKey)}`;
+    const res=await fetch(url,{
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({
+        contents:[{parts:[{text:fullText}]}],
+        generationConfig:{
+          responseModalities:['AUDIO'],
+          speechConfig:{voiceConfig:{prebuiltVoiceConfig:{voiceName:voice}}}
+        }
+      })
+    });
+    const data=await res.json();
+    if(data.error)throw new Error(data.error.message||JSON.stringify(data.error));
+    // Trả về base64 audio inline
+    const parts=data.candidates?.[0]?.content?.parts||[];
+    for(const part of parts){
+      if(part.inlineData?.data){
+        const raw=atob(part.inlineData.data);
+        const buf=new Uint8Array(raw.length);
+        for(let i=0;i<raw.length;i++)buf[i]=raw.charCodeAt(i);
+        return buf; // PCM/WAV bytes
+      }
+    }
+    throw new Error('Google TTS không trả về audio data');
+  } else {
+    // Fallback - Google TTS format
+    const url=`${getEndpoint(apiKey)}/models/gemini-2.5-flash-preview-tts:generateContent?key=${encodeURIComponent(apiKey)}`;
+    const res=await fetch(url,{
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({
+        contents:[{parts:[{text:fullText}]}],
+        generationConfig:{
+          responseModalities:['AUDIO'],
+          speechConfig:{voiceConfig:{prebuiltVoiceConfig:{voiceName:voice}}}
+        }
+      })
+    });
+    const data=await res.json();
+    if(data.error)throw new Error(data.error.message||JSON.stringify(data.error));
+    const parts=data.candidates?.[0]?.content?.parts||[];
+    for(const part of parts){
+      if(part.inlineData?.data){
+        const raw=atob(part.inlineData.data);
+        const buf=new Uint8Array(raw.length);
+        for(let i=0;i<raw.length;i++)buf[i]=raw.charCodeAt(i);
+        return buf;
+      }
+    }
+    throw new Error('TTS không trả về audio data');
+  }
 }
 
-function ttsChunkText(text,maxChars){
-  if(text.length<=maxChars)return[text];
+const TTS_SENTENCES_PER_CHUNK=4; // 4 câu/request — tốc độ đồng đều
+
+function ttsChunkText(text){
+  // Tách theo câu (dấu . ! ? và xuống dòng)
+  const sentences=text
+    .replace(/([.!?])\s+/g,'$1\n')
+    .split('\n')
+    .map(s=>s.trim())
+    .filter(s=>s.length>0);
+
+  if(!sentences.length)return[text];
+
+  // Gộp TTS_SENTENCES_PER_CHUNK câu thành 1 chunk
   const chunks=[];
-  let start=0;
-  while(start<text.length){
-    let end=Math.min(start+maxChars,text.length);
-    // Try to break at sentence boundary
-    if(end<text.length){
-      const lastDot=text.lastIndexOf('.',end);
-      const lastQ=text.lastIndexOf('?',end);
-      const lastEx=text.lastIndexOf('!',end);
-      const boundary=Math.max(lastDot,lastQ,lastEx);
-      if(boundary>start+maxChars*0.5)end=boundary+1;
-    }
-    chunks.push(text.slice(start,end).trim());
-    start=end;
+  for(let i=0;i<sentences.length;i+=TTS_SENTENCES_PER_CHUNK){
+    const group=sentences.slice(i,i+TTS_SENTENCES_PER_CHUNK).join(' ');
+    if(group.trim())chunks.push(group.trim());
   }
-  return chunks.filter(Boolean);
+  return chunks.length?chunks:[text];
 }
 
 function mergePcm(pcmArrays){
@@ -3012,6 +3006,34 @@ function selectImgModel(m){
 
 let igRefImages={}; // {charName: base64DataUrl}
 let igParsedPrompts=[]; // [{label, text, refName}]
+let igAspectRatio='16:9'; // default
+
+function igSetAspect(ratio){
+  igAspectRatio=ratio;
+  ['169','916','11'].forEach(id=>{
+    const btn=$('igAspect'+id);
+    if(!btn)return;
+    btn.style.border='1px solid var(--border2)';
+    btn.style.background='transparent';
+    btn.style.color='var(--text2)';
+  });
+  const map={'16:9':'169','9:16':'916','1:1':'11'};
+  const active=$('igAspect'+map[ratio]);
+  if(active){
+    active.style.border='1px solid var(--accent)';
+    active.style.background='var(--accentbg)';
+    active.style.color='var(--accent2)';
+  }
+}
+
+function igGetAspectPrompt(){
+  const map={
+    '16:9':'wide landscape 16:9 aspect ratio, cinematic horizontal frame, no borders, no letterbox, no vignette, no frame overlay, full bleed image',
+    '9:16':'vertical portrait 9:16 aspect ratio, mobile format, no borders, no frame overlay, full bleed image',
+    '1:1':'square 1:1 aspect ratio, no borders, no frame overlay, full bleed image'
+  };
+  return map[igAspectRatio]||map['16:9'];
+}
 let igGeneratedImages=[]; // [{label, dataUrl}]
 
 function igSyncFromPE(){
@@ -3065,7 +3087,7 @@ let igProjectStyleDNA='';
 // ── STEP 1: Extract Visual DNA from ref image via Gemini Vision ──
 async function igExtractDNA(imgApiKey, charName, refBase64){
   const p=detectProvider(imgApiKey);
-  const url=`${p?.fast||API_DIRECT+'/v1beta'}/models/gemini-2.0-flash:generateContent?key=${encodeURIComponent(imgApiKey)}`;
+  const url=`${getEndpoint(imgApiKey)}/models/gemini-2.0-flash-lite:generateContent?key=${encodeURIComponent(imgApiKey)}`;
   const prompt=`You are a visual analyst for AI image generation. Analyze this character reference image and extract a precise Visual DNA description.
 
 Return a JSON object with these fields:
@@ -3101,7 +3123,7 @@ Be extremely specific about colors (not 'dark hair' but 'blue-black hair with su
 // ── STEP 2: Optimize prompt for gemini-2.5-flash-image-preview with DNA injection ──
 async function igOptimizePrompt(imgApiKey, rawPrompt, charDNAMap, isEstablishingShot, projectStyleDNA){
   const p=detectProvider(imgApiKey);
-  const url=`${p?.fast||API_DIRECT+'/v1beta'}/models/gemini-2.0-flash:generateContent?key=${encodeURIComponent(imgApiKey)}`;
+  const url=`${getEndpoint(imgApiKey)}/models/gemini-2.0-flash-lite:generateContent?key=${encodeURIComponent(imgApiKey)}`;
 
   // Build DNA context for all characters referenced in this prompt
   let dnaContext='';
@@ -3161,7 +3183,7 @@ RULES:
 const IG_MODEL='gemini-2.5-flash-image-preview';
 
 async function igCallGeminiImage(apiKey, optimizedPrompt, refImageBase64, endpoint){
-  const base=endpoint||`${API_DIRECT}/v1beta`;
+  const base=endpoint||`${API_GOOGLE}/v1beta`;
   const url=`${base}/models/${IG_MODEL}:generateContent?key=${encodeURIComponent(apiKey)}`;
 
   const parts=[];
@@ -3219,9 +3241,8 @@ async function igGenerateRef(idx){
 Full body standing pose, facing forward, arms slightly away from body so all limbs clearly visible. Plain white background. Studio lighting, even and flat. Complete figure from head to toe, no cropping. High quality character illustration. Small name label "${name}" at the very bottom center.`;
 
   try{
-    const imgApiKey=getGoogleApiKey()||apiKey;
-    const imgProvider=detectProvider(imgApiKey);
-    const imgEndpoint=imgProvider?.direct||`${API_DIRECT}/v1beta`;
+    const imgApiKey=apiKey;
+    const imgEndpoint=`${API_GOOGLE}/v1beta`;
     const imgB64=await igCallGeminiImage(imgApiKey, refPrompt, null, imgEndpoint);
     const dataUrl='data:image/png;base64,'+imgB64;
     igRefImages[name]=dataUrl;
@@ -3253,18 +3274,13 @@ Full body standing pose, facing forward, arms slightly away from body so all lim
 // ── MAIN PIPELINE: Run All ──
 async function igRunAll(){
   const apiKey=$('apiKey').value.trim();
-  if(!apiKey){alert('Cần ShopAIKey.');return;}
+  if(!apiKey){alert('Vui lòng nhập API key trong Cài đặt.');return;}
 
   // Detect provider từ image key
-  const googleKey=getGoogleApiKey();
-  const imgApiKey=googleKey||apiKey;
-  const imgProvider=detectProvider(imgApiKey);
-  const imgEndpoint=imgProvider?.direct||`${API_DIRECT}/v1beta`;
+  const imgApiKey=apiKey;
+  const imgEndpoint=`${API_GOOGLE}/v1beta`;
 
-  if(!googleKey){
-    const ok=confirm('Bạn chưa nhập API Image.\n\nTiếp tục dùng API chính để tạo ảnh (có thể mất phí)?');
-    if(!ok)return;
-  }
+
   igParsePrompts();
   if(!igParsedPrompts.length){alert('Chưa có prompt. Dán hoặc sync từ Prompt Engineer.');return;}
 
@@ -3334,11 +3350,14 @@ async function igRunAll(){
     // Build prompt — dùng thẳng prompt từ Prompt Engineer, không optimize riêng từng ảnh
     // Chỉ append DNA nếu có ref
     let finalPrompt=p.text;
+    const aspectStr=igGetAspectPrompt();
     if(Object.keys(charDNAMap).length>0){
       const dnaSnippet=Object.entries(charDNAMap).map(([name,dna])=>
         `[${name}: ${dna.visual_summary||dna.hair||''}]`
       ).join(' ');
-      finalPrompt=`${p.text}\n\nCharacter DNA: ${dnaSnippet}\nMaintain character consistency. Cinematic lighting. 16:9 aspect ratio.`;
+      finalPrompt=`${p.text}\n\nCharacter DNA: ${dnaSnippet}\nMaintain character consistency. ${aspectStr}.`;
+    } else {
+      finalPrompt=`${p.text}\n\n${aspectStr}.`;
     }
 
     $(`igimg_${i}`).querySelector('div').innerHTML=`<div style="font-size:10px;color:var(--accent2)">🎨 Generating...</div>`;
@@ -4098,7 +4117,7 @@ async function asTranscribeAll(){
     try{
       // Transcribe từng segment một (xử lý bên trong vòng lặp riêng)
 
-      const url=`${API_DIRECT}/v1beta/models/gemini-3.1-flash-lite:generateContent?key=${encodeURIComponent(apiKey)}`;
+      const url=`${getEndpoint(apiKey)}/models/gemini-3.1-flash-lite:generateContent?key=${encodeURIComponent(apiKey)}`;
       let res,data,attempts=0;
 
       // Transcribe từng segment riêng lẻ trong batch để tránh lỗi multi-audio
