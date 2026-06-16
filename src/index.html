@@ -1357,7 +1357,7 @@ html,body{height:100%;overflow:hidden;background:var(--bg0);color:var(--text);fo
   <div class="panel-header">
     <div class="panel-tag"><span class="panel-tag-dot"></span>gemini-2.5-flash-image · Character Consistency Pipeline</div>
     <div class="panel-title">Tạo ảnh <em>đồng nhất nhân vật</em></div>
-    <div class="panel-desc">Gen Ref → Gemini extract Visual DNA → Optimize prompt → gemini-2.5-flash-image (pass ref image) → ảnh đồng nhất hoàn toàn.</div>
+    <div class="panel-desc">Gen Ref → Gemini extract Visual DNA → Optimize prompt → gemini-2.5-flash-image-preview (pass ref image) → ảnh đồng nhất hoàn toàn.</div>
   </div>
 
   <!-- PHẦN A: ẢNH THAM CHIẾU NHÂN VẬT -->
@@ -1623,9 +1623,9 @@ html,body{height:100%;overflow:hidden;background:var(--bg0);color:var(--text);fo
 <script>
 // ── MODEL ASSIGNMENT ──
 const MODEL_TEXT    = 'gemini-3.1-flash-lite';  // Character Sheet, Prompt Engineer, Rewrite, DNA, mọi tác vụ text
-const MODEL_TTS     = 'gemini-3.1-flash-tts-preview'; // TTS voice generation
-const MODEL_IMAGE   = 'gemini-2.5-flash-image'; // Nano Banana - tạo ảnh (tên mới)
-const FREE_TEXT_MODELS = [MODEL_TEXT];
+const MODEL_TTS     = 'gemini-3.1-flash-tts'; // TTS voice generation
+const MODEL_IMAGE   = 'gemini-2.5-flash-image-preview'; // Nano Banana
+const FREE_TEXT_MODELS = [MODEL_TEXT, 'gemini-2.5-flash-lite'];
 const MODEL_LABELS = {'gemini-3.1-flash-lite':'3.1 Flash-Lite'};
 const STYLE_PROMPTS = {
   auto:'',
@@ -2913,8 +2913,14 @@ async function ttsGenerate(){
     }
     if(ttsStopped)break;
     if(wavBuf)allWavBuffers.push(wavBuf);
-    // Tăng delay giữa chunks để tránh rate limit
-    if(i<chunks.length-1)await new Promise(r=>setTimeout(r,1500));
+    // 10 RPM limit → cần ít nhất 6s giữa requests
+    if(i<chunks.length-1){
+      for(let s=7;s>0;s--){
+        if(ttsStopped)break;
+        $('ttsProgLabel').textContent=`Chunk ${i+1}/${chunks.length} xong — chờ ${s}s trước chunk tiếp theo…`;
+        await new Promise(r=>setTimeout(r,1000));
+      }
+    }
   }
 
   if(ttsStopped){
@@ -3040,7 +3046,7 @@ async function ttsCallAPI(apiKey,text,voice,stylePrompt){
   }
 }
 
-const TTS_SENTENCES_PER_CHUNK=4; // 4 câu/request — tốc độ đồng đều
+const TTS_SENTENCES_PER_CHUNK=8; // tăng từ 4 lên 8 → ít chunk hơn, ít chờ hơn
 
 function ttsChunkText(text){
   // Tách theo câu (dấu . ! ? và xuống dòng)
@@ -3371,32 +3377,28 @@ Full body standing pose, facing forward, arms slightly away from body so all lim
   try{
     const imgApiKey=apiKey;
     const imgEndpoint=`${API_GOOGLE}/v1beta`;
+    btn.textContent='🎨 Đang tạo ảnh...';
     const imgB64=await igCallGeminiImage(imgApiKey, refPrompt, null, imgEndpoint);
     const dataUrl='data:image/png;base64,'+imgB64;
     igRefImages[name]=dataUrl;
-    igCharDNA[name]=null; // reset DNA, will re-extract when running batch
+    igCharDNA[name]=null;
 
     const thumb=$(`igthumb_${idx}`);
     if(thumb)thumb.innerHTML=`<img src="${dataUrl}">`;
     btn.textContent='✅ Tạo lại';btn.classList.add('done');
+    btn.disabled=false;
 
-    // Auto-extract DNA in background
-    btn.textContent='🔬 Đang extract DNA…';
-    try{
-      const dna=await igExtractDNA(imgApiKey,name,imgB64);
+    // Extract DNA trong background — không block UI
+    igExtractDNA(imgApiKey,name,imgB64).then(dna=>{
       igCharDNA[name]=dna;
-      // Set project style from first ref
-      if(!igProjectStyleDNA && dna.art_style_dna) igProjectStyleDNA=dna.art_style_dna;
-      btn.textContent='✅ DNA ✓ Tạo lại';
-    }catch(e){
-      console.warn('DNA extract failed:',e.message);
-      btn.textContent='✅ Tạo lại';
-    }
+      if(!igProjectStyleDNA&&dna.art_style_dna)igProjectStyleDNA=dna.art_style_dna;
+    }).catch(e=>console.warn('DNA extract failed:',e.message));
+
   }catch(e){
     btn.textContent='❌ Thử lại';
+    btn.disabled=false;
     alert(`Lỗi ref cho ${name}: ${e.message}`);
   }
-  btn.disabled=false;
 }
 
 // ── MAIN PIPELINE: Run All ──
