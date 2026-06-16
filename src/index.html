@@ -3045,10 +3045,9 @@ async function ttsCallAPI(apiKey,text,voice,stylePrompt){
   }
 }
 
-const TTS_SENTENCES_PER_CHUNK=8; // tăng từ 4 lên 8 → ít chunk hơn, ít chờ hơn
+const TTS_SENTENCES_PER_CHUNK=16; // 16 câu/chunk → 6 phút ≈ 2-3 chunks
 
 function ttsChunkText(text){
-  // Tách theo câu (dấu . ! ? và xuống dòng)
   const sentences=text
     .replace(/([.!?])\s+/g,'$1\n')
     .split('\n')
@@ -3057,7 +3056,6 @@ function ttsChunkText(text){
 
   if(!sentences.length)return[text];
 
-  // Gộp TTS_SENTENCES_PER_CHUNK câu thành 1 chunk
   const chunks=[];
   for(let i=0;i<sentences.length;i+=TTS_SENTENCES_PER_CHUNK){
     const group=sentences.slice(i,i+TTS_SENTENCES_PER_CHUNK).join(' ');
