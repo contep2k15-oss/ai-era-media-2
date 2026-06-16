@@ -351,7 +351,7 @@ html,body{height:100%;overflow:hidden;background:var(--bg0);color:var(--text);fo
 .pe-dna-chip{display:flex;align-items:flex-start;gap:7px;padding:8px 10px;border-radius:var(--rs);background:var(--bg0);border:1px solid var(--border2);}
 .pe-dna-chip-name{font-size:10px;font-weight:700;color:var(--accent2);white-space:nowrap;margin-top:1px;}
 .pe-dna-chip-text{font-size:10px;font-family:var(--mono);color:var(--text3);line-height:1.6;}
-.density-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;}
+.density-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:6px;}
 .density-card{padding:9px 8px;border-radius:var(--rs);border:1px solid var(--border2);background:var(--bg3);cursor:pointer;transition:all .15s;text-align:center;}
 .density-card:hover{border-color:var(--accent);}
 .density-card.active{border-color:var(--accent);background:var(--accentbg);}
@@ -968,6 +968,11 @@ html,body{height:100%;overflow:hidden;background:var(--bg0);color:var(--text);fo
           <div class="dc-label">Nhịp nhanh</div>
           <div class="dc-desc">A + B + C + Bonus</div>
         </div>
+        <div class="density-card" id="density-5" onclick="selectDensity(5)">
+          <div class="dc-num">5</div>
+          <div class="dc-label">Chi tiết</div>
+          <div class="dc-desc">A + B + C + D + E</div>
+        </div>
       </div>
     </div>
   </div>
@@ -1413,6 +1418,29 @@ html,body{height:100%;overflow:hidden;background:var(--bg0);color:var(--text);fo
         ■ 1:1 <span style="font-size:10px;font-weight:400;opacity:.7;">Vuông</span>
       </button>
     </div>
+  </div>
+
+  <!-- PROMPT PER SCENE SELECTOR -->
+  <div style="margin-bottom:12px;">
+    <div style="font-size:11px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:8px;">Số prompt mỗi đoạn <span style="font-size:10px;font-weight:400;color:var(--text3);text-transform:none;letter-spacing:0;">(A, B, C...)</span></div>
+    <div style="display:flex;gap:6px;">
+      <button class="ig-density-btn" id="igDensity1" onclick="igSetDensity(1)" style="flex:1;padding:8px 4px;border-radius:var(--rs);border:1px solid var(--border2);background:transparent;color:var(--text2);font-size:13px;font-weight:700;cursor:pointer;transition:all .15s;text-align:center;">
+        1<div style="font-size:9px;font-weight:400;color:var(--text3);margin-top:2px;">Đơn giản</div>
+      </button>
+      <button class="ig-density-btn" id="igDensity2" onclick="igSetDensity(2)" style="flex:1;padding:8px 4px;border-radius:var(--rs);border:1px solid var(--border2);background:transparent;color:var(--text2);font-size:13px;font-weight:700;cursor:pointer;transition:all .15s;text-align:center;">
+        2<div style="font-size:9px;font-weight:400;color:var(--text3);margin-top:2px;">Vừa</div>
+      </button>
+      <button class="ig-density-btn active" id="igDensity3" onclick="igSetDensity(3)" style="flex:1;padding:8px 4px;border-radius:var(--rs);border:1px solid var(--accent);background:var(--accentbg);color:var(--accent2);font-size:13px;font-weight:700;cursor:pointer;transition:all .15s;text-align:center;">
+        3<div style="font-size:9px;font-weight:400;margin-top:2px;">✅ Mặc định</div>
+      </button>
+      <button class="ig-density-btn" id="igDensity4" onclick="igSetDensity(4)" style="flex:1;padding:8px 4px;border-radius:var(--rs);border:1px solid var(--border2);background:transparent;color:var(--text2);font-size:13px;font-weight:700;cursor:pointer;transition:all .15s;text-align:center;">
+        4<div style="font-size:9px;font-weight:400;color:var(--text3);margin-top:2px;">Nhịp nhanh</div>
+      </button>
+      <button class="ig-density-btn" id="igDensity5" onclick="igSetDensity(5)" style="flex:1;padding:8px 4px;border-radius:var(--rs);border:1px solid var(--border2);background:transparent;color:var(--text2);font-size:13px;font-weight:700;cursor:pointer;transition:all .15s;text-align:center;">
+        5<div style="font-size:9px;font-weight:400;color:var(--text3);margin-top:2px;">Chi tiết</div>
+      </button>
+    </div>
+    <div style="margin-top:6px;font-size:10px;color:var(--text3);" id="igDensityInfo">Mỗi đoạn tạo 3 prompt: [N.A] · [N.B] · [N.C]</div>
   </div>
 
   <button class="btn-action-primary" id="igBtnRun" onclick="igRunAll()">
@@ -2432,7 +2460,7 @@ RULES:
 3. Same scene: same location, outfit, time of day across all shots — only camera angle differs
 4. Output: plain text, labels [N.X] on own line, prompts separated by ---, no extra headers`;
 
-  const densityMap={1:'1 prompt per scene: [N.B] only',2:'2 prompts per scene: [N.A] then [N.B]',3:'3 prompts per scene: [N.A], [N.B], [N.C]',4:'4 prompts per scene: [N.A], [N.B], [N.C], [N.D]'};
+  const densityMap={1:'1 prompt per scene: [N.A] only — single action shot',2:'2 prompts per scene: [N.A] establishing shot, then [N.B] action shot',3:'3 prompts per scene: [N.A] establishing, [N.B] action, [N.C] close-up/detail',4:'4 prompts per scene: [N.A] establishing, [N.B] action, [N.C] close-up, [N.D] bonus reaction/detail',5:'5 prompts per scene: [N.A] establishing, [N.B] action, [N.C] close-up, [N.D] detail shot, [N.E] emotional beat'};
 
   const scenesText=batchScenes.map((s,i)=>{
     const n=batchStart+i+1;
@@ -2516,7 +2544,6 @@ const TTS_MODELS_PRIORITY=[
   'gemini-2.5-flash-preview-tts',
 ];
 let ttsActiveModel=null; // set after auto-detect
-const TTS_SENTENCES_PER_CHUNK=4;
 
 const TTS_VOICES=[
   {id:'Zephyr',    desc:'Bright'},
@@ -3007,6 +3034,32 @@ function selectImgModel(m){
 let igRefImages={}; // {charName: base64DataUrl}
 let igParsedPrompts=[]; // [{label, text, refName}]
 let igAspectRatio='16:9'; // default
+let igDensityPerScene=3;  // default 3 prompts per scene
+
+function igSetDensity(n){
+  igDensityPerScene=n;
+  [1,2,3,4,5].forEach(i=>{
+    const btn=$('igDensity'+i);
+    if(!btn)return;
+    btn.style.border='1px solid var(--border2)';
+    btn.style.background='transparent';
+    btn.style.color='var(--text2)';
+    btn.querySelector('div').style.color='var(--text3)';
+  });
+  const active=$('igDensity'+n);
+  if(active){
+    active.style.border='1px solid var(--accent)';
+    active.style.background='var(--accentbg)';
+    active.style.color='var(--accent2)';
+    active.querySelector('div').style.color='';
+  }
+  const labels=['A','B','C','D','E'];
+  const names=labels.slice(0,n).map(l=>`[N.${l}]`).join(' · ');
+  const info=$('igDensityInfo');
+  if(info)info.textContent=`Mỗi đoạn tạo ${n} prompt: ${names}`;
+  // Re-parse prompts nếu có
+  if(igParsedPrompts.length)igParsePrompts();
+}
 
 function igSetAspect(ratio){
   igAspectRatio=ratio;
@@ -3048,15 +3101,16 @@ function igParsePrompts(){
   if(!raw){$('igParseInfo').textContent='';igParsedPrompts=[];return;}
   const blocks=raw.split(/\n?---\n?/).map(b=>b.trim()).filter(Boolean);
   igParsedPrompts=blocks.map(block=>{
-    const labelMatch=block.match(/^\[(\d+\.[A-D])\]/);
+    const labelMatch=block.match(/^\[(\d+\.[A-E])\]/);
     const label=labelMatch?labelMatch[1]:'?';
-    const text=block.replace(/^\[\d+\.[A-D]\]\s*/,'').trim();
+    const text=block.replace(/^\[\d+\.[A-E]\]\s*/,'').trim();
     const refMatch=text.match(/\[REF:\s*([^—\]]+)/i);
     const refName=refMatch?refMatch[1].trim():null;
     return {label,text,refName};
   });
   const withRef=igParsedPrompts.filter(p=>p.refName).length;
-  $('igParseInfo').textContent=`→ ${igParsedPrompts.length} prompt · ${withRef} có ref nhân vật · ${igParsedPrompts.length-withRef} cảnh thuần túy`;
+  const scenes=new Set(igParsedPrompts.map(p=>p.label.split('.')[0])).size;
+  $('igParseInfo').textContent=`→ ${igParsedPrompts.length} prompt · ${scenes} đoạn · ${withRef} có ref nhân vật`;
 }
 
 function igRefreshCharGrid(){
