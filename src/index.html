@@ -1522,7 +1522,7 @@ html,body{height:100%;overflow:hidden;background:var(--bg0);color:var(--text);fo
     <div id="igEmptyState" style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;color:var(--text3);text-align:center;gap:10px;">
       <div style="font-size:48px;opacity:.3;">🖼</div>
       <div style="font-size:13px;">Ảnh sẽ hiện ở đây khi generate</div>
-      <div style="font-size:11px;opacity:.6;">Parallel 5x — ảnh xuất hiện ngay khi từng ảnh xong</div>
+      <div style="font-size:11px;opacity:.6;">Tuần tự — ảnh xuất hiện ngay khi từng ảnh xong</div>
     </div>
   </div>
 
@@ -3931,7 +3931,7 @@ async function igRunAll(){
   // Không cần extract lại ở đây — bắt đầu generate ảnh ngay
 
   // ── PHASE 2: Generate images in parallel ──
-  const PARALLEL=5; // 100 req/min paid tier → 5 parallel an toàn
+  const PARALLEL=1; // Vertex image: 1 request/lúc để tránh 429
   let completed=0;
 
   async function generateOne(i){
@@ -3985,14 +3985,14 @@ async function igRunAll(){
           const wait=attempts*30; // 30s, 60s, 90s
           for(let s=wait;s>0;s--){
             if(igStopped)break;
-            $(`igimg_${i}`).querySelector('div').innerHTML=`<div style="font-size:10px;color:var(--amber)">⏳ Vertex quota, retry ${attempts}/3 sau ${s}s</div>`;
+            $(`igimg_${i}`).querySelector('div').innerHTML=`<div style="font-size:10px;color:var(--amber)">⏳ Vertex quota, retry ${attempts}/5 sau ${s}s</div>`;
             await new Promise(r=>setTimeout(r,1000));
           }
         }else if(isHighDemand&&attempts<5){
           const wait=attempts*15; // 15s, 30s, 45s
           for(let s=wait;s>0;s--){
             if(igStopped)break;
-            $(`igimg_${i}`).querySelector('div').innerHTML=`<div style="font-size:10px;color:var(--amber)">⏳ Server bận, retry ${attempts}/3 sau ${s}s</div>`;
+            $(`igimg_${i}`).querySelector('div').innerHTML=`<div style="font-size:10px;color:var(--amber)">⏳ Server bận, retry ${attempts}/5 sau ${s}s</div>`;
             await new Promise(r=>setTimeout(r,1000));
           }
         }else{
@@ -4007,7 +4007,7 @@ async function igRunAll(){
     const pct=Math.min(Math.round(completed/total*100),100);
     $('igProgBar').style.width=(10+Math.min(completed,total)/total*88)+'%';
     $('igProgPct').textContent=pct+'%';
-    $('igProgLabel').textContent=`🎨 ${completed}/${total} ảnh xong (parallel ${PARALLEL}x)…`;
+    $('igProgLabel').textContent=`🎨 ${completed}/${total} ảnh xong…`;
 
     if(imgB64){
       const dataUrl='data:image/png;base64,'+imgB64;
@@ -4026,7 +4026,7 @@ async function igRunAll(){
     }
   }
 
-  // Chạy song song PARALLEL ảnh/batch, delay 3s giữa batch
+  // Chạy tuần tự từng ảnh, delay 3s giữa mỗi ảnh
   for(let i=0;i<total;i+=PARALLEL){
     if(igStopped)break;
     while(igPaused){await new Promise(r=>setTimeout(r,200));if(igStopped)break;}
@@ -4087,17 +4087,39 @@ async function igRegenOne(i){
     finalPrompt=`[${aspectStr}]\n\n${p.text}${styleDNA}\n\nREMINDER: NO white margins, NO white padding, full bleed to all edges.`;
   }
 
-  try{
-    const imgB64=await igCallGeminiImage(imgApiKey,finalPrompt,primaryRefB64,imgEndpoint);
-    if(imgB64){
-      const dataUrl='data:image/png;base64,'+imgB64;
-      igGeneratedImages[i]={label:p.label,dataUrl};
-      if(imgEl){imgEl.classList.remove('loading');imgEl.innerHTML=`<img src="${dataUrl}" style="width:100%;height:100%;object-fit:cover;object-position:center;display:block;transform:scale(1.08);">`;}
-      const labelEl=$(`iglabel_${i}`);
-      if(labelEl)labelEl.innerHTML=`<span>${esc(p.label)}${p.refName?' · '+esc(p.refName):''}</span><button class="btn-ig-dl" onclick="igDlOne('${dataUrl}','${p.label.replace(/\./g,'_')}.png')" title="Download">⬇</button>`;
+  let imgB64=null,attempts=0;
+  while(attempts<5&&!imgB64){
+    attempts++;
+    try{
+      imgB64=await igCallGeminiImage(imgApiKey,finalPrompt,primaryRefB64,imgEndpoint);
+    }catch(e){
+      const msg=e.message||'';
+      const isExhausted=msg.match(/exhausted|quota|limit|429|resource/i);
+      const isHighDemand=msg.match(/demand|retry|500|503|overload|temporarily/i);
+      if(isExhausted&&attempts<5){
+        const wait=attempts*30;
+        for(let s=wait;s>0;s--){
+          if(imgEl)imgEl.querySelector('div').innerHTML=`<div style="font-size:10px;color:var(--amber)">⏳ Vertex quota, retry ${attempts}/5 sau ${s}s</div>`;
+          await new Promise(r=>setTimeout(r,1000));
+        }
+      }else if(isHighDemand&&attempts<5){
+        const wait=attempts*15;
+        for(let s=wait;s>0;s--){
+          if(imgEl)imgEl.querySelector('div').innerHTML=`<div style="font-size:10px;color:var(--amber)">⏳ Server bận, retry ${attempts}/5 sau ${s}s</div>`;
+          await new Promise(r=>setTimeout(r,1000));
+        }
+      }else{
+        if(imgEl){imgEl.classList.remove('loading');imgEl.innerHTML=`<div style="text-align:center;padding:12px;color:var(--red);font-size:11px;">❌ ${esc(msg.slice(0,80))}</div>`;}
+        break;
+      }
     }
-  }catch(e){
-    if(imgEl){imgEl.classList.remove('loading');imgEl.innerHTML=`<div style="text-align:center;padding:12px;color:var(--red);font-size:11px;">❌ ${esc(e.message.slice(0,80))}</div>`;}
+  }
+  if(imgB64){
+    const dataUrl='data:image/png;base64,'+imgB64;
+    igGeneratedImages[i]={label:p.label,dataUrl};
+    if(imgEl){imgEl.classList.remove('loading');imgEl.innerHTML=`<img src="${dataUrl}" style="width:100%;height:100%;object-fit:cover;object-position:center;display:block;transform:scale(1.08);">`;}
+    const labelEl=$(`iglabel_${i}`);
+    if(labelEl)labelEl.innerHTML=`<span>${esc(p.label)}${p.refName?' · '+esc(p.refName):''}</span><button class="btn-ig-dl" onclick="igDlOne('${dataUrl}','${p.label.replace(/\./g,'_')}.png')" title="Download">⬇</button>`;
   }
   if(btn){btn.textContent='🔄 Tạo lại';btn.classList.remove('loading');}
 }
