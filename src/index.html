@@ -1875,10 +1875,22 @@ async function verifyKey(){
   $('verifyBtn').disabled=true;
   showVerify('checking',null,`Đang xác minh (${p?.name||'Unknown'})…`);
   try{
-    const res=await fetch(`${getEndpoint(key)}/models?key=${encodeURIComponent(key)}&pageSize=5`);
-    const data=await res.json();
-    if(data.error)throw new Error(data.error.message);
-    const names=(data.models||[]).map(m=>m.name?.replace('models/','')).filter(n=>n?.includes('flash')).slice(0,3).join(', ');
+    // Thử shopaikey endpoint trước, fallback Google gốc
+    let verified=false, names='';
+    try{
+      const r1=await fetch(`${API_TTS}/v1beta/models?key=${encodeURIComponent(key)}&pageSize=5`);
+      const d1=await r1.json();
+      if(!d1.error){
+        names=(d1.models||[]).map(m=>m.name?.replace('models/','')).filter(n=>n?.includes('flash')).slice(0,3).join(', ');
+        verified=true;
+      }
+    }catch(e){}
+    if(!verified){
+      const r2=await fetch(`${getEndpoint(key)}/models?key=${encodeURIComponent(key)}&pageSize=5`);
+      const d2=await r2.json();
+      if(d2.error)throw new Error(d2.error.message);
+      names=(d2.models||[]).map(m=>m.name?.replace('models/','')).filter(n=>n?.includes('flash')).slice(0,3).join(', ');
+    }
     showVerify('ok','✓',`${p?.name} key hợp lệ · ${names||'OK'}`);
     $('topBadgeTxt').textContent=`${p?.name||'Key'} ✓`;
   }catch(e){
