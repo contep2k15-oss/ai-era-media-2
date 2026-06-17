@@ -1,0 +1,76 @@
+{
+  "name": "ai-era-media",
+  "version": "1.1.0",
+  "description": "AI Era Media \u2014 Desktop App",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "build:win": "electron-builder --win",
+    "build:mac": "electron-builder --mac",
+    "build:linux": "electron-builder --linux"
+  },
+  "build": {
+    "appId": "com.aieramedia.app",
+    "productName": "AI Era Media",
+    "copyright": "AI Era Media",
+    "publish": null,
+    "asar": true,
+    "asarUnpack": [
+      "node_modules/ffmpeg-static/**/*"
+    ],
+    "directories": {
+      "output": "dist"
+    },
+    "extraResources": [
+      {
+        "from": "oauth_config.json",
+        "to": "oauth_config.json"
+      }
+    ],
+    "files": [
+      "main.js",
+      "preload.js",
+      "src/**/*",
+      "assets/**/*",
+      "oauth_config.json",
+      "node_modules/ffmpeg-static/**/*"
+    ],
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "icon": "assets/icon.ico"
+    },
+    "mac": {
+      "target": "dmg",
+      "icon": "assets/icon.icns"
+    },
+    "linux": {
+      "target": "AppImage",
+      "icon": "assets/icon.png"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "installerLanguages": [
+        "vi-VN",
+        "en-US"
+      ],
+      "language": "1033"
+    }
+  },
+  "dependencies": {
+    "ffmpeg-static": "^5.2.0"
+  },
+  "devDependencies": {
+    "electron": "^30.0.0",
+    "electron-builder": "^24.13.3"
+  }
+}
