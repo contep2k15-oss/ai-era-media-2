@@ -3715,6 +3715,7 @@ async function igCallGeminiImage(apiKey, optimizedPrompt, refImageBase64, endpoi
   const vertexToken = await getVertexToken();
   if(vertexToken){
     const url=getVertexUrl(MODEL_IMAGE);
+    console.log(`[Vertex Image] Request at ${new Date().toISOString()}`);
 
     const parts=[];
     if(refImageBase64) parts.push({inlineData:{mimeType:'image/png',data:refImageBase64}});
@@ -3739,6 +3740,7 @@ async function igCallGeminiImage(apiKey, optimizedPrompt, refImageBase64, endpoi
       }
     }
     // Vertex lỗi → throw thẳng với message gốc từ Vertex
+    console.error(`[Vertex Image] Error at ${new Date().toISOString()}:`, data.error);
     throw new Error('[Vertex] ' + (data.error?.message || JSON.stringify(data.error)));
   }
 
@@ -3799,12 +3801,13 @@ async function igGenerateAllRefs(){
   btn.innerHTML=`⏳ 0/${todo.length} xong...`;
 
   let done=0;
-  // Chạy parallel tất cả
-  await Promise.allSettled(todo.map(async idx=>{
+  // Tuần tự từng ảnh — Vertex chỉ chịu 1 request tại một thời điểm
+  for(const idx of todo){
     await igGenerateRef(idx);
     done++;
     btn.innerHTML=`⏳ ${done}/${todo.length} xong...`;
-  }));
+    if(done < todo.length) await new Promise(r=>setTimeout(r,2000));
+  }
 
   btn.disabled=false;
   btn.innerHTML='✅ Xong! Tạo lại tất cả';
@@ -3855,11 +3858,12 @@ Full body standing pose, facing forward, arms slightly away from body so all lim
     btn.textContent='✅ Tạo lại';btn.classList.add('done');
     btn.disabled=false;
 
-    // Extract DNA trong background — không block UI
-    igExtractDNA(imgApiKey,name,imgB64).then(dna=>{
+    // Extract DNA — await để không overlap Vertex request với ảnh tiếp theo
+    try{
+      const dna=await igExtractDNA(imgApiKey,name,imgB64);
       igCharDNA[name]=dna;
       if(!igProjectStyleDNA&&dna.art_style_dna)igProjectStyleDNA=dna.art_style_dna;
-    }).catch(e=>console.warn('DNA extract failed:',e.message));
+    }catch(e){console.warn('DNA extract failed:',e.message);}
 
   }catch(e){
     btn.textContent='❌ Thử lại';
@@ -3921,7 +3925,7 @@ async function igRunAll(){
   // Không cần extract lại ở đây — bắt đầu generate ảnh ngay
 
   // ── PHASE 2: Generate images in parallel ──
-  const PARALLEL=5; // 500 RPM → 5 parallel an toàn
+  const PARALLEL=1; // Vertex chỉ chịu 1 request tại một thời điểm
   let completed=0;
 
   async function generateOne(i){
@@ -4020,14 +4024,14 @@ async function igRunAll(){
     }
   }
 
-  // Chạy song song PARALLEL ảnh/batch, delay 100ms giữa batch
+  // Chạy song song PARALLEL ảnh/batch, delay 3s giữa batch
   for(let i=0;i<total;i+=PARALLEL){
     if(igStopped)break;
     while(igPaused){await new Promise(r=>setTimeout(r,200));if(igStopped)break;}
     const batch=[];
     for(let j=i;j<Math.min(i+PARALLEL,total);j++) batch.push(generateOne(j));
     await Promise.all(batch);
-    if(i+PARALLEL<total&&!igStopped) await new Promise(r=>setTimeout(r,1000)); // 1s delay giữa batch tránh rate limit
+    if(i+PARALLEL<total&&!igStopped) await new Promise(r=>setTimeout(r,2000));
   }
 
   if(igStopped){

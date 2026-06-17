@@ -188,6 +188,7 @@ function createWindow() {
   });
   win.loadFile(path.join(__dirname, 'src', 'index.html'));
   win.once('ready-to-show', () => win.show());
+  win.webContents.openDevTools(); // DEBUG — xóa sau khi test xong
   win.webContents.setWindowOpenHandler(({ url }) => {
     shell.openExternal(url); return { action: 'deny' };
   });
