@@ -3806,7 +3806,7 @@ async function igGenerateAllRefs(){
     await igGenerateRef(idx);
     done++;
     btn.innerHTML=`⏳ ${done}/${todo.length} xong...`;
-    if(done < todo.length) await new Promise(r=>setTimeout(r,2000));
+    if(done < todo.length) await new Promise(r=>setTimeout(r,500));
   }
 
   btn.disabled=false;
@@ -3836,9 +3836,15 @@ Full body standing pose, facing forward, arms slightly away from body so all lim
         btn.textContent=attempts>1?`🔄 Retry ${attempts}/4…`:'🎨 Đang tạo ảnh...';
         imgB64=await igCallGeminiImage(imgApiKey, refPrompt, null, imgEndpoint);
       }catch(e){
+        const isExhaustedRef=(e.message||'').match(/exhausted|quota|limit|429|resource/i);
         const isRetry=(e.message||'').match(/demand|retry|500|503|overload|temporarily/i);
-        if(isRetry && attempts<4){
-          // Countdown retry
+        if(isExhaustedRef && attempts<4){
+          const wait=attempts*30;
+          for(let s=wait;s>0;s--){
+            btn.textContent=`⏳ Vertex quota, thử lại sau ${s}s (${attempts}/4)`;
+            await new Promise(r=>setTimeout(r,1000));
+          }
+        } else if(isRetry && attempts<4){
           for(let s=10;s>0;s--){
             btn.textContent=`⏳ Server bận, thử lại sau ${s}s (${attempts}/4)`;
             await new Promise(r=>setTimeout(r,1000));
@@ -3925,7 +3931,7 @@ async function igRunAll(){
   // Không cần extract lại ở đây — bắt đầu generate ảnh ngay
 
   // ── PHASE 2: Generate images in parallel ──
-  const PARALLEL=1; // Vertex chỉ chịu 1 request tại một thời điểm
+  const PARALLEL=5; // 100 req/min paid tier → 5 parallel an toàn
   let completed=0;
 
   async function generateOne(i){
@@ -3971,26 +3977,22 @@ async function igRunAll(){
         imgB64=await igCallGeminiImage(imgApiKey,finalPrompt,primaryRefB64,imgEndpoint);
       }catch(e){
         const msg=e.message||'';
-        const isLimit=msg.match(/quota|limit|429|resource.*exhausted/i);
-        // "API key not valid" từ Vertex thường là rate limit khi parallel quá cao
+        const isExhausted=msg.match(/exhausted|quota|limit|429|resource/i);
         const isHighDemand=msg.match(/demand|retry|500|503|overload|temporarily|API key not valid|key not valid/i);
 
-        if(isLimit){
-          igStopped=true;
-          $(`igimg_${i}`).classList.remove('loading');
-          $(`igimg_${i}`).innerHTML=`<div style="text-align:center;padding:12px;color:var(--amber);font-size:11px;">⏸ Dừng do limit</div>`;
-          $('igProgLabel').textContent=`⚠ Hết quota hôm nay. Thử lại vào ngày mai.`;
-          $('igProgBar').style.background='var(--amber)';
-          alert('⚠ Google AI Studio key đã hết quota hôm nay!\n\nGiới hạn: 2.000 ảnh/ngày.\nVui lòng thử lại vào ngày mai.');
-          return;
-        }
-
-        if(isHighDemand&&attempts<3){
-          // High demand → chờ ngắn rồi retry, không block cả batch
-          const wait=attempts*3; // 3s, 6s
+        if(isExhausted&&attempts<3){
+          // Vertex quota exhausted → chờ lâu hơn rồi retry
+          const wait=attempts*20; // 20s, 40s
           for(let s=wait;s>0;s--){
             if(igStopped)break;
-            $(`igimg_${i}`).querySelector('div').innerHTML=`<div style="font-size:10px;color:var(--amber)">⏳ High demand, retry ${attempts}/3 sau ${s}s</div>`;
+            $(`igimg_${i}`).querySelector('div').innerHTML=`<div style="font-size:10px;color:var(--amber)">⏳ Vertex quota, retry ${attempts}/3 sau ${s}s</div>`;
+            await new Promise(r=>setTimeout(r,1000));
+          }
+        }else if(isHighDemand&&attempts<3){
+          const wait=attempts*10; // 10s, 20s
+          for(let s=wait;s>0;s--){
+            if(igStopped)break;
+            $(`igimg_${i}`).querySelector('div').innerHTML=`<div style="font-size:10px;color:var(--amber)">⏳ Server bận, retry ${attempts}/3 sau ${s}s</div>`;
             await new Promise(r=>setTimeout(r,1000));
           }
         }else{
@@ -4031,7 +4033,7 @@ async function igRunAll(){
     const batch=[];
     for(let j=i;j<Math.min(i+PARALLEL,total);j++) batch.push(generateOne(j));
     await Promise.all(batch);
-    if(i+PARALLEL<total&&!igStopped) await new Promise(r=>setTimeout(r,2000));
+    if(i+PARALLEL<total&&!igStopped) await new Promise(r=>setTimeout(r,500));
   }
 
   if(igStopped){
