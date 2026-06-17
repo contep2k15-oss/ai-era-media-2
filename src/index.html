@@ -1737,17 +1737,8 @@ async function callVertexOrStudio(model, body, apiKey){
     if(data.error) throw new Error(data.error.message||JSON.stringify(data.error));
     return data;
   }
-  // AI Studio (fallback hoặc model chưa có trên Vertex)
-  const studioModel = entry ? entry.id : model;
-  const url = `${API_GOOGLE}/v1beta/models/${studioModel}:generateContent?key=${encodeURIComponent(apiKey)}`;
-  const res = await fetch(url, {
-    method:'POST',
-    headers:{'Content-Type':'application/json'},
-    body: JSON.stringify(body)
-  });
-  const data = await res.json();
-  if(data.error) throw new Error(data.error.message||JSON.stringify(data.error));
-  return data;
+  // Không có Vertex token → báo lỗi rõ ràng
+  throw new Error('Chưa đăng nhập Google Cloud. Vui lòng kết nối Vertex AI trong Cài đặt.');
 }
 
 // Helper: get endpoint cho key hiện tại
@@ -1875,23 +1866,12 @@ async function verifyKey(){
   $('verifyBtn').disabled=true;
   showVerify('checking',null,`Đang xác minh (${p?.name||'Unknown'})…`);
   try{
-    // Thử shopaikey endpoint trước, fallback Google gốc
-    let verified=false, names='';
-    try{
-      const r1=await fetch(`${API_TTS}/v1beta/models?key=${encodeURIComponent(key)}&pageSize=5`);
-      const d1=await r1.json();
-      if(!d1.error){
-        names=(d1.models||[]).map(m=>m.name?.replace('models/','')).filter(n=>n?.includes('flash')).slice(0,3).join(', ');
-        verified=true;
-      }
-    }catch(e){}
-    if(!verified){
-      const r2=await fetch(`${getEndpoint(key)}/models?key=${encodeURIComponent(key)}&pageSize=5`);
-      const d2=await r2.json();
-      if(d2.error)throw new Error(d2.error.message);
-      names=(d2.models||[]).map(m=>m.name?.replace('models/','')).filter(n=>n?.includes('flash')).slice(0,3).join(', ');
-    }
-    showVerify('ok','✓',`${p?.name} key hợp lệ · ${names||'OK'}`);
+    // Verify bằng shopaikey endpoint (TTS key)
+    const r=await fetch(`${API_TTS}/v1beta/models?key=${encodeURIComponent(key)}&pageSize=5`);
+    const d=await r.json();
+    if(d.error)throw new Error(d.error.message);
+    const names=(d.models||[]).map(m=>m.name?.replace('models/','')).filter(n=>n?.includes('flash')||n?.includes('tts')).slice(0,3).join(', ');
+    showVerify('ok','✓',`Key hợp lệ · ${names||'OK'}`);
     $('topBadgeTxt').textContent=`${p?.name||'Key'} ✓`;
   }catch(e){
     let msg=e.message||'';
@@ -3758,16 +3738,12 @@ async function igCallGeminiImage(apiKey, optimizedPrompt, refImageBase64, endpoi
         if(part.inlineData?.mimeType?.startsWith('image/')) return part.inlineData.data;
       }
     }
-    // Nếu Vertex lỗi → fallback AI Studio
-    console.warn('Vertex AI error, fallback to AI Studio:', data.error?.message);
+    // Vertex lỗi → throw thẳng với message gốc từ Vertex
+    throw new Error('[Vertex] ' + (data.error?.message || JSON.stringify(data.error)));
   }
 
-  // AI Studio fallback
-  const base=endpoint||`${API_GOOGLE}/v1beta`;
-  const url=`${base}/models/${IG_MODEL}:generateContent?key=${encodeURIComponent(apiKey)}`;
-  const parts=[];
-  if(refImageBase64) parts.push({inlineData:{mimeType:'image/png',data:refImageBase64}});
-  parts.push({text:optimizedPrompt});
+  // Không có Vertex token → yêu cầu đăng nhập
+  throw new Error('Image Gen yêu cầu đăng nhập Google Cloud (Vertex AI). Vui lòng kết nối Vertex AI trong Cài đặt.');
 
   const res=await fetch(url,{
     method:'POST',
@@ -3848,7 +3824,7 @@ Full body standing pose, facing forward, arms slightly away from body so all lim
 
   try{
     const imgApiKey=apiKey;
-    const imgEndpoint=`${API_GOOGLE}/v1beta`;
+    const imgEndpoint=null; // Image dùng Vertex AI hoàn toàn
 
     let imgB64=null, attempts=0;
     while(attempts<4 && !imgB64){
@@ -3905,7 +3881,7 @@ async function igRunAll(){
 
   // Detect provider từ image key
   const imgApiKey=apiKey;
-  const imgEndpoint=`${API_GOOGLE}/v1beta`;
+  const imgEndpoint=null; // Vertex only
 
 
   igParsePrompts();
@@ -3992,7 +3968,8 @@ async function igRunAll(){
       }catch(e){
         const msg=e.message||'';
         const isLimit=msg.match(/quota|limit|429|resource.*exhausted/i);
-        const isHighDemand=msg.match(/demand|retry|500|503|overload/i);
+        // "API key not valid" từ Vertex thường là rate limit khi parallel quá cao
+        const isHighDemand=msg.match(/demand|retry|500|503|overload|temporarily|API key not valid|key not valid/i);
 
         if(isLimit){
           igStopped=true;
@@ -4050,7 +4027,7 @@ async function igRunAll(){
     const batch=[];
     for(let j=i;j<Math.min(i+PARALLEL,total);j++) batch.push(generateOne(j));
     await Promise.all(batch);
-    if(i+PARALLEL<total&&!igStopped) await new Promise(r=>setTimeout(r,300));
+    if(i+PARALLEL<total&&!igStopped) await new Promise(r=>setTimeout(r,1000)); // 1s delay giữa batch tránh rate limit
   }
 
   if(igStopped){
@@ -4075,7 +4052,7 @@ async function igRegenOne(i){
   if(!p)return;
 
   const imgApiKey=apiKey;
-  const imgEndpoint=`${API_GOOGLE}/v1beta`;
+  const imgEndpoint=null; // Vertex only
 
   const btn=$(`igregenBtn_${i}`);
   const imgEl=$(`igimg_${i}`);
