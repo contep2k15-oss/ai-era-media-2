@@ -1426,7 +1426,7 @@ html,body{height:100%;overflow:hidden;background:var(--bg0);color:var(--text);fo
         <!-- Nút tạo tất cả ref song song -->
         <button onclick="igGenerateAllRefs()" id="igBtnAllRefs" style="width:100%;margin-bottom:8px;padding:7px;background:var(--bg3);border:1px solid var(--border2);border-radius:var(--rs);color:var(--text2);font-size:11px;font-weight:600;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:5px;">
           <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="5 3 19 12 5 21 5 3"/></svg>
-          Tạo tất cả ảnh tham chiếu (song song)
+          Tạo tất cả ảnh tham chiếu (tuần tự)
         </button>
         <div class="ig-char-grid" id="igCharGrid">
           <div style="font-size:13px;color:var(--text3);padding:12px;">Chưa có nhân vật. Tạo Character Sheet ở tab 1 trước.</div>
@@ -3784,7 +3784,7 @@ async function igGenerateAllRefs(){
 
   const btn=$('igBtnAllRefs');
   btn.disabled=true;
-  btn.innerHTML='⏳ Đang tạo song song...';
+  btn.innerHTML='⏳ Đang tạo tuần tự...';
 
   // Chỉ tạo những nhân vật chưa có ref
   const todo=lastChars.map((_,i)=>i).filter(i=>!igRefImages[lastChars[i]?.name]);
@@ -3792,7 +3792,7 @@ async function igGenerateAllRefs(){
     // Tất cả đã có → hỏi có tạo lại không
     if(!confirm('Tất cả nhân vật đã có ảnh tham chiếu.\nTạo lại tất cả?')){
       btn.disabled=false;
-      btn.innerHTML='<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="5 3 19 12 5 21 5 3"/></svg> Tạo tất cả ảnh tham chiếu (song song)';
+      btn.innerHTML='<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="5 3 19 12 5 21 5 3"/></svg> Tạo tất cả ảnh tham chiếu (tuần tự)';
       return;
     }
     todo.push(...lastChars.map((_,i)=>i));
@@ -3806,7 +3806,7 @@ async function igGenerateAllRefs(){
     await igGenerateRef(idx);
     done++;
     btn.innerHTML=`⏳ ${done}/${todo.length} xong...`;
-    if(done < todo.length) await new Promise(r=>setTimeout(r,500));
+    if(done < todo.length) await new Promise(r=>setTimeout(r,3000)); // 3s để DNA extract xong trước
   }
 
   btn.disabled=false;
@@ -3830,23 +3830,23 @@ Full body standing pose, facing forward, arms slightly away from body so all lim
     const imgEndpoint=null; // Image dùng Vertex AI hoàn toàn
 
     let imgB64=null, attempts=0;
-    while(attempts<4 && !imgB64){
+    while(attempts<5 && !imgB64){
       attempts++;
       try{
-        btn.textContent=attempts>1?`🔄 Retry ${attempts}/4…`:'🎨 Đang tạo ảnh...';
+        btn.textContent=attempts>1?`🔄 Retry ${attempts}/5…`:'🎨 Đang tạo ảnh...';
         imgB64=await igCallGeminiImage(imgApiKey, refPrompt, null, imgEndpoint);
       }catch(e){
         const isExhaustedRef=(e.message||'').match(/exhausted|quota|limit|429|resource/i);
         const isRetry=(e.message||'').match(/demand|retry|500|503|overload|temporarily/i);
-        if(isExhaustedRef && attempts<4){
+        if(isExhaustedRef && attempts<5){
           const wait=attempts*30;
           for(let s=wait;s>0;s--){
-            btn.textContent=`⏳ Vertex quota, thử lại sau ${s}s (${attempts}/4)`;
+            btn.textContent=`⏳ Vertex quota, thử lại sau ${s}s (${attempts}/5)`;
             await new Promise(r=>setTimeout(r,1000));
           }
-        } else if(isRetry && attempts<4){
+        } else if(isRetry && attempts<5){
           for(let s=10;s>0;s--){
-            btn.textContent=`⏳ Server bận, thử lại sau ${s}s (${attempts}/4)`;
+            btn.textContent=`⏳ Server bận, thử lại sau ${s}s (${attempts}/5)`;
             await new Promise(r=>setTimeout(r,1000));
           }
         } else {
@@ -3931,7 +3931,7 @@ async function igRunAll(){
   // Không cần extract lại ở đây — bắt đầu generate ảnh ngay
 
   // ── PHASE 2: Generate images in parallel ──
-  const PARALLEL=1; // Vertex AI image model chỉ chịu 1 request/lúc — tránh 429
+  const PARALLEL=5; // 100 req/min paid tier → 5 parallel an toàn
   let completed=0;
 
   async function generateOne(i){
@@ -3981,18 +3981,18 @@ async function igRunAll(){
         const isHighDemand=msg.match(/demand|retry|500|503|overload|temporarily|API key not valid|key not valid/i);
 
         if(isExhausted&&attempts<5){
-          // Vertex 429 → exponential backoff 30s/60s/90s/120s
-          const wait=attempts*30; // 30s, 60s, 90s, 120s
+          // Vertex quota exhausted → chờ lâu hơn rồi retry
+          const wait=attempts*30; // 30s, 60s, 90s
           for(let s=wait;s>0;s--){
             if(igStopped)break;
-            $(`igimg_${i}`).querySelector('div').innerHTML=`<div style="font-size:10px;color:var(--amber)">⏳ Vertex quota 429, retry ${attempts}/5 sau ${s}s</div>`;
+            $(`igimg_${i}`).querySelector('div').innerHTML=`<div style="font-size:10px;color:var(--amber)">⏳ Vertex quota, retry ${attempts}/3 sau ${s}s</div>`;
             await new Promise(r=>setTimeout(r,1000));
           }
         }else if(isHighDemand&&attempts<5){
-          const wait=attempts*15; // 15s, 30s, 45s, 60s
+          const wait=attempts*15; // 15s, 30s, 45s
           for(let s=wait;s>0;s--){
             if(igStopped)break;
-            $(`igimg_${i}`).querySelector('div').innerHTML=`<div style="font-size:10px;color:var(--amber)">⏳ Server bận, retry ${attempts}/5 sau ${s}s</div>`;
+            $(`igimg_${i}`).querySelector('div').innerHTML=`<div style="font-size:10px;color:var(--amber)">⏳ Server bận, retry ${attempts}/3 sau ${s}s</div>`;
             await new Promise(r=>setTimeout(r,1000));
           }
         }else{
@@ -4033,7 +4033,7 @@ async function igRunAll(){
     const batch=[];
     for(let j=i;j<Math.min(i+PARALLEL,total);j++) batch.push(generateOne(j));
     await Promise.all(batch);
-    if(i+PARALLEL<total&&!igStopped) await new Promise(r=>setTimeout(r,4000)); // 4s giữa mỗi ảnh — Vertex image ~15 req/min
+    if(i+PARALLEL<total&&!igStopped) await new Promise(r=>setTimeout(r,3000));
   }
 
   if(igStopped){
