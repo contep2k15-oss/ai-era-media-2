@@ -1667,7 +1667,7 @@ html,body{height:100%;overflow:hidden;background:var(--bg0);color:var(--text);fo
 <script>
 // ── MODEL ASSIGNMENT ──
 const MODEL_TEXT    = 'gemini-3.1-flash-lite';  // Character Sheet, Prompt Engineer, Rewrite, DNA, mọi tác vụ text
-const MODEL_TTS     = 'gemini-3.1-flash-tts-preview'; // TTS voice generation (full)
+const MODEL_TTS     = 'gpt-4o-mini-tts'; // TTS voice generation (full)
 const MODEL_TTS_PREVIEW = 'gemini-2.5-flash-preview-tts'; // Preview nghe thử giọng
 const MODEL_IMAGE   = 'gemini-2.5-flash-image'; // Nano Banana
 const FREE_TEXT_MODELS = [MODEL_TEXT];
@@ -2972,11 +2972,12 @@ const TTS_MODELS_PRIORITY=[
 let ttsActiveModel=null; // set after auto-detect
 
 const TTS_VOICES=[
-  {id:'Callirrhoe', desc:'Nữ · Easy-going',  gender:'female'},
-  {id:'Kore',       desc:'Nữ · Firm',         gender:'female'},
-  {id:'Alnilam',    desc:'Nam · Firm',         gender:'male'},
-  {id:'Schedar',    desc:'Nam · Even',         gender:'male'},
-  {id:'Charon',     desc:'Nam · Informative',  gender:'male'},
+  {id:'alloy',   desc:'Nam · Trung tính',    gender:'male'},
+  {id:'echo',    desc:'Nam · Trầm',          gender:'male'},
+  {id:'fable',   desc:'Nam · Ấm',            gender:'male'},
+  {id:'onyx',    desc:'Nam · Sâu lắng',      gender:'male'},
+  {id:'nova',    desc:'Nữ · Năng động',      gender:'female'},
+  {id:'shimmer', desc:'Nữ · Nhẹ nhàng',     gender:'female'},
 ];
 
 const TTS_STYLE_PROMPTS={
@@ -3009,18 +3010,18 @@ const TTS_DUR_WORDS={
 
 let ttsSelectedStyle='documentary';
 let ttsSelectedDur='1min';
-let ttsSelectedVoice='Charon';
+let ttsSelectedVoice='onyx';
 let ttsPreviewAudio=null;
 let ttsAudioUrl=null;
 
 // 5 giọng đại diện có thể nghe thử (cache vào localStorage)
-const TTS_PREVIEW_VOICES=['Callirrhoe','Kore','Alnilam','Schedar','Charon'];
+const TTS_PREVIEW_VOICES=['alloy','echo','nova','onyx','shimmer'];
 const TTS_PREVIEW_LABELS={
-  'Callirrhoe':'Nữ · Easy-going',
-  'Kore':'Nữ · Firm',
-  'Alnilam':'Nam · Firm',
-  'Schedar':'Nam · Even',
-  'Charon':'Nam · Informative'
+  'alloy':'Nam · Trung tính',
+  'echo':'Nam · Trầm',
+  'nova':'Nữ · Năng động',
+  'onyx':'Nam · Sâu lắng',
+  'shimmer':'Nữ · Nhẹ nhàng'
 };
 
 // Cache key prefix
@@ -3059,18 +3060,19 @@ async function ttsPreviewVoice(voiceId){
     const sampleText=`Hello, I'm ${voiceId}. This is how I sound when narrating your content.`;
     try{
       // TTS preview: luôn AI Studio
-      const ttsPreviewBody={
-        contents:[{role:'user',parts:[{text:sampleText}]}],
-        generationConfig:{
-          responseModalities:['AUDIO'],
-          speechConfig:{voiceConfig:{prebuiltVoiceConfig:{voiceName:voiceId}}}
-        }
-      };
-      const ttsPreviewUrl=`${API_TTS}/v1beta/models/${MODEL_TTS_PREVIEW}:generateContent?key=${encodeURIComponent(apiKey)}`;
-      const ttsPreviewRes=await fetch(ttsPreviewUrl,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(ttsPreviewBody)});
-      const data=await ttsPreviewRes.json();
-      if(data.error) throw new Error(data.error.message||JSON.stringify(data.error));
-      const parts=data.candidates?.[0]?.content?.parts||[];
+      const ttsPreviewBody={model:MODEL_TTS,input:sampleText,voice:voiceId,response_format:'wav'};
+      const ttsPreviewUrl=`${API_TTS}/v1/audio/speech`;
+      const ttsPreviewRes=await fetch(ttsPreviewUrl,{
+        method:'POST',
+        headers:{'Content-Type':'application/json','Authorization':`Bearer ${apiKey}`},
+        body:JSON.stringify(ttsPreviewBody)
+      });
+      if(!ttsPreviewRes.ok){
+        const d=await ttsPreviewRes.json().catch(()=>({}));
+        throw new Error(d.error?.message||'Preview lỗi '+ttsPreviewRes.status);
+      }
+      const previewBuf=await ttsPreviewRes.arrayBuffer();
+      const parts=[{inlineData:{data:btoa(String.fromCharCode(...new Uint8Array(previewBuf)))}}];
       let found=false;
       for(const part of parts){
         if(part.inlineData?.data){
@@ -3418,30 +3420,27 @@ async function ttsDetectModel(apiKey){
 }
 
 async function ttsCallAPI(apiKey,text,voice,stylePrompt){
-  const fullText=stylePrompt?`${stylePrompt}\n\nTRANSCRIPT:\n${text}`:text;
-  const model=MODEL_TTS;
-  // TTS models chưa available trên Vertex AI → luôn dùng AI Studio
+  const instructions=stylePrompt||'';
   const body={
-    contents:[{role:'user',parts:[{text:fullText}]}],
-    generationConfig:{
-      responseModalities:['AUDIO'],
-      speechConfig:{voiceConfig:{prebuiltVoiceConfig:{voiceName:voice}}}
-    }
+    model:MODEL_TTS,
+    input:text,
+    voice:voice,
+    response_format:'wav'
   };
-  const studioUrl=`${API_TTS}/v1beta/models/${model}:generateContent?key=${encodeURIComponent(apiKey)}`;
-  const res=await fetch(studioUrl,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
-  const data=await res.json();
-  if(data.error) throw new Error(data.error.message||JSON.stringify(data.error));
-  const parts=data.candidates?.[0]?.content?.parts||[];
-  for(const part of parts){
-    if(part.inlineData?.data){
-      const raw=atob(part.inlineData.data);
-      const buf=new Uint8Array(raw.length);
-      for(let i=0;i<raw.length;i++)buf[i]=raw.charCodeAt(i);
-      return buf;
-    }
+  if(instructions) body.instructions=instructions;
+  const url=`${API_TTS}/v1/audio/speech`;
+  const res=await fetch(url,{
+    method:'POST',
+    headers:{'Content-Type':'application/json','Authorization':`Bearer ${apiKey}`},
+    body:JSON.stringify(body)
+  });
+  if(!res.ok){
+    let msg='TTS lỗi '+res.status;
+    try{const d=await res.json();msg=d.error?.message||JSON.stringify(d);}catch(e){}
+    throw new Error(msg);
   }
-  throw new Error('Google TTS không trả về audio data');
+  const arrayBuf=await res.arrayBuffer();
+  return new Uint8Array(arrayBuf);
 }
 
 // Thêm WAV header cho PCM raw data từ Google TTS
