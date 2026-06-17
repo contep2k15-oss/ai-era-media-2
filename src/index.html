@@ -3931,7 +3931,7 @@ async function igRunAll(){
   // Không cần extract lại ở đây — bắt đầu generate ảnh ngay
 
   // ── PHASE 2: Generate images in parallel ──
-  const PARALLEL=5; // 100 req/min paid tier → 5 parallel an toàn
+  const PARALLEL=1; // Vertex AI image model chỉ chịu 1 request/lúc — tránh 429
   let completed=0;
 
   async function generateOne(i){
@@ -3971,7 +3971,7 @@ async function igRunAll(){
 
     let imgB64=null,attempts=0;
 
-    while(attempts<3&&!imgB64){
+    while(attempts<5&&!imgB64){
       attempts++;
       try{
         imgB64=await igCallGeminiImage(imgApiKey,finalPrompt,primaryRefB64,imgEndpoint);
@@ -3980,19 +3980,19 @@ async function igRunAll(){
         const isExhausted=msg.match(/exhausted|quota|limit|429|resource/i);
         const isHighDemand=msg.match(/demand|retry|500|503|overload|temporarily|API key not valid|key not valid/i);
 
-        if(isExhausted&&attempts<3){
-          // Vertex quota exhausted → chờ lâu hơn rồi retry
-          const wait=attempts*20; // 20s, 40s
+        if(isExhausted&&attempts<5){
+          // Vertex 429 → exponential backoff 30s/60s/90s/120s
+          const wait=attempts*30; // 30s, 60s, 90s, 120s
           for(let s=wait;s>0;s--){
             if(igStopped)break;
-            $(`igimg_${i}`).querySelector('div').innerHTML=`<div style="font-size:10px;color:var(--amber)">⏳ Vertex quota, retry ${attempts}/3 sau ${s}s</div>`;
+            $(`igimg_${i}`).querySelector('div').innerHTML=`<div style="font-size:10px;color:var(--amber)">⏳ Vertex quota 429, retry ${attempts}/5 sau ${s}s</div>`;
             await new Promise(r=>setTimeout(r,1000));
           }
-        }else if(isHighDemand&&attempts<3){
-          const wait=attempts*10; // 10s, 20s
+        }else if(isHighDemand&&attempts<5){
+          const wait=attempts*15; // 15s, 30s, 45s, 60s
           for(let s=wait;s>0;s--){
             if(igStopped)break;
-            $(`igimg_${i}`).querySelector('div').innerHTML=`<div style="font-size:10px;color:var(--amber)">⏳ Server bận, retry ${attempts}/3 sau ${s}s</div>`;
+            $(`igimg_${i}`).querySelector('div').innerHTML=`<div style="font-size:10px;color:var(--amber)">⏳ Server bận, retry ${attempts}/5 sau ${s}s</div>`;
             await new Promise(r=>setTimeout(r,1000));
           }
         }else{
@@ -4033,7 +4033,7 @@ async function igRunAll(){
     const batch=[];
     for(let j=i;j<Math.min(i+PARALLEL,total);j++) batch.push(generateOne(j));
     await Promise.all(batch);
-    if(i+PARALLEL<total&&!igStopped) await new Promise(r=>setTimeout(r,500));
+    if(i+PARALLEL<total&&!igStopped) await new Promise(r=>setTimeout(r,4000)); // 4s giữa mỗi ảnh — Vertex image ~15 req/min
   }
 
   if(igStopped){
