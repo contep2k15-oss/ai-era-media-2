@@ -1891,7 +1891,7 @@ async function callGeminiText(parts,apiKey){
     try{
       showStatus(`Đang dùng ${MODEL_LABELS[modelId]||modelId}…`,'Phân tích video & thiết kế nhân vật');
       const body={
-        contents:[{parts}],
+        contents:[{role:'user',parts}],
         generationConfig:{temperature:0.5,maxOutputTokens:8192,responseMimeType:'application/json'},
         systemInstruction:{parts:[{text:'You are a professional anime/film character designer and AI prompt engineer. Always respond with ONLY valid JSON. No markdown, no explanation.'}]}
       };
@@ -2911,7 +2911,7 @@ RULES:
     attempts++;
     try{
       data=await callVertexOrStudio(MODEL_TEXT,{
-        contents:[{parts:[{text:userPrompt}]}],
+        contents:[{role:'user',parts:[{text:userPrompt}]}],
         generationConfig:{temperature:0.6,maxOutputTokens:8192},
         systemInstruction:{parts:[{text:systemPrompt}]}
       },apiKey);
@@ -3054,7 +3054,7 @@ async function ttsPreviewVoice(voiceId){
     const sampleText=`Hello, I'm ${voiceId}. This is how I sound when narrating your content.`;
     try{
       const data=await callVertexOrStudio(MODEL_TTS_PREVIEW,{
-        contents:[{parts:[{text:sampleText}]}],
+        contents:[{role:'user',parts:[{text:sampleText}]}],
         generationConfig:{
           responseModalities:['AUDIO'],
           speechConfig:{voiceConfig:{prebuiltVoiceConfig:{voiceName:voiceId}}}
@@ -3254,7 +3254,7 @@ ${subTruncated}`;
     try{
       $('ttsBtnRewrite').textContent=`⏳ Đang viết lại (${model})...`;
       const data=await callVertexOrStudio(MODEL_TEXT,{
-        contents:[{parts:[{text:prompt}]}],
+        contents:[{role:'user',parts:[{text:prompt}]}],
         generationConfig:{temperature:0.7,maxOutputTokens:8192}
       },apiKey);
       if(data.error){
@@ -3405,7 +3405,7 @@ async function ttsDetectModel(apiKey){
   for(const model of TTS_MODELS_PRIORITY){
     try{
       const data=await callVertexOrStudio(model,{
-        contents:[{parts:[{text:'Hi'}]}],
+        contents:[{role:'user',parts:[{text:'Hi'}]}],
         generationConfig:{responseModalities:['AUDIO'],speechConfig:{voiceConfig:{prebuiltVoiceConfig:{voiceName:'Kore'}}}}
       },apiKey);
       if(!data.error){
@@ -3422,7 +3422,7 @@ async function ttsCallAPI(apiKey,text,voice,stylePrompt){
   const fullText=stylePrompt?`${stylePrompt}\n\nTRANSCRIPT:\n${text}`:text;
   const model=MODEL_TTS;
   const data=await callVertexOrStudio(model,{
-    contents:[{parts:[{text:fullText}]}],
+    contents:[{role:'user',parts:[{text:fullText}]}],
     generationConfig:{
       responseModalities:['AUDIO'],
       speechConfig:{voiceConfig:{prebuiltVoiceConfig:{voiceName:voice}}}
@@ -3638,7 +3638,7 @@ Return a JSON object with these fields:
 Be extremely specific about colors (not 'dark hair' but 'blue-black hair with subtle navy highlights'). This DNA will be injected into every scene prompt to maintain character consistency.`;
 
   const data=await callVertexOrStudio(MODEL_TEXT,{
-    contents:[{parts:[
+    contents:[{role:'user',parts:[
       {inlineData:{mimeType:'image/png',data:refBase64}},
       {text:prompt}
     ]}],
@@ -3694,7 +3694,7 @@ RULES:
   const userMsg=`Original scene prompt:\n${rawPrompt}\n\nRewrite this as an optimized Gemini image generation prompt:`;
 
   const data=await callVertexOrStudio(MODEL_TEXT,{
-    contents:[{parts:[{text:userMsg}]}],
+    contents:[{role:'user',parts:[{text:userMsg}]}],
     generationConfig:{temperature:0.4,maxOutputTokens:512},
     systemInstruction:{parts:[{text:systemPrompt}]}
   },imgApiKey);
