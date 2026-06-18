@@ -3343,10 +3343,10 @@ async function ttsGenerate(){
     let wavBuf=null;let attempts=0;
     while(attempts<5&&!wavBuf){
       attempts++;
-      // Fallback model theo số lần thử: lần 1-2 model chính, lần 3 tts-1-1106, lần 4+ tts-1
+      // Fallback model: lần 1 gpt-4o-mini-tts, lần 2 tts-1-1106, lần 3+ tts-1
       let useModel=MODEL_TTS;
-      if(attempts===3) useModel='tts-1-1106';
-      else if(attempts>=4) useModel='tts-1';
+      if(attempts===2) useModel='tts-1-1106';
+      else if(attempts>=3) useModel='tts-1';
       try{
         if(attempts>=3) $('ttsProgLabel').textContent=`Chunk ${i+1}: thử model ${useModel}…`;
         wavBuf=await ttsCallAPI(apiKey,chunks[i],ttsSelectedVoice,stylePrompt,useModel);
@@ -3357,7 +3357,7 @@ async function ttsGenerate(){
         }
       }catch(e){
         const msg=e.message||'';
-        const isRetry=msg.match(/quota|demand|retry|500|503|429|rỗng|empty/i);
+        const isRetry=msg.match(/quota|demand|retry|500|503|429|rỗng|empty|渠道|channel|distributor|unavailable|无可用/i);
         if(attempts<5){
           const wait=isRetry?20:8; // 20s nếu quota, 8s nếu lỗi khác
           for(let s=wait;s>0;s--){
