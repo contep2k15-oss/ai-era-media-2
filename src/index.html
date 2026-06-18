@@ -1696,7 +1696,7 @@ const VERTEX_MODELS = {
   [MODEL_TEXT]:        { id: 'gemini-3.1-flash-lite',        region: 'global'      },
   [MODEL_TTS]:         { id: 'gemini-3.1-flash-tts-preview', region: 'global'      },
   [MODEL_TTS_PREVIEW]: { id: 'gemini-2.5-flash-preview-tts', region: 'us-central1' },
-  [MODEL_IMAGE]:       { id: 'gemini-3.1-flash-image',       region: 'global'      },
+  [MODEL_IMAGE]:       { id: 'gemini-3.1-flash-image',       region: 'us-central1' }, // Tier 2: 500 req/min
 };
 
 function getVertexUrl(model){
@@ -3072,7 +3072,11 @@ async function ttsPreviewVoice(voiceId){
         throw new Error(d.error?.message||'Preview lỗi '+ttsPreviewRes.status);
       }
       const previewBuf=await ttsPreviewRes.arrayBuffer();
-      const parts=[{inlineData:{data:btoa(String.fromCharCode(...new Uint8Array(previewBuf)))}}];
+      // Convert ArrayBuffer → base64 an toàn (không bị stack overflow)
+      const previewBytes=new Uint8Array(previewBuf);
+      let previewBin='';
+      for(let k=0;k<previewBytes.length;k++) previewBin+=String.fromCharCode(previewBytes[k]);
+      const parts=[{inlineData:{data:btoa(previewBin)}}];
       let found=false;
       for(const part of parts){
         if(part.inlineData?.data){
@@ -3732,15 +3736,17 @@ async function igCallGeminiImage(apiKey, optimizedPrompt, refImageBase64, endpoi
       })
     });
     const data=await res.json();
-    if(!data.error){
-      const resParts=data.candidates?.[0]?.content?.parts||[];
-      for(const part of resParts){
-        if(part.inlineData?.mimeType?.startsWith('image/')) return part.inlineData.data;
-      }
+    if(data.error){
+      console.error(`[Vertex Image] Error at ${new Date().toISOString()}:`, data.error);
+      const errMsg=data.error?.message||data.error?.status||JSON.stringify(data.error)||'Unknown Vertex error';
+      throw new Error('[Vertex] ' + errMsg);
     }
-    // Vertex lỗi → throw thẳng với message gốc từ Vertex
-    console.error(`[Vertex Image] Error at ${new Date().toISOString()}:`, data.error);
-    throw new Error('[Vertex] ' + (data.error?.message || JSON.stringify(data.error)));
+    const resParts=data.candidates?.[0]?.content?.parts||[];
+    for(const part of resParts){
+      if(part.inlineData?.mimeType?.startsWith('image/')) return part.inlineData.data;
+    }
+    // Không có image data → throw rõ ràng
+    throw new Error('[Vertex] Không trả về ảnh — thử lại');
   }
 
   // Không có Vertex token → yêu cầu đăng nhập
@@ -3805,7 +3811,7 @@ async function igGenerateAllRefs(){
     await igGenerateRef(idx);
     done++;
     btn.innerHTML=`⏳ ${done}/${todo.length} xong...`;
-    if(done < todo.length) await new Promise(r=>setTimeout(r,3000)); // 3s để DNA extract xong trước
+    if(done < todo.length) await new Promise(r=>setTimeout(r,15000)); // 15s để Vertex cooldown
   }
 
   btn.disabled=false;
@@ -3976,7 +3982,7 @@ async function igRunAll(){
         imgB64=await igCallGeminiImage(imgApiKey,finalPrompt,primaryRefB64,imgEndpoint);
       }catch(e){
         const msg=e.message||'';
-        const isExhausted=msg.match(/exhausted|quota|limit|429|resource/i);
+        const isExhausted=msg.match(/exhausted|quota|limit|429|resource|không trả về|no image/i);
         const isHighDemand=msg.match(/demand|retry|500|503|overload|temporarily|API key not valid|key not valid/i);
 
         if(isExhausted&&attempts<5){
@@ -4032,7 +4038,7 @@ async function igRunAll(){
     const batch=[];
     for(let j=i;j<Math.min(i+PARALLEL,total);j++) batch.push(generateOne(j));
     await Promise.all(batch);
-    if(i+PARALLEL<total&&!igStopped) await new Promise(r=>setTimeout(r,3000));
+    if(i+PARALLEL<total&&!igStopped) await new Promise(r=>setTimeout(r,15000)); // 15s tránh 429
   }
 
   if(igStopped){
@@ -4093,7 +4099,7 @@ async function igRegenOne(i){
       imgB64=await igCallGeminiImage(imgApiKey,finalPrompt,primaryRefB64,imgEndpoint);
     }catch(e){
       const msg=e.message||'';
-      const isExhausted=msg.match(/exhausted|quota|limit|429|resource/i);
+      const isExhausted=msg.match(/exhausted|quota|limit|429|resource|không trả về|no image/i);
       const isHighDemand=msg.match(/demand|retry|500|503|overload|temporarily/i);
       if(isExhausted&&attempts<5){
         const wait=attempts*30;
