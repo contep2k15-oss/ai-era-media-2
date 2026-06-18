@@ -788,21 +788,10 @@ html,body{height:100%;overflow:hidden;background:var(--bg0);color:var(--text);fo
         <div class="result-title" id="resultTitle">Character Reference Sheet</div>
         <div class="result-meta" id="resultMeta"></div>
       </div>
-      <div style="display:flex;gap:6px;">
-        <button class="btn-export" onclick="exportAll()">
-          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-          Export prompts
-        </button>
-        <button class="btn-export" onclick="exportCharsJSON()">
-          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-          Export JSON
-        </button>
-        <button class="btn-export" onclick="document.getElementById('csImportFile').click()">
-          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
-          Import JSON
-        </button>
-        <input type="file" id="csImportFile" accept=".json" style="display:none" onchange="importCharsJSON(this)">
-      </div>
+      <button class="btn-export" onclick="exportAll()">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+        Export tất cả prompts
+      </button>
     </div>
     <!-- Action buttons -->
     <div class="result-actions">
@@ -1678,7 +1667,7 @@ html,body{height:100%;overflow:hidden;background:var(--bg0);color:var(--text);fo
 <script>
 // ── MODEL ASSIGNMENT ──
 const MODEL_TEXT    = 'gemini-3.1-flash-lite';  // Character Sheet, Prompt Engineer, Rewrite, DNA, mọi tác vụ text
-const MODEL_TTS     = 'gpt-4o-mini-tts'; // TTS voice generation (full)
+const MODEL_TTS     = 'gemini-3.1-flash-tts-preview'; // TTS voice generation (full)
 const MODEL_TTS_PREVIEW = 'gemini-2.5-flash-preview-tts'; // Preview nghe thử giọng
 const MODEL_IMAGE   = 'gemini-2.5-flash-image'; // Nano Banana
 const FREE_TEXT_MODELS = [MODEL_TEXT];
@@ -1697,7 +1686,7 @@ const ROLE_CLASSES = {main:'role-main',sub:'role-sub',villain:'role-villain',cro
 
 // ── API ENDPOINT ──
 const API_GOOGLE = 'https://generativelanguage.googleapis.com';
-// API_TTS removed — TTS dùng Edge TTS (miễn phí)
+const API_TTS    = 'https://api.shopaikey.com'; // shopaikey — TTS only
 // ✅ Gemini 3.1 → Agent Platform, bắt buộc dùng global endpoint
 const API_VERTEX_GLOBAL   = 'https://aiplatform.googleapis.com';
 const API_VERTEX_REGIONAL = 'https://us-central1-aiplatform.googleapis.com';
@@ -1727,7 +1716,7 @@ async function getVertexAccessToken(){
 // Models chưa available trên Vertex AI → luôn dùng AI Studio
 const VERTEX_UNSUPPORTED = new Set([
   'gemini-3.1-flash-tts',
-  'gemini-3.1-flash-tts-preview',  // Gemini TTS model
+  'gemini-3.1-flash-tts-preview',  // dùng AI Studio (shopaikey.com)
   'gemini-2.5-flash-tts',
   'gemini-2.5-flash-preview-tts',
 ]);
@@ -2366,72 +2355,6 @@ function copyFull(i){
   doCopy(`=== ${c.name} (${c.role}) ===\nArchetype: ${c.archetype}\nGender: ${c.gender} | Age: ${c.age_range}\nHair: ${app.hair} | Eyes: ${app.eyes} | Skin: ${app.skin}\nBuild: ${app.build} | Height: ${app.height}\nOutfit: ${c.outfit}\nPersonality: ${(c.personality_tags||[]).join(', ')}\nRole: ${c.role_in_story}\n\n[AI PROMPT]\n${c.ai_prompt}\n\n[NEGATIVE]\n${c.negative_prompt}`);
 }
 
-// Export nhân vật dạng JSON (đầy đủ data)
-function exportCharsJSON(){
-  if(!lastChars.length){alert('Chưa có nhân vật nào.');return;}
-  const data={
-    version:'2.0',
-    type:'character_sheet',
-    exportedAt:new Date().toISOString(),
-    projectTitle:lastProject?.title||'AI Era Media Project',
-    characters:lastChars.map(c=>({...c}))
-  };
-  const json=JSON.stringify(data,null,2);
-  const blob=new Blob([json],{type:'application/json'});
-  const a=document.createElement('a');a.href=URL.createObjectURL(blob);
-  a.download=`char_sheet_${(lastProject?.title||'project').replace(/\s+/g,'_')}_${new Date().toISOString().slice(0,10)}.json`;
-  a.click();
-}
-
-// Import nhân vật từ JSON
-function importCharsJSON(input){
-  const file=input.files[0];
-  if(!file)return;
-  const reader=new FileReader();
-  reader.onload=e=>{
-    try{
-      const data=JSON.parse(e.target.result);
-      if(!data.characters||!Array.isArray(data.characters)){
-        alert('File JSON không đúng định dạng.');return;
-      }
-      let added=0,updated=0;
-      data.characters.forEach(char=>{
-        if(!char.name)return;
-        const existing=lastChars.findIndex(c=>c.name===char.name);
-        if(existing>=0){
-          // Merge: cập nhật data mới
-          Object.assign(lastChars[existing],char);
-          updated++;
-        }else{
-          lastChars.push(char);
-          added++;
-        }
-      });
-      // Refresh Character Sheet grid
-      if($('charsGrid')&&lastChars.length>0){
-        $('charsGrid').innerHTML=lastChars.map((c,i)=>{
-          const app=c.appearance||{};
-          return `<div class="char-card">
-            <div class="cc-header"><span class="cc-name">${esc(c.name)}</span><span class="cc-role cc-role-${c.role}">${esc(getRoleLabelEN(c.role))}</span></div>
-            <div class="cc-archetype">${esc(c.archetype||'')}</div>
-            <div class="cc-meta">${esc(c.gender||'')} · ${esc(c.age_range||'')}</div>
-            <div class="cc-prompt">${esc((c.ai_prompt||'').slice(0,120))}…</div>
-            <div class="cc-actions"><button class="btn-copy-prompt" onclick="copyCharPrompt(${i})"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg> Copy prompt</button></div>
-          </div>`;
-        }).join('');
-      }
-      // Refresh Image Gen grid nếu có
-      if(typeof igRefreshCharGrid==='function') igRefreshCharGrid();
-
-      alert(\`✅ Import xong!\n- Thêm mới: \${added} nhân vật\n- Cập nhật: \${updated} nhân vật\n- Tổng: \${lastChars.length} nhân vật\`);
-    }catch(err){
-      alert('Lỗi đọc file: '+err.message);
-    }
-  };
-  reader.readAsText(file);
-  input.value='';
-}
-
 function exportAll(){
   const txt=lastChars.map(c=>{const app=c.appearance||{};return `=== ${c.name} (${getRoleLabel(c.role)}) ===\n${c.archetype} | ${c.gender} | ${c.age_range}\nHair: ${app.hair} | Eyes: ${app.eyes}\nOutfit: ${c.outfit}\nPersonality: ${(c.personality_tags||[]).join(', ')}\nRole: ${c.role_in_story}\n\nPROMPT:\n${c.ai_prompt}\n\nNEGATIVE:\n${c.negative_prompt}\n${'─'.repeat(60)}`;}).join('\n\n');
   const blob=new Blob([txt],{type:'text/plain;charset=utf-8'});
@@ -3049,12 +2972,12 @@ const TTS_MODELS_PRIORITY=[
 let ttsActiveModel=null; // set after auto-detect
 
 const TTS_VOICES=[
-  {id:'en-US-AndrewNeural',   desc:'Nam · Trầm, kể chuyện',  gender:'male'},
-  {id:'en-US-GuyNeural',      desc:'Nam · Ấm',               gender:'male'},
-  {id:'en-US-BrianNeural',    desc:'Nam · Tự nhiên',         gender:'male'},
-  {id:'en-US-AriaNeural',     desc:'Nữ · Đa năng',           gender:'female'},
-  {id:'en-US-JennyNeural',    desc:'Nữ · Thân thiện',        gender:'female'},
-  {id:'en-US-EmmaNeural',     desc:'Nữ · Nhẹ nhàng',         gender:'female'},
+  {id:'en-US-AndrewNeural',desc:'Nam · Trầm, kể chuyện',gender:'male'},
+  {id:'en-US-GuyNeural',desc:'Nam · Ấm',gender:'male'},
+  {id:'en-US-BrianNeural',desc:'Nam · Tự nhiên',gender:'male'},
+  {id:'en-US-AriaNeural',desc:'Nữ · Đa năng',gender:'female'},
+  {id:'en-US-JennyNeural',desc:'Nữ · Thân thiện',gender:'female'},
+  {id:'en-US-EmmaNeural',desc:'Nữ · Nhẹ nhàng',gender:'female'},
 ];
 
 const TTS_STYLE_PROMPTS={
@@ -3105,7 +3028,7 @@ const TTS_PREVIEW_LABELS={
 const TTS_CACHE_PREFIX='aiera_tts_preview_';
 
 async function ttsPreviewVoice(voiceId){
-  const apiKey=$('apiKey').value.trim(); // Edge TTS không cần key
+  const apiKey=$('apiKey').value.trim();
 
   const btn=$(`ttsplay_${voiceId}`);
   if(!btn)return;
@@ -3133,25 +3056,33 @@ async function ttsPreviewVoice(voiceId){
 
   if(!pcmBuf){
     btn.textContent='⏳';btn.style.color='var(--accent)';
-    const sampleText=`Hello, this is a voice preview for narrating your content.`;
+    const sampleText=`Hello, I'm ${voiceId}. This is how I sound when narrating your content.`;
     try{
-      if(!window.electronAPI?.edgeTTS) throw new Error('Edge TTS cần chạy trong app desktop');
-      const result=await window.electronAPI.edgeTTS({text:sampleText,voice:voiceId,rate:'+0%',pitch:'+0Hz'});
-      if(!result||!result.ok) throw new Error(result?.error||'Preview lỗi');
-      // MP3 base64 → decode PCM → WAV
-      const mp3Bytes=Uint8Array.from(atob(result.data),c=>c.charCodeAt(0));
-      const ctx=new (window.AudioContext||window.webkitAudioContext)();
-      const ab=await ctx.decodeAudioData(mp3Bytes.buffer.slice(0));
-      const ch=ab.getChannelData(0);
-      const ratio=ab.sampleRate/24000;
-      const outLen=Math.floor(ch.length/ratio);
-      const int16=new Int16Array(outLen);
-      for(let i=0;i<outLen;i++){
-        const s=ch[Math.floor(i*ratio)]||0;
-        int16[i]=Math.max(-32768,Math.min(32767,Math.round(s*32767)));
+      // TTS preview: luôn AI Studio
+      if(!window.electronAPI||!window.electronAPI.edgeTTS) throw new Error('Edge TTS cần app desktop');
+      var previewResult=await window.electronAPI.edgeTTS({text:sampleText,voice:voiceId,rate:'+0%',pitch:'+0Hz'});
+      if(!previewResult||!previewResult.ok) throw new Error(previewResult?previewResult.error:'Preview lỗi');
+      var mp3Bytes=Uint8Array.from(atob(previewResult.data),function(c){return c.charCodeAt(0);});
+      var ctx2=new (window.AudioContext||window.webkitAudioContext)();
+      var ab2=await ctx2.decodeAudioData(mp3Bytes.buffer.slice(0));
+      var ch=ab2.getChannelData(0);
+      var ratio2=ab2.sampleRate/24000;
+      var outLen2=Math.floor(ch.length/ratio2);
+      var int16b=new Int16Array(outLen2);
+      for(var k2=0;k2<outLen2;k2++){var sv=ch[Math.floor(k2*ratio2)]||0;int16b[k2]=Math.max(-32768,Math.min(32767,Math.round(sv*32767)));}
+      ctx2.close();
+      pcmBuf=addWavHeader(new Uint8Array(int16b.buffer),24000,1,16);
+      var found=true;
+      var parts=[{inlineData:{data:'dummy'}}]; // skip loop below
+      for(const part of parts){
+        if(part.inlineData?.data){
+          const raw=atob(part.inlineData.data);
+          pcmBuf=new Uint8Array(raw.length);
+          for(let i=0;i<raw.length;i++)pcmBuf[i]=raw.charCodeAt(i);
+          found=true;break;
+        }
       }
-      ctx.close();
-      pcmBuf=addWavHeader(new Uint8Array(int16.buffer),24000,1,16);
+      if(!found)throw new Error('TTS không trả về audio data');
       // Cache
       try{
         let binary='';
@@ -3379,7 +3310,7 @@ ${subTruncated}`;
 
 // ── GENERATE FULL VOICE ──
 async function ttsGenerate(){
-  const apiKey=$('apiKey').value.trim(); // Edge TTS không cần, giữ để tương thích
+  const apiKey=$('apiKey').value.trim();
   const script=$('ttsScriptOut').value.trim();
   if(!script){alert('Kịch bản trống. Hãy viết lại ở bước 2 trước.');return;}
 
@@ -3387,7 +3318,7 @@ async function ttsGenerate(){
   $('ttsResult').style.display='none';
   $('ttsErrEl').classList.remove('show');
   $('ttsProgWrap').style.display='block';
-  $('ttsProgLabel').textContent=`Chuẩn bị… (Edge TTS)`;
+  $('ttsProgLabel').textContent='Chuẩn bị… (Edge TTS)';
   ttsResetControls();
 
   // Split into chunks
@@ -3416,7 +3347,7 @@ async function ttsGenerate(){
         }
       }catch(e){
         const msg=e.message||'';
-        const isRetry=msg.match(/quota|demand|retry|500|503|429|rỗng|empty|timeout|unavailable/i);
+        const isRetry=msg.match(/quota|demand|retry|500|503|429|rỗng|empty/i);
         if(attempts<5){
           const wait=isRetry?20:8; // 20s nếu quota, 8s nếu lỗi khác
           for(let s=wait;s>0;s--){
@@ -3436,7 +3367,7 @@ async function ttsGenerate(){
     if(wavBuf)allWavBuffers.push(wavBuf);
     // 10 RPM limit → cần ít nhất 6s giữa requests
     if(i<chunks.length-1){
-      await new Promise(r=>setTimeout(r,500)); // Edge TTS: delay ngắn
+      await new Promise(r=>setTimeout(r,500));
     }
   }
 
@@ -3483,41 +3414,26 @@ async function ttsDetectModel(apiKey){
   return ttsActiveModel;
 }
 
-async function ttsCallAPI(apiKey,text,voice,stylePrompt,modelOverride){
-  // Dùng Microsoft Edge TTS (miễn phí) qua Electron main process
-  if(!window.electronAPI?.edgeTTS){
-    throw new Error('Edge TTS không khả dụng — cần chạy trong app desktop');
+async function ttsCallAPI(apiKey,text,voice,stylePrompt){
+  if(!window.electronAPI||!window.electronAPI.edgeTTS){
+    throw new Error('Edge TTS cần chạy trong app desktop');
   }
-  // Map style → rate (Edge TTS không có instructions, dùng prosody rate)
-  const rateMap={
-    documentary:'-5%', storytelling:'+0%', podcast:'+0%', educational:'-5%',
-    hype:'+10%', comedy:'+5%', meme:'+8%', sarcastic:'+0%', asmr:'-15%'
-  };
-  const rate=rateMap[ttsSelectedStyle]||'+0%';
-
-  const result=await window.electronAPI.edgeTTS({text,voice,rate,pitch:'+0Hz'});
-  if(!result||!result.ok){
-    throw new Error(result?.error||'Edge TTS lỗi không xác định');
-  }
-  // result.data là MP3 base64 → decode thành PCM WAV để merge được
-  const mp3Bytes=Uint8Array.from(atob(result.data),c=>c.charCodeAt(0));
-
-  // Decode MP3 → PCM bằng Web Audio API
-  const audioCtx=new (window.AudioContext||window.webkitAudioContext)();
-  const audioBuf=await audioCtx.decodeAudioData(mp3Bytes.buffer.slice(0));
-  // Lấy kênh mono, resample về 24kHz cho khớp pipeline
-  const pcm=audioBuf.getChannelData(0); // Float32 [-1,1]
-  const srcRate=audioBuf.sampleRate;
-  const dstRate=24000;
-  const ratio=srcRate/dstRate;
-  const outLen=Math.floor(pcm.length/ratio);
-  const int16=new Int16Array(outLen);
-  for(let i=0;i<outLen;i++){
-    const s=pcm[Math.floor(i*ratio)]||0;
-    int16[i]=Math.max(-32768,Math.min(32767,Math.round(s*32767)));
+  var result=await window.electronAPI.edgeTTS({text:text,voice:voice,rate:'+0%',pitch:'+0Hz'});
+  if(!result||!result.ok) throw new Error(result?result.error:'Edge TTS lỗi');
+  var mp3Bytes=Uint8Array.from(atob(result.data),function(c){return c.charCodeAt(0);});
+  var audioCtx=new (window.AudioContext||window.webkitAudioContext)();
+  var audioBuf=await audioCtx.decodeAudioData(mp3Bytes.buffer.slice(0));
+  var pcm=audioBuf.getChannelData(0);
+  var srcRate=audioBuf.sampleRate;
+  var dstRate=24000;
+  var ratio=srcRate/dstRate;
+  var outLen=Math.floor(pcm.length/ratio);
+  var int16=new Int16Array(outLen);
+  for(var k=0;k<outLen;k++){
+    var s=pcm[Math.floor(k*ratio)]||0;
+    int16[k]=Math.max(-32768,Math.min(32767,Math.round(s*32767)));
   }
   audioCtx.close();
-  // Trả về WAV (24kHz mono 16bit) để khớp với mergePcm/pcmToWav
   return addWavHeader(new Uint8Array(int16.buffer),24000,1,16);
 }
 
@@ -3546,7 +3462,7 @@ function addWavHeader(pcmData, sampleRate=24000, numChannels=1, bitsPerSample=16
   return new Uint8Array(buf);
 }
 
-const TTS_SENTENCES_PER_CHUNK=6; // 6 câu/chunk — Edge TTS xử lý nhanh hơn
+const TTS_SENTENCES_PER_CHUNK=6; // Edge TTS xử lý nhanh hơn
 
 function ttsChunkText(text){
   const sentences=text
@@ -3811,16 +3727,15 @@ async function igCallGeminiImage(apiKey, optimizedPrompt, refImageBase64, endpoi
     });
     const data=await res.json();
     if(data.error){
-      console.error(`[Vertex Image] Error at ${new Date().toISOString()}:`, data.error);
-      const errMsg=data.error?.message||data.error?.status||JSON.stringify(data.error)||'Unknown Vertex error';
-      throw new Error('[Vertex] ' + errMsg);
+      console.error('[Vertex Image] Error at '+new Date().toISOString()+':', data.error);
+      var errMsg=data.error?.message||data.error?.status||JSON.stringify(data.error)||'Unknown';
+      throw new Error('[Vertex] '+errMsg);
     }
     const resParts=data.candidates?.[0]?.content?.parts||[];
     for(const part of resParts){
       if(part.inlineData?.mimeType?.startsWith('image/')) return part.inlineData.data;
     }
-    // Không có image data → throw rõ ràng
-    throw new Error('[Vertex] Không trả về ảnh — thử lại');
+    throw new Error('[Vertex] No image data returned');
   }
 
   // Không có Vertex token → yêu cầu đăng nhập
@@ -3885,7 +3800,7 @@ async function igGenerateAllRefs(){
     await igGenerateRef(idx);
     done++;
     btn.innerHTML=`⏳ ${done}/${todo.length} xong...`;
-    if(done < todo.length) await new Promise(r=>setTimeout(r, done===1 ? 15000 : 20000)); // nhân vật đầu 15s, sau 20s
+    if(done < todo.length) await new Promise(r=>setTimeout(r,20000)); // 20s giữa nhân vật
   }
 
   btn.disabled=false;
@@ -3909,23 +3824,23 @@ Full body standing pose, facing forward, arms slightly away from body so all lim
     const imgEndpoint=null; // Image dùng Vertex AI hoàn toàn
 
     let imgB64=null, attempts=0;
-    while(attempts<5 && !imgB64){
+    while(attempts<4 && !imgB64){
       attempts++;
       try{
-        btn.textContent=attempts>1?`🔄 Retry ${attempts}/5…`:'🎨 Đang tạo ảnh...';
+        btn.textContent=attempts>1?`🔄 Retry ${attempts}/4…`:'🎨 Đang tạo ảnh...';
         imgB64=await igCallGeminiImage(imgApiKey, refPrompt, null, imgEndpoint);
       }catch(e){
         const isExhaustedRef=(e.message||'').match(/exhausted|quota|limit|429|resource/i);
         const isRetry=(e.message||'').match(/demand|retry|500|503|overload|temporarily/i);
-        if(isExhaustedRef && attempts<5){
-          const wait=attempts*15;
+        if(isExhaustedRef && attempts<4){
+          const wait=attempts*30;
           for(let s=wait;s>0;s--){
-            btn.textContent=`⏳ Vertex quota, thử lại sau ${s}s (${attempts}/5)`;
+            btn.textContent=`⏳ Vertex quota, thử lại sau ${s}s (${attempts}/4)`;
             await new Promise(r=>setTimeout(r,1000));
           }
-        } else if(isRetry && attempts<5){
+        } else if(isRetry && attempts<4){
           for(let s=10;s>0;s--){
-            btn.textContent=`⏳ Server bận, thử lại sau ${s}s (${attempts}/5)`;
+            btn.textContent=`⏳ Server bận, thử lại sau ${s}s (${attempts}/4)`;
             await new Promise(r=>setTimeout(r,1000));
           }
         } else {
@@ -3977,6 +3892,7 @@ async function igRunAll(){
   if(!igParsedPrompts.length){alert('Chưa có prompt. Dán hoặc sync từ Storyboard.');return;}
 
   const total=igParsedPrompts.length;
+  let igDelay=20000,igConsecOK=0; // adaptive delay
 
   $('igBtnRun').disabled=true;
   $('igProgWrap').style.display='block';
@@ -4010,7 +3926,7 @@ async function igRunAll(){
   // Không cần extract lại ở đây — bắt đầu generate ảnh ngay
 
   // ── PHASE 2: Generate images in parallel ──
-  const PARALLEL=1; // Vertex image: 1 request/lúc để tránh 429
+  const PARALLEL=1; // Tuần tự — tránh 429
   let completed=0;
 
   async function generateOne(i){
@@ -4035,7 +3951,7 @@ async function igRunAll(){
     const aspectStr=igGetAspectPrompt();
     const hasRef=refMatches.length>0 && primaryRefB64;
     // Chỉ inject DNA khi KHÔNG có ref image — ref image tự handle style
-    const styleDNA=igDNA_IG?`\nVisual Style: ${igDNA_IG}`:''; // Luôn thêm style dù có ref
+    const styleDNA=igDNA_IG?`\nVisual Style: ${igDNA_IG}`:''; // Luôn thêm style
 
     if(Object.keys(charDNAMap).length>0){
       const dnaSnippet=Object.entries(charDNAMap).map(([name,dna])=>
@@ -4049,22 +3965,35 @@ async function igRunAll(){
     $(`igimg_${i}`).querySelector('div').innerHTML=`<div style="font-size:10px;color:var(--accent2)">🎨 Generating...</div>`;
 
     let imgB64=null,attempts=0;
+
     while(attempts<3&&!imgB64){
       attempts++;
       try{
         imgB64=await igCallGeminiImage(imgApiKey,finalPrompt,primaryRefB64,imgEndpoint);
       }catch(e){
         const msg=e.message||'';
-        if(attempts<3){
-          const wait=attempts*10; // 10s, 20s — ngắn hơn trước
+        const isExhausted=msg.match(/exhausted|quota|limit|429|resource/i);
+        const isHighDemand=msg.match(/demand|retry|500|503|overload|temporarily|API key not valid|key not valid/i);
+
+        if(isExhausted&&attempts<3){
+          // Vertex quota exhausted → chờ lâu hơn rồi retry
+          const wait=attempts*15; // 15s, 30s
           for(let s=wait;s>0;s--){
             if(igStopped)break;
-            $(`igimg_${i}`).querySelector('div').innerHTML=`<div style="font-size:10px;color:var(--amber)">⏳ Retry ${attempts}/3 sau ${s}s</div>`;
+            $(`igimg_${i}`).querySelector('div').innerHTML=`<div style="font-size:10px;color:var(--amber)">⏳ Vertex quota, retry ${attempts}/3 sau ${s}s</div>`;
+            await new Promise(r=>setTimeout(r,1000));
+          }
+        }else if(isHighDemand&&attempts<3){
+          const wait=attempts*15; // 15s, 30s
+          for(let s=wait;s>0;s--){
+            if(igStopped)break;
+            $(`igimg_${i}`).querySelector('div').innerHTML=`<div style="font-size:10px;color:var(--amber)">⏳ Server bận, retry ${attempts}/3 sau ${s}s</div>`;
             await new Promise(r=>setTimeout(r,1000));
           }
         }else{
           $(`igimg_${i}`).classList.remove('loading');
           $(`igimg_${i}`).innerHTML=`<div style="text-align:center;padding:12px;color:var(--red);font-size:11px;">❌ ${esc(msg.slice(0,100))}</div>`;
+          break;
         }
       }
     }
@@ -4073,10 +4002,11 @@ async function igRunAll(){
     const pct=Math.min(Math.round(completed/total*100),100);
     $('igProgBar').style.width=(10+Math.min(completed,total)/total*88)+'%';
     $('igProgPct').textContent=pct+'%';
-    $('igProgLabel').textContent=`🎨 ${completed}/${total} ảnh xong…`;
+    $('igProgLabel').textContent=`🎨 ${completed}/${total} ảnh xong (parallel ${PARALLEL}x)…`;
 
     if(imgB64){
       const dataUrl='data:image/png;base64,'+imgB64;
+      // Dùng index cố định thay vì push để tránh race condition
       igGeneratedImages[i]={label:p.label,dataUrl};
       const el=$(`igimg_${i}`);
       if(el){
@@ -4085,42 +4015,26 @@ async function igRunAll(){
       }
       const labelEl=$(`iglabel_${i}`);
       if(labelEl) labelEl.innerHTML=`<span>${esc(p.label)}${p.refName?' · '+esc(p.refName):''}</span><button class="btn-ig-dl" onclick="igDlOne('${dataUrl}','${p.label.replace(/\./g,'_')}.png')" title="Download">⬇</button>`;
+      // Count thực tế từ array (bỏ undefined)
       const doneCount=igGeneratedImages.filter(Boolean).length;
       $('igResultsTitle').textContent=`✅ ${doneCount}/${total} ảnh`;
     }
   }
 
-  // === ADAPTIVE DELAY: tự điều chỉnh tốc độ ===
-  let adaptiveDelay=20000; // bắt đầu 20s
-  const DELAY_MIN=12000;   // tối thiểu 12s
-  const DELAY_MAX=40000;   // tối đa 40s
-  let consecutiveOK=0;     // đếm số ảnh OK liên tiếp
-
+  // Chạy song song PARALLEL ảnh/batch, delay 3s giữa batch
   for(let i=0;i<total;i+=PARALLEL){
     if(igStopped)break;
     while(igPaused){await new Promise(r=>setTimeout(r,200));if(igStopped)break;}
     const batch=[];
     for(let j=i;j<Math.min(i+PARALLEL,total);j++) batch.push(generateOne(j));
     await Promise.all(batch);
-
-    // Điều chỉnh delay dựa trên kết quả
-    const lastOK=igGeneratedImages[i]!==null && igGeneratedImages[i]!==undefined;
-    if(lastOK){
-      consecutiveOK++;
-      // 3 ảnh OK liên tiếp → giảm delay 2s (min 12s)
-      if(consecutiveOK>=3){
-        adaptiveDelay=Math.max(DELAY_MIN, adaptiveDelay-2000);
-        consecutiveOK=0;
-      }
-    }else{
-      consecutiveOK=0;
-      // Bị lỗi → tăng delay 8s (max 40s)
-      adaptiveDelay=Math.min(DELAY_MAX, adaptiveDelay+8000);
-    }
-
     if(i+PARALLEL<total&&!igStopped){
-      $('igProgLabel').textContent=`🎨 ${igGeneratedImages.filter(Boolean).length}/${total} xong… delay ${Math.round(adaptiveDelay/1000)}s`;
-      await new Promise(r=>setTimeout(r,adaptiveDelay));
+      // Adaptive delay: OK liên tiếp → giảm, 429 → tăng
+      const lastOK=igGeneratedImages[i]!=null;
+      if(lastOK){igConsecOK++;if(igConsecOK>=3){igDelay=Math.max(12000,igDelay-2000);igConsecOK=0;}}
+      else{igConsecOK=0;igDelay=Math.min(40000,igDelay+8000);}
+      $('igProgLabel').textContent=`🎨 ${igGeneratedImages.filter(Boolean).length}/${total} xong… delay ${Math.round(igDelay/1000)}s`;
+      await new Promise(r=>setTimeout(r,igDelay));
     }
   }
 
@@ -4166,7 +4080,7 @@ async function igRegenOne(i){
   }
   const aspectStr=igGetAspectPrompt();
   const hasRef=refMatches.length>0 && primaryRefB64;
-  const styleDNA=igDNA_IG?`\nVisual Style: ${igDNA_IG}`:''; // Luôn thêm style dù có ref
+  const styleDNA=igDNA_IG?`\nVisual Style: ${igDNA_IG}`:''; // Luôn thêm style
   let finalPrompt=p.text;
   if(Object.keys(charDNAMap).length>0){
     const dnaSnippet=Object.entries(charDNAMap).map(([name,dna])=>`[${name}: ${dna?.visual_summary||dna?.hair||''}]`).join(' ');
@@ -4175,39 +4089,17 @@ async function igRegenOne(i){
     finalPrompt=`[${aspectStr}]\n\n${p.text}${styleDNA}\n\nREMINDER: NO white margins, NO white padding, full bleed to all edges.`;
   }
 
-  let imgB64=null,attempts=0;
-  while(attempts<5&&!imgB64){
-    attempts++;
-    try{
-      imgB64=await igCallGeminiImage(imgApiKey,finalPrompt,primaryRefB64,imgEndpoint);
-    }catch(e){
-      const msg=e.message||'';
-      const isExhausted=msg.match(/exhausted|quota|limit|429|resource|không trả về|no image/i);
-      const isHighDemand=msg.match(/demand|retry|500|503|overload|temporarily/i);
-      if(isExhausted&&attempts<5){
-        const wait=attempts*15;
-        for(let s=wait;s>0;s--){
-          if(imgEl)imgEl.querySelector('div').innerHTML=`<div style="font-size:10px;color:var(--amber)">⏳ Vertex quota, retry ${attempts}/5 sau ${s}s</div>`;
-          await new Promise(r=>setTimeout(r,1000));
-        }
-      }else if(isHighDemand&&attempts<5){
-        const wait=attempts*15;
-        for(let s=wait;s>0;s--){
-          if(imgEl)imgEl.querySelector('div').innerHTML=`<div style="font-size:10px;color:var(--amber)">⏳ Server bận, retry ${attempts}/5 sau ${s}s</div>`;
-          await new Promise(r=>setTimeout(r,1000));
-        }
-      }else{
-        if(imgEl){imgEl.classList.remove('loading');imgEl.innerHTML=`<div style="text-align:center;padding:12px;color:var(--red);font-size:11px;">❌ ${esc(msg.slice(0,80))}</div>`;}
-        break;
-      }
+  try{
+    const imgB64=await igCallGeminiImage(imgApiKey,finalPrompt,primaryRefB64,imgEndpoint);
+    if(imgB64){
+      const dataUrl='data:image/png;base64,'+imgB64;
+      igGeneratedImages[i]={label:p.label,dataUrl};
+      if(imgEl){imgEl.classList.remove('loading');imgEl.innerHTML=`<img src="${dataUrl}" style="width:100%;height:100%;object-fit:cover;object-position:center;display:block;transform:scale(1.08);">`;}
+      const labelEl=$(`iglabel_${i}`);
+      if(labelEl)labelEl.innerHTML=`<span>${esc(p.label)}${p.refName?' · '+esc(p.refName):''}</span><button class="btn-ig-dl" onclick="igDlOne('${dataUrl}','${p.label.replace(/\./g,'_')}.png')" title="Download">⬇</button>`;
     }
-  }
-  if(imgB64){
-    const dataUrl='data:image/png;base64,'+imgB64;
-    igGeneratedImages[i]={label:p.label,dataUrl};
-    if(imgEl){imgEl.classList.remove('loading');imgEl.innerHTML=`<img src="${dataUrl}" style="width:100%;height:100%;object-fit:cover;object-position:center;display:block;transform:scale(1.08);">`;}
-    const labelEl=$(`iglabel_${i}`);
-    if(labelEl)labelEl.innerHTML=`<span>${esc(p.label)}${p.refName?' · '+esc(p.refName):''}</span><button class="btn-ig-dl" onclick="igDlOne('${dataUrl}','${p.label.replace(/\./g,'_')}.png')" title="Download">⬇</button>`;
+  }catch(e){
+    if(imgEl){imgEl.classList.remove('loading');imgEl.innerHTML=`<div style="text-align:center;padding:12px;color:var(--red);font-size:11px;">❌ ${esc(e.message.slice(0,80))}</div>`;}
   }
   if(btn){btn.textContent='🔄 Tạo lại';btn.classList.remove('loading');}
 }
@@ -4217,29 +4109,14 @@ function igExportChars(){
   const chars=Object.keys(igRefImages);
   if(!chars.length){alert('Chưa có ảnh tham chiếu nào để export.');return;}
   const data={
-    version:'2.0',
+    version:'1.0',
     exportedAt:new Date().toISOString(),
     projectTitle:lastProject?.title||'AI Era Media Project',
-    characters:chars.map(name=>{
-      // Tìm data nhân vật từ lastChars
-      const charData=lastChars.find(c=>c.name===name)||{};
-      return {
-        name,
-        refImage: igRefImages[name]||null,
-        dna: igCharDNA[name]||null,
-        // Thêm data Character Sheet
-        role: charData.role||'',
-        archetype: charData.archetype||'',
-        gender: charData.gender||'',
-        age_range: charData.age_range||'',
-        appearance: charData.appearance||{},
-        outfit: charData.outfit||'',
-        personality_tags: charData.personality_tags||[],
-        role_in_story: charData.role_in_story||'',
-        ai_prompt: charData.ai_prompt||'',
-        negative_prompt: charData.negative_prompt||''
-      };
-    })
+    characters:chars.map(name=>({
+      name,
+      refImage: igRefImages[name]||null,
+      dna: igCharDNA[name]||null
+    }))
   };
   const json=JSON.stringify(data,null,2);
   const blob=new Blob([json],{type:'application/json'});
@@ -4262,56 +4139,27 @@ function igImportChars(input){
         alert('File JSON không đúng định dạng.');return;
       }
       let loaded=0;
-      data.characters.forEach(char=>{
+      data.characters.forEach(function(char){
         if(!char.name)return;
-        if(char.refImage){
-          igRefImages[char.name]=char.refImage;
-          console.log('[Import] Loaded ref image for:', char.name, '— size:', char.refImage.length, 'chars');
-        }
+        if(char.refImage) igRefImages[char.name]=char.refImage;
         if(char.dna) igCharDNA[char.name]=char.dna;
-
-        // Cập nhật hoặc thêm vào lastChars
-        const existing=lastChars.findIndex(c=>c.name===char.name);
-        const charEntry={
-          name:char.name,
-          role:char.role||'sub',
-          archetype:char.archetype||'',
-          gender:char.gender||'',
-          age_range:char.age_range||'',
-          appearance:char.appearance||{},
-          outfit:char.outfit||'',
-          personality_tags:char.personality_tags||[],
-          role_in_story:char.role_in_story||'',
-          ai_prompt:char.ai_prompt||'',
-          negative_prompt:char.negative_prompt||''
-        };
+        var existing=lastChars.findIndex(function(c){return c.name===char.name;});
         if(existing>=0){
-          // Merge: giữ data cũ, cập nhật data mới nếu có
-          Object.keys(charEntry).forEach(k=>{
-            if(charEntry[k]&&charEntry[k]!=='') lastChars[existing][k]=charEntry[k];
-          });
+          if(char.role) lastChars[existing].role=char.role;
+          if(char.archetype) lastChars[existing].archetype=char.archetype;
         }else{
-          lastChars.push(charEntry);
+          lastChars.push({name:char.name,role:char.role||'sub',archetype:char.archetype||'',gender:char.gender||''});
         }
         loaded++;
       });
-
-      // Refresh cả Character Sheet grid và Image Gen grid
       igRefreshCharGrid();
-      // Refresh Character Sheet grid nếu đang hiển thị
-      if($('charsGrid')){
-        $('charsGrid').innerHTML=lastChars.map((c,i)=>{
-          return `<div class="char-card"><b>${esc(c.name)}</b><br><small>${esc(c.role)} · ${esc(c.archetype||'')}</small></div>`;
-        }).join('');
-      }
-
-      alert(`✅ Đã import ${loaded} nhân vật từ "${data.projectTitle||file.name}"\n- Ảnh ref: ${Object.keys(igRefImages).length}\n- DNA: ${Object.keys(igCharDNA).length}\n- Nhân vật: ${lastChars.length}`);
+      alert('Import xong: '+loaded+' nhan vat');
     }catch(err){
       alert('Lỗi đọc file JSON: '+err.message);
     }
   };
   reader.readAsText(file);
-  input.value='';
+  input.value=''; // reset để có thể import lại cùng file
 }
 
 function igDlOne(dataUrl,filename){

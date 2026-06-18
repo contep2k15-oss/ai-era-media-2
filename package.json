@@ -16,7 +16,8 @@
     "publish": null,
     "asar": true,
     "asarUnpack": [
-      "node_modules/ffmpeg-static/**/*"
+      "node_modules/ffmpeg-static/**/*",
+      "node_modules/ws/**/*"
     ],
     "directories": {
       "output": "dist"

@@ -6,21 +6,21 @@ const http = require('http');
 const { URL } = require('url');
 const edgeTTS = require('./edge-tts');
 
-// Edge TTS handler — trả về MP3 base64
+app.commandLine.appendSwitch('disable-features', 'OutOfBlinkCors');
+app.commandLine.appendSwitch('disable-background-timer-throttling');
+
+// Edge TTS IPC
 ipcMain.handle('edge-tts', async (event, { text, voice, rate, pitch }) => {
   try {
-    console.log(`[Edge TTS] voice=${voice} text=${text.length} chars`);
+    console.log('[Edge TTS] voice=' + voice + ' text=' + text.length + ' chars');
     const buf = await edgeTTS.synthesize(text, { voice, rate, pitch });
-    console.log(`[Edge TTS] OK — ${buf.length} bytes`);
+    console.log('[Edge TTS] OK ' + buf.length + ' bytes');
     return { ok: true, data: buf.toString('base64') };
   } catch (e) {
-    console.error(`[Edge TTS] FAIL:`, e.message);
-    return { ok: false, error: e.message || 'Edge TTS loi' };
+    console.error('[Edge TTS] FAIL:', e.message);
+    return { ok: false, error: e.message || 'Edge TTS error' };
   }
 });
-
-app.commandLine.appendSwitch('disable-features', 'OutOfBlinkCors');
-app.commandLine.appendSwitch('disable-background-timer-throttling'); // Chạy timer bình thường khi ở background
 
 // ── GOOGLE OAUTH2 CONFIG ──
 // Credentials được load từ file config riêng (không commit lên Git)
@@ -198,7 +198,7 @@ function createWindow() {
       nodeIntegration: false, contextIsolation: true,
       preload: path.join(__dirname, 'preload.js'),
       webSecurity: false,
-      backgroundThrottling: false, // Không throttle khi app ở background
+      backgroundThrottling: false,
     },
     show: false,
   });
