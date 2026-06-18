@@ -20,6 +20,7 @@ ipcMain.handle('edge-tts', async (event, { text, voice, rate, pitch }) => {
 });
 
 app.commandLine.appendSwitch('disable-features', 'OutOfBlinkCors');
+app.commandLine.appendSwitch('disable-background-timer-throttling'); // Chạy timer bình thường khi ở background
 
 // ── GOOGLE OAUTH2 CONFIG ──
 // Credentials được load từ file config riêng (không commit lên Git)
@@ -197,6 +198,7 @@ function createWindow() {
       nodeIntegration: false, contextIsolation: true,
       preload: path.join(__dirname, 'preload.js'),
       webSecurity: false,
+      backgroundThrottling: false, // Không throttle khi app ở background
     },
     show: false,
   });
