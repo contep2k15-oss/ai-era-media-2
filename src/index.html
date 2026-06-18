@@ -3808,7 +3808,7 @@ async function igGenerateAllRefs(){
     await igGenerateRef(idx);
     done++;
     btn.innerHTML=`⏳ ${done}/${todo.length} xong...`;
-    if(done < todo.length) await new Promise(r=>setTimeout(r,15000)); // 15s để Vertex cooldown
+    if(done < todo.length) await new Promise(r=>setTimeout(r, done===1 ? 15000 : 20000)); // nhân vật đầu 15s, sau 20s
   }
 
   btn.disabled=false;
@@ -3841,7 +3841,7 @@ Full body standing pose, facing forward, arms slightly away from body so all lim
         const isExhaustedRef=(e.message||'').match(/exhausted|quota|limit|429|resource/i);
         const isRetry=(e.message||'').match(/demand|retry|500|503|overload|temporarily/i);
         if(isExhaustedRef && attempts<5){
-          const wait=attempts*30;
+          const wait=attempts*15;
           for(let s=wait;s>0;s--){
             btn.textContent=`⏳ Vertex quota, thử lại sau ${s}s (${attempts}/5)`;
             await new Promise(r=>setTimeout(r,1000));
@@ -3958,7 +3958,7 @@ async function igRunAll(){
     const aspectStr=igGetAspectPrompt();
     const hasRef=refMatches.length>0 && primaryRefB64;
     // Chỉ inject DNA khi KHÔNG có ref image — ref image tự handle style
-    const styleDNA=(!hasRef && igDNA_IG)?`\nVisual Style: ${igDNA_IG}`:'';
+    const styleDNA=igDNA_IG?`\nVisual Style: ${igDNA_IG}`:''; // Luôn thêm style dù có ref
 
     if(Object.keys(charDNAMap).length>0){
       const dnaSnippet=Object.entries(charDNAMap).map(([name,dna])=>
@@ -3984,7 +3984,7 @@ async function igRunAll(){
 
         if(isExhausted&&attempts<5){
           // Vertex quota exhausted → chờ lâu hơn rồi retry
-          const wait=attempts*30; // 30s, 60s, 90s
+          const wait=attempts*15; // 15s, 30s, 45s
           for(let s=wait;s>0;s--){
             if(igStopped)break;
             $(`igimg_${i}`).querySelector('div').innerHTML=`<div style="font-size:10px;color:var(--amber)">⏳ Vertex quota, retry ${attempts}/5 sau ${s}s</div>`;
@@ -4035,7 +4035,7 @@ async function igRunAll(){
     const batch=[];
     for(let j=i;j<Math.min(i+PARALLEL,total);j++) batch.push(generateOne(j));
     await Promise.all(batch);
-    if(i+PARALLEL<total&&!igStopped) await new Promise(r=>setTimeout(r,15000)); // 15s tránh 429
+    if(i+PARALLEL<total&&!igStopped) await new Promise(r=>setTimeout(r, i===0 ? 15000 : 20000)); // ảnh đầu 15s, sau 20s
   }
 
   if(igStopped){
@@ -4080,7 +4080,7 @@ async function igRegenOne(i){
   }
   const aspectStr=igGetAspectPrompt();
   const hasRef=refMatches.length>0 && primaryRefB64;
-  const styleDNA=(!hasRef && igDNA_IG)?`\nVisual Style: ${igDNA_IG}`:'';
+  const styleDNA=igDNA_IG?`\nVisual Style: ${igDNA_IG}`:''; // Luôn thêm style dù có ref
   let finalPrompt=p.text;
   if(Object.keys(charDNAMap).length>0){
     const dnaSnippet=Object.entries(charDNAMap).map(([name,dna])=>`[${name}: ${dna?.visual_summary||dna?.hair||''}]`).join(' ');
@@ -4099,7 +4099,7 @@ async function igRegenOne(i){
       const isExhausted=msg.match(/exhausted|quota|limit|429|resource|không trả về|no image/i);
       const isHighDemand=msg.match(/demand|retry|500|503|overload|temporarily/i);
       if(isExhausted&&attempts<5){
-        const wait=attempts*30;
+        const wait=attempts*15;
         for(let s=wait;s>0;s--){
           if(imgEl)imgEl.querySelector('div').innerHTML=`<div style="font-size:10px;color:var(--amber)">⏳ Vertex quota, retry ${attempts}/5 sau ${s}s</div>`;
           await new Promise(r=>setTimeout(r,1000));
