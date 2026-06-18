@@ -13,9 +13,15 @@ const TRUSTED_TOKEN = '6A5AA1D4EAFF4E9FB37E23D68491D6F4';
 const WSS_URL = 'wss://speech.platform.bing.com/consumer/speech/synthesize/readaloud/edge/v1?TrustedClientToken=' + TRUSTED_TOKEN;
 const VOICES_URL = 'https://speech.platform.bing.com/consumer/speech/synthesize/readaloud/voices/list?trustedclienttoken=' + TRUSTED_TOKEN;
 
-// Tạo Sec-MS-GEC token theo thuật toán của Edge
+// Tạo Sec-MS-GEC token theo thuật toán mới nhất của Edge
+// Ref: edge-tts (rany2) DRM.generate_sec_ms_gec
+const WIN_EPOCH = 11644473600n; // giây giữa 1601 và 1970
+const S_TO_NS = 1000000000n;
 function generateSecMsGec() {
-  let ticks = BigInt(Math.floor(Date.now() / 1000) + 11644473600) * 10000000n;
+  // Unix time (giây) + offset epoch Windows, đổi sang đơn vị 100-nanosecond
+  let ticks = BigInt(Math.floor(Date.now() / 1000)) + WIN_EPOCH;
+  ticks = ticks * S_TO_NS / 100n; // → 100-nanosecond intervals
+  // Làm tròn xuống bội số 3,000,000,000 (= 5 phút trong đơn vị 100ns)
   ticks = ticks - (ticks % 3000000000n);
   const strToHash = ticks.toString() + TRUSTED_TOKEN;
   return crypto.createHash('sha256').update(strToHash, 'ascii').digest('hex').toUpperCase();
@@ -38,7 +44,7 @@ function synthesize(text, options = {}) {
     const pitch = options.pitch || '+0Hz';
 
     const secMsGec = generateSecMsGec();
-    const url = WSS_URL + '&Sec-MS-GEC=' + secMsGec + '&Sec-MS-GEC-Version=1-130.0.2849.68';
+    const url = WSS_URL + '&Sec-MS-GEC=' + secMsGec + '&Sec-MS-GEC-Version=1-149.0.4022.69';
 
     let ws;
     try {
@@ -47,7 +53,7 @@ function synthesize(text, options = {}) {
           'Pragma': 'no-cache',
           'Cache-Control': 'no-cache',
           'Origin': 'chrome-extension://jdiccldimpdaibmpdkjnbmckianbfold',
-          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36 Edg/130.0.0.0',
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/149.0.0.0 Safari/537.36 Edg/149.0.0.0',
           'Accept-Encoding': 'gzip, deflate, br',
           'Accept-Language': 'en-US,en;q=0.9'
         }
