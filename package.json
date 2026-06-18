@@ -30,10 +30,12 @@
     "files": [
       "main.js",
       "preload.js",
+      "edge-tts.js",
       "src/**/*",
       "assets/**/*",
       "oauth_config.json",
-      "node_modules/ffmpeg-static/**/*"
+      "node_modules/ffmpeg-static/**/*",
+      "node_modules/ws/**/*"
     ],
     "win": {
       "target": [
@@ -67,7 +69,8 @@
     }
   },
   "dependencies": {
-    "ffmpeg-static": "^5.2.0"
+    "ffmpeg-static": "^5.2.0",
+    "ws": "^8.18.0"
   },
   "devDependencies": {
     "electron": "^30.0.0",

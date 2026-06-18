@@ -4,6 +4,17 @@ const fs = require('fs');
 const os = require('os');
 const http = require('http');
 const { URL } = require('url');
+const edgeTTS = require('./edge-tts');
+
+// Edge TTS handler — trả về MP3 base64
+ipcMain.handle('edge-tts', async (event, { text, voice, rate, pitch }) => {
+  try {
+    const buf = await edgeTTS.synthesize(text, { voice, rate, pitch });
+    return { ok: true, data: buf.toString('base64') };
+  } catch (e) {
+    return { ok: false, error: e.message || 'Edge TTS loi' };
+  }
+});
 
 app.commandLine.appendSwitch('disable-features', 'OutOfBlinkCors');
 

@@ -11,4 +11,6 @@ contextBridge.exposeInMainWorld('electronAPI', {
   googleGetToken: () => ipcRenderer.invoke('google-get-token'),
   googleLogout: () => ipcRenderer.invoke('google-logout'),
   googleAuthStatus: () => ipcRenderer.invoke('google-auth-status'),
+  // Edge TTS (Microsoft, miễn phí)
+  edgeTTS: (params) => ipcRenderer.invoke('edge-tts', params),
 });

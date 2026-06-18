@@ -2972,12 +2972,12 @@ const TTS_MODELS_PRIORITY=[
 let ttsActiveModel=null; // set after auto-detect
 
 const TTS_VOICES=[
-  {id:'alloy',   desc:'Nam · Trung tính',    gender:'male'},
-  {id:'echo',    desc:'Nam · Trầm',          gender:'male'},
-  {id:'fable',   desc:'Nam · Ấm',            gender:'male'},
-  {id:'onyx',    desc:'Nam · Sâu lắng',      gender:'male'},
-  {id:'nova',    desc:'Nữ · Năng động',      gender:'female'},
-  {id:'shimmer', desc:'Nữ · Nhẹ nhàng',     gender:'female'},
+  {id:'en-US-AndrewNeural',   desc:'Nam · Trầm, kể chuyện',  gender:'male'},
+  {id:'en-US-GuyNeural',      desc:'Nam · Ấm',               gender:'male'},
+  {id:'en-US-BrianNeural',    desc:'Nam · Tự nhiên',         gender:'male'},
+  {id:'en-US-AriaNeural',     desc:'Nữ · Đa năng',           gender:'female'},
+  {id:'en-US-JennyNeural',    desc:'Nữ · Thân thiện',        gender:'female'},
+  {id:'en-US-EmmaNeural',     desc:'Nữ · Nhẹ nhàng',         gender:'female'},
 ];
 
 const TTS_STYLE_PROMPTS={
@@ -3010,26 +3010,25 @@ const TTS_DUR_WORDS={
 
 let ttsSelectedStyle='documentary';
 let ttsSelectedDur='1min';
-let ttsSelectedVoice='onyx';
+let ttsSelectedVoice='en-US-AndrewNeural';
 let ttsPreviewAudio=null;
 let ttsAudioUrl=null;
 
 // 5 giọng đại diện có thể nghe thử (cache vào localStorage)
-const TTS_PREVIEW_VOICES=['alloy','echo','nova','onyx','shimmer'];
+const TTS_PREVIEW_VOICES=['en-US-AndrewNeural','en-US-GuyNeural','en-US-AriaNeural','en-US-JennyNeural','en-US-EmmaNeural'];
 const TTS_PREVIEW_LABELS={
-  'alloy':'Nam · Trung tính',
-  'echo':'Nam · Trầm',
-  'nova':'Nữ · Năng động',
-  'onyx':'Nam · Sâu lắng',
-  'shimmer':'Nữ · Nhẹ nhàng'
+  'en-US-AndrewNeural':'Nam · Trầm, kể chuyện',
+  'en-US-GuyNeural':'Nam · Ấm',
+  'en-US-AriaNeural':'Nữ · Đa năng',
+  'en-US-JennyNeural':'Nữ · Thân thiện',
+  'en-US-EmmaNeural':'Nữ · Nhẹ nhàng'
 };
 
 // Cache key prefix
 const TTS_CACHE_PREFIX='aiera_tts_preview_';
 
 async function ttsPreviewVoice(voiceId){
-  const apiKey=$('apiKey').value.trim();
-  if(!apiKey){alert('Vui lòng nhập API key trước.');return;}
+  const apiKey=$('apiKey').value.trim(); // Edge TTS không cần key
 
   const btn=$(`ttsplay_${voiceId}`);
   if(!btn)return;
@@ -3057,36 +3056,25 @@ async function ttsPreviewVoice(voiceId){
 
   if(!pcmBuf){
     btn.textContent='⏳';btn.style.color='var(--accent)';
-    const sampleText=`Hello, I'm ${voiceId}. This is how I sound when narrating your content.`;
+    const sampleText=`Hello, this is a voice preview for narrating your content.`;
     try{
-      // TTS preview: luôn AI Studio
-      const ttsPreviewBody={model:MODEL_TTS,input:sampleText,voice:voiceId,response_format:'wav'};
-      const ttsPreviewUrl=`${API_TTS}/v1/audio/speech`;
-      const ttsPreviewRes=await fetch(ttsPreviewUrl,{
-        method:'POST',
-        headers:{'Content-Type':'application/json','Authorization':`Bearer ${apiKey}`},
-        body:JSON.stringify(ttsPreviewBody)
-      });
-      if(!ttsPreviewRes.ok){
-        const d=await ttsPreviewRes.json().catch(()=>({}));
-        throw new Error(d.error?.message||'Preview lỗi '+ttsPreviewRes.status);
+      if(!window.electronAPI?.edgeTTS) throw new Error('Edge TTS cần chạy trong app desktop');
+      const result=await window.electronAPI.edgeTTS({text:sampleText,voice:voiceId,rate:'+0%',pitch:'+0Hz'});
+      if(!result||!result.ok) throw new Error(result?.error||'Preview lỗi');
+      // MP3 base64 → decode PCM → WAV
+      const mp3Bytes=Uint8Array.from(atob(result.data),c=>c.charCodeAt(0));
+      const ctx=new (window.AudioContext||window.webkitAudioContext)();
+      const ab=await ctx.decodeAudioData(mp3Bytes.buffer.slice(0));
+      const ch=ab.getChannelData(0);
+      const ratio=ab.sampleRate/24000;
+      const outLen=Math.floor(ch.length/ratio);
+      const int16=new Int16Array(outLen);
+      for(let i=0;i<outLen;i++){
+        const s=ch[Math.floor(i*ratio)]||0;
+        int16[i]=Math.max(-32768,Math.min(32767,Math.round(s*32767)));
       }
-      const previewBuf=await ttsPreviewRes.arrayBuffer();
-      // Convert ArrayBuffer → base64 an toàn (không bị stack overflow)
-      const previewBytes=new Uint8Array(previewBuf);
-      let previewBin='';
-      for(let k=0;k<previewBytes.length;k++) previewBin+=String.fromCharCode(previewBytes[k]);
-      const parts=[{inlineData:{data:btoa(previewBin)}}];
-      let found=false;
-      for(const part of parts){
-        if(part.inlineData?.data){
-          const raw=atob(part.inlineData.data);
-          pcmBuf=new Uint8Array(raw.length);
-          for(let i=0;i<raw.length;i++)pcmBuf[i]=raw.charCodeAt(i);
-          found=true;break;
-        }
-      }
-      if(!found)throw new Error('TTS không trả về audio data');
+      ctx.close();
+      pcmBuf=addWavHeader(new Uint8Array(int16.buffer),24000,1,16);
       // Cache
       try{
         let binary='';
@@ -3314,8 +3302,7 @@ ${subTruncated}`;
 
 // ── GENERATE FULL VOICE ──
 async function ttsGenerate(){
-  const apiKey=$('apiKey').value.trim();
-  if(!apiKey){alert('Cần API key.');return;}
+  const apiKey=$('apiKey').value.trim(); // Edge TTS không cần, giữ để tương thích
   const script=$('ttsScriptOut').value.trim();
   if(!script){alert('Kịch bản trống. Hãy viết lại ở bước 2 trước.');return;}
 
@@ -3323,7 +3310,7 @@ async function ttsGenerate(){
   $('ttsResult').style.display='none';
   $('ttsErrEl').classList.remove('show');
   $('ttsProgWrap').style.display='block';
-  $('ttsProgLabel').textContent=`Chuẩn bị… (${TTS_MODEL})`;
+  $('ttsProgLabel').textContent=`Chuẩn bị… (Edge TTS)`;
   ttsResetControls();
 
   // Split into chunks
@@ -3343,13 +3330,8 @@ async function ttsGenerate(){
     let wavBuf=null;let attempts=0;
     while(attempts<5&&!wavBuf){
       attempts++;
-      // Fallback model: lần 1 gpt-4o-mini-tts, lần 2 tts-1-1106, lần 3+ tts-1
-      let useModel=MODEL_TTS;
-      if(attempts===2) useModel='tts-1-1106';
-      else if(attempts>=3) useModel='tts-1';
       try{
-        if(attempts>=3) $('ttsProgLabel').textContent=`Chunk ${i+1}: thử model ${useModel}…`;
-        wavBuf=await ttsCallAPI(apiKey,chunks[i],ttsSelectedVoice,stylePrompt,useModel);
+        wavBuf=await ttsCallAPI(apiKey,chunks[i],ttsSelectedVoice,stylePrompt);
         if(!wavBuf||wavBuf.length<100){
           // API trả về empty/rỗng — retry
           wavBuf=null;
@@ -3357,7 +3339,7 @@ async function ttsGenerate(){
         }
       }catch(e){
         const msg=e.message||'';
-        const isRetry=msg.match(/quota|demand|retry|500|503|429|rỗng|empty|渠道|channel|distributor|unavailable|无可用/i);
+        const isRetry=msg.match(/quota|demand|retry|500|503|429|rỗng|empty|timeout|unavailable/i);
         if(attempts<5){
           const wait=isRetry?20:8; // 20s nếu quota, 8s nếu lỗi khác
           for(let s=wait;s>0;s--){
@@ -3377,11 +3359,7 @@ async function ttsGenerate(){
     if(wavBuf)allWavBuffers.push(wavBuf);
     // 10 RPM limit → cần ít nhất 6s giữa requests
     if(i<chunks.length-1){
-      for(let s=7;s>0;s--){
-        if(ttsStopped)break;
-        $('ttsProgLabel').textContent=`Chunk ${i+1}/${chunks.length} xong — chờ ${s}s trước chunk tiếp theo…`;
-        await new Promise(r=>setTimeout(r,1000));
-      }
+      await new Promise(r=>setTimeout(r,500)); // Edge TTS: delay ngắn
     }
   }
 
@@ -3429,29 +3407,41 @@ async function ttsDetectModel(apiKey){
 }
 
 async function ttsCallAPI(apiKey,text,voice,stylePrompt,modelOverride){
-  const model=modelOverride||MODEL_TTS;
-  const instructions=stylePrompt||'';
-  const body={
-    model:model,
-    input:text,
-    voice:voice,
-    response_format:'wav'
-  };
-  // Chỉ gpt-4o-mini-tts hỗ trợ instructions; tts-1/tts-1-1106 thì không
-  if(instructions && model.includes('gpt-4o')) body.instructions=instructions;
-  const url=`${API_TTS}/v1/audio/speech`;
-  const res=await fetch(url,{
-    method:'POST',
-    headers:{'Content-Type':'application/json','Authorization':`Bearer ${apiKey}`},
-    body:JSON.stringify(body)
-  });
-  if(!res.ok){
-    let msg='TTS lỗi '+res.status;
-    try{const d=await res.json();msg=d.error?.message||JSON.stringify(d);}catch(e){}
-    throw new Error(msg);
+  // Dùng Microsoft Edge TTS (miễn phí) qua Electron main process
+  if(!window.electronAPI?.edgeTTS){
+    throw new Error('Edge TTS không khả dụng — cần chạy trong app desktop');
   }
-  const arrayBuf=await res.arrayBuffer();
-  return new Uint8Array(arrayBuf);
+  // Map style → rate (Edge TTS không có instructions, dùng prosody rate)
+  const rateMap={
+    documentary:'-5%', storytelling:'+0%', podcast:'+0%', educational:'-5%',
+    hype:'+10%', comedy:'+5%', meme:'+8%', sarcastic:'+0%', asmr:'-15%'
+  };
+  const rate=rateMap[ttsSelectedStyle]||'+0%';
+
+  const result=await window.electronAPI.edgeTTS({text,voice,rate,pitch:'+0Hz'});
+  if(!result||!result.ok){
+    throw new Error(result?.error||'Edge TTS lỗi không xác định');
+  }
+  // result.data là MP3 base64 → decode thành PCM WAV để merge được
+  const mp3Bytes=Uint8Array.from(atob(result.data),c=>c.charCodeAt(0));
+
+  // Decode MP3 → PCM bằng Web Audio API
+  const audioCtx=new (window.AudioContext||window.webkitAudioContext)();
+  const audioBuf=await audioCtx.decodeAudioData(mp3Bytes.buffer.slice(0));
+  // Lấy kênh mono, resample về 24kHz cho khớp pipeline
+  const pcm=audioBuf.getChannelData(0); // Float32 [-1,1]
+  const srcRate=audioBuf.sampleRate;
+  const dstRate=24000;
+  const ratio=srcRate/dstRate;
+  const outLen=Math.floor(pcm.length/ratio);
+  const int16=new Int16Array(outLen);
+  for(let i=0;i<outLen;i++){
+    const s=pcm[Math.floor(i*ratio)]||0;
+    int16[i]=Math.max(-32768,Math.min(32767,Math.round(s*32767)));
+  }
+  audioCtx.close();
+  // Trả về WAV (24kHz mono 16bit) để khớp với mergePcm/pcmToWav
+  return addWavHeader(new Uint8Array(int16.buffer),24000,1,16);
 }
 
 // Thêm WAV header cho PCM raw data từ Google TTS
