@@ -65,8 +65,8 @@ function synthesize(text, options = {}) {
     const audioChunks = [];
     let timeout = setTimeout(() => {
       try { ws.close(); } catch(e){}
-      reject(new Error('Edge TTS timeout (30s)'));
-    }, 30000);
+      reject(new Error('Edge TTS timeout (90s)'));
+    }, 90000);
 
     ws.on('open', () => {
       // 1. Gửi config

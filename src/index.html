@@ -3469,7 +3469,7 @@ function addWavHeader(pcmData, sampleRate=24000, numChannels=1, bitsPerSample=16
   return new Uint8Array(buf);
 }
 
-const TTS_SENTENCES_PER_CHUNK=16; // 16 câu/chunk → 6 phút ≈ 2-3 chunks
+const TTS_SENTENCES_PER_CHUNK=6; // 6 câu/chunk — Edge TTS xử lý nhanh hơn
 
 function ttsChunkText(text){
   const sentences=text

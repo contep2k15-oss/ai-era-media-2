@@ -9,9 +9,12 @@ const edgeTTS = require('./edge-tts');
 // Edge TTS handler — trả về MP3 base64
 ipcMain.handle('edge-tts', async (event, { text, voice, rate, pitch }) => {
   try {
+    console.log(`[Edge TTS] voice=${voice} text=${text.length} chars`);
     const buf = await edgeTTS.synthesize(text, { voice, rate, pitch });
+    console.log(`[Edge TTS] OK — ${buf.length} bytes`);
     return { ok: true, data: buf.toString('base64') };
   } catch (e) {
+    console.error(`[Edge TTS] FAIL:`, e.message);
     return { ok: false, error: e.message || 'Edge TTS loi' };
   }
 });
