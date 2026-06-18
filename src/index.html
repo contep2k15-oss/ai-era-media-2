@@ -3972,35 +3972,22 @@ async function igRunAll(){
     $(`igimg_${i}`).querySelector('div').innerHTML=`<div style="font-size:10px;color:var(--accent2)">🎨 Generating...</div>`;
 
     let imgB64=null,attempts=0;
-
-    while(attempts<5&&!imgB64){
+    while(attempts<3&&!imgB64){
       attempts++;
       try{
         imgB64=await igCallGeminiImage(imgApiKey,finalPrompt,primaryRefB64,imgEndpoint);
       }catch(e){
         const msg=e.message||'';
-        const isExhausted=msg.match(/exhausted|quota|limit|429|resource|không trả về|no image/i);
-        const isHighDemand=msg.match(/demand|retry|500|503|overload|temporarily|API key not valid|key not valid/i);
-
-        if(isExhausted&&attempts<5){
-          // Vertex quota exhausted → chờ lâu hơn rồi retry
-          const wait=attempts*15; // 15s, 30s, 45s
+        if(attempts<3){
+          const wait=attempts*10; // 10s, 20s — ngắn hơn trước
           for(let s=wait;s>0;s--){
             if(igStopped)break;
-            $(`igimg_${i}`).querySelector('div').innerHTML=`<div style="font-size:10px;color:var(--amber)">⏳ Vertex quota, retry ${attempts}/5 sau ${s}s</div>`;
-            await new Promise(r=>setTimeout(r,1000));
-          }
-        }else if(isHighDemand&&attempts<5){
-          const wait=attempts*15; // 15s, 30s, 45s
-          for(let s=wait;s>0;s--){
-            if(igStopped)break;
-            $(`igimg_${i}`).querySelector('div').innerHTML=`<div style="font-size:10px;color:var(--amber)">⏳ Server bận, retry ${attempts}/5 sau ${s}s</div>`;
+            $(`igimg_${i}`).querySelector('div').innerHTML=`<div style="font-size:10px;color:var(--amber)">⏳ Retry ${attempts}/3 sau ${s}s</div>`;
             await new Promise(r=>setTimeout(r,1000));
           }
         }else{
           $(`igimg_${i}`).classList.remove('loading');
           $(`igimg_${i}`).innerHTML=`<div style="text-align:center;padding:12px;color:var(--red);font-size:11px;">❌ ${esc(msg.slice(0,100))}</div>`;
-          break;
         }
       }
     }
@@ -4013,7 +4000,6 @@ async function igRunAll(){
 
     if(imgB64){
       const dataUrl='data:image/png;base64,'+imgB64;
-      // Dùng index cố định thay vì push để tránh race condition
       igGeneratedImages[i]={label:p.label,dataUrl};
       const el=$(`igimg_${i}`);
       if(el){
@@ -4022,20 +4008,43 @@ async function igRunAll(){
       }
       const labelEl=$(`iglabel_${i}`);
       if(labelEl) labelEl.innerHTML=`<span>${esc(p.label)}${p.refName?' · '+esc(p.refName):''}</span><button class="btn-ig-dl" onclick="igDlOne('${dataUrl}','${p.label.replace(/\./g,'_')}.png')" title="Download">⬇</button>`;
-      // Count thực tế từ array (bỏ undefined)
       const doneCount=igGeneratedImages.filter(Boolean).length;
       $('igResultsTitle').textContent=`✅ ${doneCount}/${total} ảnh`;
     }
   }
 
-  // Chạy tuần tự từng ảnh, delay 3s giữa mỗi ảnh
+  // === ADAPTIVE DELAY: tự điều chỉnh tốc độ ===
+  let adaptiveDelay=20000; // bắt đầu 20s
+  const DELAY_MIN=12000;   // tối thiểu 12s
+  const DELAY_MAX=40000;   // tối đa 40s
+  let consecutiveOK=0;     // đếm số ảnh OK liên tiếp
+
   for(let i=0;i<total;i+=PARALLEL){
     if(igStopped)break;
     while(igPaused){await new Promise(r=>setTimeout(r,200));if(igStopped)break;}
     const batch=[];
     for(let j=i;j<Math.min(i+PARALLEL,total);j++) batch.push(generateOne(j));
     await Promise.all(batch);
-    if(i+PARALLEL<total&&!igStopped) await new Promise(r=>setTimeout(r, i===0 ? 15000 : 20000)); // ảnh đầu 15s, sau 20s
+
+    // Điều chỉnh delay dựa trên kết quả
+    const lastOK=igGeneratedImages[i]!==null && igGeneratedImages[i]!==undefined;
+    if(lastOK){
+      consecutiveOK++;
+      // 3 ảnh OK liên tiếp → giảm delay 2s (min 12s)
+      if(consecutiveOK>=3){
+        adaptiveDelay=Math.max(DELAY_MIN, adaptiveDelay-2000);
+        consecutiveOK=0;
+      }
+    }else{
+      consecutiveOK=0;
+      // Bị lỗi → tăng delay 8s (max 40s)
+      adaptiveDelay=Math.min(DELAY_MAX, adaptiveDelay+8000);
+    }
+
+    if(i+PARALLEL<total&&!igStopped){
+      $('igProgLabel').textContent=`🎨 ${igGeneratedImages.filter(Boolean).length}/${total} xong… delay ${Math.round(adaptiveDelay/1000)}s`;
+      await new Promise(r=>setTimeout(r,adaptiveDelay));
+    }
   }
 
   if(igStopped){
