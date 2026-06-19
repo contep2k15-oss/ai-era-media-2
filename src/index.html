@@ -776,6 +776,19 @@ html,body{height:100%;overflow:hidden;background:var(--bg0);color:var(--text);fo
     Áp dụng Visual DNA trước để nhân vật thừa hưởng phong cách video
   </div>
 
+  <!-- Export / Import JSON nhân vật + ảnh ref + style project -->
+  <div style="display:flex;gap:6px;margin-top:8px;margin-bottom:8px;">
+    <button onclick="igExportChars()" style="flex:1;padding:7px 8px;background:var(--bg3);border:1px solid var(--border2);border-radius:var(--rs);color:var(--text2);font-size:11px;font-weight:600;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:5px;">
+      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+      Export JSON
+    </button>
+    <button onclick="document.getElementById('csImportFile').click()" style="flex:1;padding:7px 8px;background:var(--bg3);border:1px solid var(--border2);border-radius:var(--rs);color:var(--text2);font-size:11px;font-weight:600;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:5px;">
+      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+      Import JSON
+    </button>
+    <input type="file" id="csImportFile" accept=".json" style="display:none" onchange="igImportChars(this)">
+  </div>
+
   <div class="status" id="statusEl">
     <div class="spin-lg"></div>
     <div><div class="status-main" id="statusMain">Đang phân tích…</div><div class="status-sub" id="statusSub"></div></div>
@@ -1411,18 +1424,7 @@ html,body{height:100%;overflow:hidden;background:var(--bg0);color:var(--text);fo
         <div class="section-sub">Generate 1 lần, dùng cho tất cả prompt</div>
       </div>
       <div class="block-body">
-        <!-- Export / Import -->
-        <div style="display:flex;gap:6px;margin-bottom:8px;">
-          <button onclick="igExportChars()" style="flex:1;padding:6px 8px;background:var(--bg3);border:1px solid var(--border2);border-radius:var(--rs);color:var(--text2);font-size:11px;font-weight:600;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:4px;">
-            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-            Export JSON
-          </button>
-          <button onclick="document.getElementById('igImportFile').click()" style="flex:1;padding:6px 8px;background:var(--bg3);border:1px solid var(--border2);border-radius:var(--rs);color:var(--text2);font-size:11px;font-weight:600;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:4px;">
-            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
-            Import JSON
-          </button>
-          <input type="file" id="igImportFile" accept=".json" style="display:none" onchange="igImportChars(this)">
-        </div>
+        <!-- Export/Import đã chuyển sang tab Script & Style -->
         <!-- Nút tạo tất cả ref song song -->
         <button onclick="igGenerateAllRefs()" id="igBtnAllRefs" style="width:100%;margin-bottom:8px;padding:7px;background:var(--bg3);border:1px solid var(--border2);border-radius:var(--rs);color:var(--text2);font-size:11px;font-weight:600;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:5px;">
           <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="5 3 19 12 5 21 5 3"/></svg>
@@ -2838,9 +2840,10 @@ async function peRunBatch(apiKey,batchIndex,totalBatches){
   // Resolve style: auto → use lastProject.art_style, fallback to cinematic
   let styleDesc;
   if(peStyle==='auto'){
-    const medium=lastProject?.medium||'';
-    const style=lastProject?.style||lastProject?.art_style||'';
-    const visualDna=lastProject?.visual_dna||'';
+    const sa=lastProject?.style_analysis||{};
+    const medium=sa.medium||lastProject?.medium||'';
+    const style=sa.style||lastProject?.art_style||lastProject?.style||'';
+    const visualDna=sa.visual_dna||lastProject?.visual_dna||'';
     const autoStyle=[medium,style].filter(Boolean).join(', ');
     if(visualDna){
       // Dùng FULL Visual DNA để khóa phong cách chính xác
@@ -3927,6 +3930,8 @@ async function igRunAll(){
         </div>
       </div>
       <div class="ig-card-label" id="iglabel_${i}"><span>${esc(p.label)}${p.refName?' · '+esc(p.refName):''}</span></div>
+      <textarea class="ig-prompt-edit" id="igprompt_${i}" rows="2" style="width:100%;font-size:10px;padding:4px 6px;background:var(--bg2);color:var(--text2);border:1px solid var(--border2);border-radius:4px;resize:vertical;margin-top:2px;display:none;">${esc(p.raw)}</textarea>
+      <button class="btn-ig-edit" id="igediBtn_${i}" onclick="igTogglePrompt(${i})" style="width:100%;padding:3px;background:none;border:1px solid var(--border2);border-radius:4px;color:var(--text3);font-size:10px;cursor:pointer;margin-top:2px;">✏️ Sửa prompt</button>
     </div>`).join('');
   $('igResultsTitle').textContent=`Đang khởi động pipeline… 0/${total}`;
 
@@ -4061,11 +4066,28 @@ async function igRunAll(){
 }
 
 // ── TẠO LẠI 1 ẢNH CỤ THỂ ──
+function igTogglePrompt(i){
+  var ta=$('igprompt_'+i);
+  if(!ta)return;
+  if(ta.style.display==='none'){
+    ta.style.display='block';
+    $('igediBtn_'+i).textContent='🔽 Ẩn prompt';
+  }else{
+    ta.style.display='none';
+    $('igediBtn_'+i).textContent='✏️ Sửa prompt';
+    // Cập nhật prompt đã sửa vào igParsedPrompts
+    if(igParsedPrompts[i]) igParsedPrompts[i].raw=ta.value;
+  }
+}
+
 async function igRegenOne(i){
   const apiKey=$('apiKey').value.trim();
   if(!apiKey){alert('Vui lòng nhập API key.');return;}
   const p=igParsedPrompts[i];
   if(!p)return;
+  // Đọc prompt từ textarea nếu user đã sửa
+  var editedTA=$('igprompt_'+i);
+  if(editedTA&&editedTA.value) p.raw=editedTA.value;
 
   const imgApiKey=apiKey;
   const imgEndpoint=null; // Vertex only
@@ -4114,60 +4136,109 @@ async function igRegenOne(i){
 
 // ── EXPORT / IMPORT NHÂN VẬT ──
 function igExportChars(){
-  const chars=Object.keys(igRefImages);
-  if(!chars.length){alert('Chưa có ảnh tham chiếu nào để export.');return;}
-  const data={
-    version:'1.0',
+  if(!lastChars.length && !Object.keys(igRefImages).length){
+    alert('Chua co nhan vat hoac anh tham chieu nao de export.');return;
+  }
+  var sa=lastProject?.style_analysis||{};
+  var data={
+    version:'3.0',
     exportedAt:new Date().toISOString(),
-    projectTitle:lastProject?.title||'AI Era Media Project',
-    characters:chars.map(name=>({
-      name,
-      refImage: igRefImages[name]||null,
-      dna: igCharDNA[name]||null
-    }))
+    project:{
+      title:lastProject?.title||'',
+      medium:sa.medium||'',
+      genre:sa.genre||lastProject?.genre||'',
+      style:sa.style||lastProject?.art_style||'',
+      niche:sa.niche||'',
+      visual_dna:sa.visual_dna||lastProject?.visual_dna||'',
+      tone:lastProject?.tone||'',
+      time_period:lastProject?.time_period||''
+    },
+    characters:lastChars.map(function(c){
+      return {
+        name:c.name,
+        role:c.role||'',
+        archetype:c.archetype||'',
+        gender:c.gender||'',
+        age_range:c.age_range||'',
+        appearance:c.appearance||{},
+        outfit:c.outfit||'',
+        personality_tags:c.personality_tags||[],
+        role_in_story:c.role_in_story||'',
+        ai_prompt:c.ai_prompt||'',
+        negative_prompt:c.negative_prompt||'',
+        refImage:igRefImages[c.name]||null,
+        dna:igCharDNA[c.name]||null
+      };
+    })
   };
-  const json=JSON.stringify(data,null,2);
-  const blob=new Blob([json],{type:'application/json'});
-  const url=URL.createObjectURL(blob);
-  const a=document.createElement('a');
-  a.href=url;
-  a.download=`characters_${(lastProject?.title||'project').replace(/\s+/g,'_')}_${new Date().toISOString().slice(0,10)}.json`;
-  document.body.appendChild(a);a.click();document.body.removeChild(a);
-  URL.revokeObjectURL(url);
+  var json=JSON.stringify(data,null,2);
+  var blob=new Blob([json],{type:'application/json'});
+  var a=document.createElement('a');
+  a.href=URL.createObjectURL(blob);
+  a.download='characters_'+(data.project.title||'project').replace(/\s+/g,'_')+'_'+new Date().toISOString().slice(0,10)+'.json';
+  a.click();
+  URL.revokeObjectURL(a.href);
 }
 
 function igImportChars(input){
-  const file=input.files[0];
+  var file=input.files[0];
   if(!file)return;
-  const reader=new FileReader();
-  reader.onload=e=>{
+  var reader=new FileReader();
+  reader.onload=function(e){
     try{
-      const data=JSON.parse(e.target.result);
+      var data=JSON.parse(e.target.result);
       if(!data.characters||!Array.isArray(data.characters)){
-        alert('File JSON không đúng định dạng.');return;
+        alert('File JSON khong dung dinh dang.');return;
       }
-      let loaded=0;
+      // Restore project style (v3.0+)
+      if(data.project){
+        var p=data.project;
+        if(!lastProject||typeof lastProject!=='object') lastProject={};
+        if(p.title) lastProject.title=p.title;
+        if(p.tone) lastProject.tone=p.tone;
+        if(p.time_period) lastProject.time_period=p.time_period;
+        if(p.genre) lastProject.genre=p.genre;
+        if(p.style||p.medium||p.visual_dna){
+          if(!lastProject.style_analysis) lastProject.style_analysis={};
+          if(p.medium) lastProject.style_analysis.medium=p.medium;
+          if(p.genre) lastProject.style_analysis.genre=p.genre;
+          if(p.style){lastProject.style_analysis.style=p.style;lastProject.art_style=p.style;}
+          if(p.niche) lastProject.style_analysis.niche=p.niche;
+          if(p.visual_dna){lastProject.style_analysis.visual_dna=p.visual_dna;lastProject.visual_dna=p.visual_dna;}
+        }
+      }
+      // Restore characters
+      var loaded=0,refs=0;
       data.characters.forEach(function(char){
         if(!char.name)return;
-        if(char.refImage) igRefImages[char.name]=char.refImage;
+        if(char.refImage){igRefImages[char.name]=char.refImage;refs++;}
         if(char.dna) igCharDNA[char.name]=char.dna;
         var existing=lastChars.findIndex(function(c){return c.name===char.name;});
+        var entry={
+          name:char.name,role:char.role||'sub',archetype:char.archetype||'',
+          gender:char.gender||'',age_range:char.age_range||'',
+          appearance:char.appearance||{},outfit:char.outfit||'',
+          personality_tags:char.personality_tags||[],
+          role_in_story:char.role_in_story||'',
+          ai_prompt:char.ai_prompt||'',negative_prompt:char.negative_prompt||''
+        };
         if(existing>=0){
-          if(char.role) lastChars[existing].role=char.role;
-          if(char.archetype) lastChars[existing].archetype=char.archetype;
+          Object.keys(entry).forEach(function(k){if(entry[k]&&entry[k]!=='')lastChars[existing][k]=entry[k];});
         }else{
-          lastChars.push({name:char.name,role:char.role||'sub',archetype:char.archetype||'',gender:char.gender||''});
+          lastChars.push(entry);
         }
         loaded++;
       });
       igRefreshCharGrid();
-      alert('Import xong: '+loaded+' nhan vat');
+      var msg='Import xong!\n- Nhan vat: '+loaded+'\n- Anh ref: '+refs;
+      if(data.project&&data.project.visual_dna) msg+='\n- Visual DNA: Co';
+      alert(msg);
     }catch(err){
-      alert('Lỗi đọc file JSON: '+err.message);
+      alert('Loi doc file: '+err.message);
     }
   };
   reader.readAsText(file);
-  input.value=''; // reset để có thể import lại cùng file
+  input.value='';
 }
 
 function igDlOne(dataUrl,filename){
