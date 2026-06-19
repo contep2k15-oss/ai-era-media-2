@@ -2838,10 +2838,18 @@ async function peRunBatch(apiKey,batchIndex,totalBatches){
   // Resolve style: auto → use lastProject.art_style, fallback to cinematic
   let styleDesc;
   if(peStyle==='auto'){
-    const autoStyle=lastProject?.art_style||lastProject?.genre||'';
-    styleDesc=autoStyle
-      ?`${autoStyle} style, consistent with the video's visual aesthetic, 8K resolution, ultra-detailed`
-      :PE_STYLE_PROMPTS.cinematic;
+    const medium=lastProject?.medium||'';
+    const style=lastProject?.style||lastProject?.art_style||'';
+    const visualDna=lastProject?.visual_dna||'';
+    const autoStyle=[medium,style].filter(Boolean).join(', ');
+    if(visualDna){
+      // Dùng FULL Visual DNA để khóa phong cách chính xác
+      styleDesc=`${autoStyle}. Visual DNA: ${visualDna}. Strictly maintain this exact visual style for ALL images`;
+    }else if(autoStyle){
+      styleDesc=`${autoStyle} style, consistent with the video's visual aesthetic, 8K resolution, ultra-detailed`;
+    }else{
+      styleDesc=PE_STYLE_PROMPTS.cinematic;
+    }
   } else {
     styleDesc=PE_STYLE_PROMPTS[peStyle]||PE_STYLE_PROMPTS.cinematic;
   }
@@ -2853,7 +2861,7 @@ async function peRunBatch(apiKey,batchIndex,totalBatches){
   const batchEnd=Math.min(batchStart+peBatchSize,peScenes.length);
   const batchScenes=peScenes.slice(batchStart,batchEnd);
 
-  const styleAnchor=styleDesc.split(',').slice(0,4).join(',');
+  const styleAnchor=styleDesc.split(',').slice(0,8).join(','); // 8 phần đủ chi tiết để khóa style
 
   // REF tags with English role labels
   const refTags=[...peSelectedChars].map(i=>{
@@ -2890,9 +2898,9 @@ COMPOSITION RULE: ALL shots must use wide cinematic framing. Even close-up shots
 
 PROMPT STRUCTURE:
 - [N.A] Establishing Shot: wide environment/location ONLY, camera pulls back far to show full setting. No REF tags. No character names or appearance. 50-70 words. End with: "${styleMatchNote} No text. No watermarks."
-- [N.B] Action Shot: REF tag(s) first, then exact action/pose/expression from the audio, wide shot showing character in environment context. 40-60 words. End with: "${styleAnchor}. ${compositionRule}. [add refer note ONLY for characters tagged in this prompt] No text. No watermarks."
-- [N.C] Emotion/Detail Shot: REF tag(s) first, medium close-up showing character face AND surrounding environment visible on both sides (NOT tight crop). 40-60 words. End with: "${styleAnchor}. ${compositionRule}. [add refer note ONLY for characters tagged in this prompt] No text. No watermarks."
-- [N.D] Bonus Angle: REF tag(s) first, creative angle (overhead/low/silhouette) in wide cinematic frame. 40-60 words. End with: "${styleAnchor}. ${compositionRule}. [add refer note ONLY for characters tagged in this prompt] No text. No watermarks."
+- [N.B] Action Shot: REF tag(s) first, then exact action/pose/expression from the audio, wide shot showing character in environment context. 40-60 words. End with: "${styleMatchNote} ${compositionRule}. [add refer note ONLY for characters tagged in this prompt] No text. No watermarks."
+- [N.C] Emotion/Detail Shot: REF tag(s) first, medium close-up showing character face AND surrounding environment visible on both sides (NOT tight crop). 40-60 words. End with: "${styleMatchNote} ${compositionRule}. [add refer note ONLY for characters tagged in this prompt] No text. No watermarks."
+- [N.D] Bonus Angle: REF tag(s) first, creative angle (overhead/low/silhouette) in wide cinematic frame. 40-60 words. End with: "${styleMatchNote} ${compositionRule}. [add refer note ONLY for characters tagged in this prompt] No text. No watermarks."
 
 RULES:
 1. [N.A] — NO REF tags, NO character appearance description whatsoever
