@@ -863,6 +863,14 @@ html,body{height:100%;overflow:hidden;background:var(--bg0);color:var(--text);fo
         </div>
         <div style="margin-top:6px;font-size:10px;color:var(--text3);">Đăng nhập 1 lần · Token tự gia hạn · Image Gen dùng credit thay AI Studio</div>
       </div>
+
+      <div class="settings-section" style="margin-top:12px;padding-top:12px;border-top:1px solid var(--border2);">
+        <div class="settings-label">Công cụ Debug</div>
+        <button onclick="window.electronAPI?.toggleDevTools()" style="padding:7px 14px;background:var(--bg3);border:1px solid var(--border2);border-radius:7px;color:var(--text2);font-size:12px;font-weight:600;cursor:pointer;">
+          🛠️ Bật / Tắt DevTools
+        </button>
+        <div style="margin-top:5px;font-size:10px;color:var(--text3);">Mở bảng kiểm tra lỗi (Console) — chỉ dùng khi cần debug</div>
+      </div>
     </div>
   </div>
 </div>
@@ -2021,28 +2029,15 @@ function renderStyleAnalysisCard(sa, proj){
       ${proj.time_period?`<div class="va-item"><span class="va-label">Thời đại</span><span class="va-val">${esc(proj.time_period)}</span></div>`:''}
     </div>`:''}
     <div id="dnaApplyStatus" style="padding:8px 12px;background:${dnaApplied?'rgba(16,185,129,0.1)':'rgba(245,158,11,0.1)'};border:1px solid ${dnaApplied?'rgba(16,185,129,0.3)':'rgba(245,158,11,0.3)'};border-radius:var(--rs);font-size:11px;color:${dnaApplied?'var(--green)':'var(--amber)'};text-align:center;margin-bottom:8px;">
-      ${dnaApplied?'✅ Visual DNA đã áp dụng':'⚡ Chọn tab muốn áp dụng Visual DNA'}
+      ${dnaApplied?'✅ Visual DNA đã áp dụng vào toàn bộ dự án':'⚡ Bấm nút bên dưới để áp dụng Visual DNA vào tất cả tab'}
     </div>
     ${sa.visual_dna?`
-    <div style="background:var(--bg2);border:1px solid var(--border2);border-radius:var(--rs);padding:10px;margin-bottom:8px;">
-      <div style="font-size:10px;font-weight:700;color:var(--text3);text-transform:uppercase;margin-bottom:8px;">Áp dụng vào:</div>
-      <div style="display:flex;flex-direction:column;gap:6px;margin-bottom:10px;">
-        <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:12px;color:var(--text2);">
-          <input type="checkbox" id="dnaChkChar" checked style="width:14px;height:14px;accent-color:var(--accent);cursor:pointer;">
-          Character Sheet <span style="font-size:10px;color:var(--text3);">— prompt nhân vật</span>
-        </label>
-        <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:12px;color:var(--text2);">
-          <input type="checkbox" id="dnaChkPE" checked style="width:14px;height:14px;accent-color:var(--accent);cursor:pointer;">
-          Storyboard <span style="font-size:10px;color:var(--text3);">— tạo prompt ảnh</span>
-        </label>
-        <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:12px;color:var(--text2);">
-          <input type="checkbox" id="dnaChkIG" checked style="width:14px;height:14px;accent-color:var(--accent);cursor:pointer;">
-          Image Gen <span style="font-size:10px;color:var(--text3);">— generate ảnh</span>
-        </label>
-      </div>
-      <button onclick="igApplyStyle('${esc(sa.visual_dna).replace(/'/g,'\\\'')}',event)" style="width:100%;padding:9px;background:#10b981;border:none;border-radius:var(--rs);color:#0a0f0e;font-size:12px;font-weight:700;cursor:pointer;">
-        ✦ Áp dụng Visual DNA
+    <div style="margin-bottom:8px;">
+      <button onclick="igApplyStyle('${esc(sa.visual_dna).replace(/'/g,'\\\'')}')" 
+        style="width:100%;padding:9px;background:#10b981;border:none;border-radius:var(--rs);color:#0a0f0e;font-size:12px;font-weight:700;cursor:pointer;">
+        ✦ Áp dụng Visual DNA vào toàn bộ dự án
       </button>
+      <div style="font-size:10px;color:var(--text3);text-align:center;margin-top:5px;">Ghi đè style cho: Character Sheet · Storyboard · Image Gen</div>
     </div>`:''}
   `;
 }
@@ -2161,50 +2156,41 @@ Return ONLY valid JSON matching this schema: ${schema}`;
 }
 
 // ── ÁP DỤNG VISUAL DNA VÀO DỰ ÁN ──
-function igApplyStyle(visualDna,evt){
+function igApplyStyle(visualDna){
   if(!visualDna)return;
 
-  const chkChar=$('dnaChkChar')?.checked;
-  const chkPE=$('dnaChkPE')?.checked;
-  const chkIG=$('dnaChkIG')?.checked;
-
-  if(chkChar){igDNA_CHAR=visualDna;igProjectStyleDNA=visualDna;}
-  else igDNA_CHAR='';
-
-  if(chkPE) igDNA_PE=visualDna;
-  else igDNA_PE='';
-
-  if(chkIG) igDNA_IG=visualDna;
-  else igDNA_IG='';
-
+  // Luôn ghi đè TẤT CẢ — không cần checkbox
+  igDNA_CHAR=visualDna;
+  igProjectStyleDNA=visualDna;
+  igDNA_PE=visualDna;
+  igDNA_IG=visualDna;
   lastAnalyzedDNA=visualDna;
+
+  // Cập nhật lastProject để Storyboard "auto" đọc đúng DNA
+  if(!lastProject.style_analysis) lastProject.style_analysis={};
+  lastProject.style_analysis.visual_dna=visualDna;
+  lastProject.visual_dna=visualDna;
+
+  // Cập nhật label Storyboard style nếu đang chọn auto
+  if(typeof peStyle!=='undefined' && peStyle==='auto'){
+    const subEl=$('peCharSubLabel');
+    if(subEl) subEl.textContent=`Tự động theo video: "${visualDna.split(',').slice(0,4).join(',').trim()}…"`;
+  }
 
   // Update status
   const status=$('dnaApplyStatus');
   if(status){
-    const applied=[];
-    if(chkChar)applied.push('Character Sheet');
-    if(chkPE)applied.push('Storyboard');
-    if(chkIG)applied.push('Image Gen');
     status.style.background='rgba(16,185,129,0.1)';
     status.style.borderColor='rgba(16,185,129,0.3)';
     status.style.color='var(--green)';
-    status.textContent=applied.length
-      ?`✅ Đã áp dụng vào: ${applied.join(' · ')}`
-      :'⚠ Chưa chọn tab nào';
+    status.textContent='✅ Đã áp dụng Visual DNA vào: Character Sheet · Storyboard · Image Gen';
   }
 
-  if(chkChar){
-    const genBtn=$('genBtn');
-    if(genBtn){
-      genBtn.style.background='';
-      genBtn.style.border='';
-      genBtn.style.color='';
-      genBtn.style.opacity='1';
-    }
-    const hint=$('genBtnHint');
-    if(hint)hint.style.display='none';
-  }
+  // Unlock nút Tạo Character Sheet
+  const genBtn=$('genBtn');
+  if(genBtn){genBtn.style.background='';genBtn.style.border='';genBtn.style.color='';genBtn.style.opacity='1';}
+  const hint=$('genBtnHint');
+  if(hint)hint.style.display='none';
 }
 
 function getRoleClass(role){return ROLE_CLASSES[role]||'role-other';}
@@ -2663,10 +2649,10 @@ function selectPeStyle(s){
   document.querySelectorAll('[id^="pestyle-"]').forEach(c=>c.classList.remove('active'));
   $('pestyle-'+s)?.classList.add('active');
   if(s==='auto'){
-    const autoStyle=lastProject?.art_style||lastProject?.genre||'';
+    const visualDna=lastProject?.style_analysis?.visual_dna||lastProject?.visual_dna||'';
     const subEl=$('peCharSubLabel');
-    if(autoStyle) subEl.textContent=`Tự động theo video: "${autoStyle}"`;
-    else subEl.textContent='⚠ Chưa có dữ liệu video — hãy tạo Character Sheet trước';
+    if(visualDna) subEl.textContent=`Tự động theo video: "${visualDna.split(',').slice(0,4).join(',').trim()}…"`;
+    else subEl.textContent='⚠ Chưa có Visual DNA — hãy phân tích video ở tab Script & Style trước';
   } else {
     const subEl=$('peCharSubLabel');
     if(subEl.textContent.startsWith('Tự động') || subEl.textContent.startsWith('⚠'))

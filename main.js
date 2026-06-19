@@ -204,7 +204,6 @@ function createWindow() {
   });
   win.loadFile(path.join(__dirname, 'src', 'index.html'));
   win.once('ready-to-show', () => win.show());
-  win.webContents.openDevTools(); // DEBUG — xóa sau khi test xong
   win.webContents.setWindowOpenHandler(({ url }) => {
     shell.openExternal(url); return { action: 'deny' };
   });
@@ -216,6 +215,12 @@ ipcMain.on('win-maximize', () => {
   if (win?.isMaximized()) win.unmaximize(); else win?.maximize();
 });
 ipcMain.on('win-close', () => BrowserWindow.getFocusedWindow()?.close());
+ipcMain.on('toggle-devtools', () => {
+  const win = BrowserWindow.getFocusedWindow();
+  if (!win) return;
+  if (win.webContents.isDevToolsOpened()) win.webContents.closeDevTools();
+  else win.webContents.openDevTools();
+});
 
 ipcMain.handle('open-file', async (event, filePath) => {
   shell.showItemInFolder(filePath);
