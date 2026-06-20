@@ -637,6 +637,30 @@ html,body{height:100%;overflow:hidden;background:var(--bg0);color:var(--text);fo
 </head>
 <body>
 
+<!-- ── LICENSE GATE ── -->
+<div id="licenseGate" style="position:fixed;inset:0;background:#080c12;z-index:99999;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:0;">
+  <div style="text-align:center;margin-bottom:28px;">
+    <div style="font-size:32px;margin-bottom:8px;">🔐</div>
+    <div style="font-size:20px;font-weight:800;color:#10b981;letter-spacing:.05em;">AI ERA MEDIA</div>
+    <div style="font-size:11px;color:#475569;margin-top:4px;">by Mr Duong</div>
+  </div>
+  <div id="licenseBox" style="width:340px;background:#0f1319;border:1px solid #1e293b;border-radius:12px;padding:24px;">
+    <div style="font-size:13px;font-weight:700;color:#e2e8f0;margin-bottom:16px;text-align:center;">Nhập License Key để tiếp tục</div>
+    <input id="licenseInput" type="text" placeholder="XXXX-XXXX-XXXX" autocomplete="off"
+      style="width:100%;padding:10px 14px;background:#141924;border:1px solid #1e293b;border-radius:8px;color:#e2e8f0;font-size:13px;font-family:monospace;text-align:center;letter-spacing:.08em;box-sizing:border-box;outline:none;"
+      onkeydown="if(event.key==='Enter')checkLicense()"
+      oninput="this.value=this.value.toUpperCase()"/>
+    <button onclick="checkLicense()" id="licenseBtn"
+      style="width:100%;margin-top:12px;padding:11px;background:#10b981;border:none;border-radius:8px;color:#0a0f0e;font-size:13px;font-weight:800;cursor:pointer;transition:opacity .15s;">
+      ✦ Kích hoạt
+    </button>
+    <div id="licenseMsg" style="margin-top:12px;font-size:11px;text-align:center;color:#475569;min-height:16px;"></div>
+  </div>
+  <div style="margin-top:20px;font-size:10px;color:#1e293b;">Liên hệ: <a href="https://zalo.me/0986001830" style="color:#10b981;text-decoration:none;">Zalo 0986001830</a></div>
+</div>
+
+<!-- ── LICENSE INFO (hiện trong Settings) ── -->
+
 <div class="app">
 
 <!-- TITLEBAR -->
@@ -656,6 +680,9 @@ html,body{height:100%;overflow:hidden;background:var(--bg0);color:var(--text);fo
   <button class="btn-settings" id="btnInstall" onclick="installPWA()" title="Cài app ra Desktop" style="display:none;color:var(--accent2);border-color:rgba(16,185,129,.3);">
     <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
   </button>
+  <a href="https://zalo.me/0986001830" target="_blank" style="display:flex;align-items:center;gap:5px;padding:4px 10px;background:rgba(16,185,129,0.08);border:1px solid rgba(16,185,129,0.25);border-radius:var(--rs);color:var(--green);font-size:11px;font-weight:700;text-decoration:none;cursor:pointer;transition:all .15s;-webkit-app-region:no-drag;" onmouseover="this.style.background='rgba(16,185,129,0.18)'" onmouseout="this.style.background='rgba(16,185,129,0.08)'" title="Liên hệ Mr Duong qua Zalo">
+    <span style="font-size:13px;">👨‍💻</span> Mr Duong
+  </a>
   <button class="btn-settings" onclick="openSettings()" title="Cài đặt">
     <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
   </button>
@@ -851,7 +878,7 @@ html,body{height:100%;overflow:hidden;background:var(--bg0);color:var(--text);fo
       </div>
 
       <div class="settings-section" style="margin-top:12px;padding-top:12px;border-top:1px solid var(--border2);">
-        <div class="settings-label">Vertex AI <span style="font-size:10px;font-weight:400;color:var(--text3);">— Dùng $300 Google Cloud credit cho Image Gen</span></div>
+        <div class="settings-label">Vertex AI <span style="font-size:10px;font-weight:400;color:var(--text3);">— Vertex AI Image Generation</span></div>
         <div id="vertexAuthStatus" style="margin-bottom:8px;font-size:12px;color:var(--text3);">Đang kiểm tra...</div>
         <div style="display:flex;gap:8px;">
           <button id="vertexLoginBtn" onclick="vertexLogin()" style="padding:7px 14px;background:#6366f1;border:none;border-radius:7px;color:#fff;font-size:12px;font-weight:700;cursor:pointer;">
@@ -861,7 +888,32 @@ html,body{height:100%;overflow:hidden;background:var(--bg0);color:var(--text);fo
             Ngắt kết nối
           </button>
         </div>
-        <div style="margin-top:6px;font-size:10px;color:var(--text3);">Đăng nhập 1 lần · Token tự gia hạn · Image Gen dùng credit thay AI Studio</div>
+        <div style="margin-top:6px;font-size:10px;color:var(--text3);">Đăng nhập 1 lần · Token tự gia hạn · Image Gen qua Vertex AI</div>
+      </div>
+
+      <div class="settings-section" style="margin-top:12px;padding-top:12px;border-top:1px solid var(--border2);">
+        <div class="settings-label">Thông tin License</div>
+        <div id="settingsLicenseInfo" style="background:var(--bg2);border:1px solid var(--border2);border-radius:8px;padding:10px 14px;font-size:11px;">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
+            <span style="color:var(--text3);">Key:</span>
+            <span id="sLicKey" style="font-family:monospace;color:var(--green);font-weight:700;">—</span>
+          </div>
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
+            <span style="color:var(--text3);">Người dùng:</span>
+            <span id="sLicUser" style="color:var(--text);">—</span>
+          </div>
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
+            <span style="color:var(--text3);">Hết hạn:</span>
+            <span id="sLicExpiry" style="color:var(--amber);font-weight:700;">—</span>
+          </div>
+          <div style="display:flex;justify-content:space-between;align-items:center;">
+            <span style="color:var(--text3);">Còn lại:</span>
+            <span id="sLicDays" style="color:var(--green);font-weight:700;">—</span>
+          </div>
+        </div>
+        <button onclick="logoutLicense()" style="margin-top:8px;padding:6px 12px;background:var(--bg3);border:1px solid var(--border2);border-radius:7px;color:var(--red);font-size:11px;font-weight:600;cursor:pointer;">
+          🔓 Đăng xuất License
+        </button>
       </div>
 
       <div class="settings-section" style="margin-top:12px;padding-top:12px;border-top:1px solid var(--border2);">
@@ -1792,7 +1844,7 @@ async function vertexCheckAuth(){
   try{
     const res=await window.electronAPI.googleAuthStatus();
     if(res.loggedIn){
-      if(status){status.textContent='✅ Đã kết nối Google Cloud — Image Gen dùng $300 credit';status.style.color='var(--green)';}
+      if(status){status.textContent='✅ Đã kết nối Google Cloud — Vertex AI sẵn sàng';status.style.color='var(--green)';}
       if(loginBtn)loginBtn.style.display='none';
       if(logoutBtn)logoutBtn.style.display='';
     } else {
@@ -5336,6 +5388,172 @@ function asUseAsScript(){
     $('peScript').scrollIntoView({behavior:'smooth',block:'center'});
   },100);
 }
+
+// ══════════════════════════════════════════
+// LICENSE SYSTEM
+// ══════════════════════════════════════════
+const LICENSE_API = 'https://script.google.com/macros/s/AKfycbzObsTdR50rTAYqw1thwcS21vz3k7ShHsqbarO_Y8hoobvNqrtgB529lbkj2scGN3qY/exec';
+const LICENSE_SECRET = 'aieramedia_mrduong_2026';
+const LICENSE_CACHE_KEY = 'aiem_license_cache';
+const LICENSE_CACHE_TTL = 24 * 60 * 60 * 1000; // 24 giờ
+
+function licMD5Sig(key) {
+  // Tính MD5 đơn giản bằng cách dùng SubtleCrypto — async
+  // Dùng hàm sync đơn giản để tránh phức tạp
+  // Ta dùng chuỗi sig = btoa(key + SECRET) để match với server
+  // Server sẽ được update để dùng cùng logic
+  let str = key + LICENSE_SECRET;
+  let hash = 0;
+  for (let i = 0; i < str.length; i++) {
+    const chr = str.charCodeAt(i);
+    hash = ((hash << 5) - hash) + chr;
+    hash |= 0;
+  }
+  return Math.abs(hash).toString(16).padStart(8,'0');
+}
+
+async function licCheckOnline(key) {
+  const sig = licMD5Sig(key);
+  const url = `${LICENSE_API}?key=${encodeURIComponent(key)}&sig=${sig}`;
+  const res = await fetch(url);
+  return await res.json();
+}
+
+function licSaveCache(key, data) {
+  localStorage.setItem(LICENSE_CACHE_KEY, JSON.stringify({
+    key, data, ts: Date.now()
+  }));
+}
+
+function licLoadCache() {
+  try {
+    const raw = localStorage.getItem(LICENSE_CACHE_KEY);
+    if (!raw) return null;
+    const obj = JSON.parse(raw);
+    if (Date.now() - obj.ts > LICENSE_CACHE_TTL) return null; // hết hạn cache
+    return obj;
+  } catch(e) { return null; }
+}
+
+function licClearCache() {
+  localStorage.removeItem(LICENSE_CACHE_KEY);
+}
+
+function licShowGate(msg='') {
+  const gate = document.getElementById('licenseGate');
+  if (gate) gate.style.display = 'flex';
+  if (msg) {
+    const el = document.getElementById('licenseMsg');
+    if (el) { el.textContent = msg; el.style.color = '#ef4444'; }
+  }
+}
+
+function licHideGate(data, key) {
+  const gate = document.getElementById('licenseGate');
+  if (gate) gate.style.display = 'none';
+  // Cập nhật Settings
+  const fmt = (d) => {
+    const dt = new Date(d);
+    return dt.toLocaleDateString('vi-VN');
+  };
+  const el = (id) => document.getElementById(id);
+  if (el('sLicKey'))    el('sLicKey').textContent    = key;
+  if (el('sLicUser'))   el('sLicUser').textContent   = data.user || '—';
+  if (el('sLicExpiry')) el('sLicExpiry').textContent = fmt(data.expiry);
+  if (el('sLicDays'))   el('sLicDays').textContent   = `${data.days_left} ngày`;
+  if (data.days_left <= 7) {
+    if (el('sLicDays')) el('sLicDays').style.color = '#ef4444';
+    if (el('sLicExpiry')) el('sLicExpiry').style.color = '#ef4444';
+  }
+}
+
+function logoutLicense() {
+  if (!confirm('Đăng xuất license? Bạn sẽ cần nhập lại key khi mở app.')) return;
+  licClearCache();
+  closeSettings();
+  location.reload();
+}
+
+async function checkLicense() {
+  const key = (document.getElementById('licenseInput')?.value || '').trim().toUpperCase();
+  if (!key) {
+    document.getElementById('licenseMsg').textContent = 'Vui lòng nhập license key';
+    document.getElementById('licenseMsg').style.color = '#ef4444';
+    return;
+  }
+  const btn = document.getElementById('licenseBtn');
+  const msg = document.getElementById('licenseMsg');
+  btn.disabled = true;
+  btn.textContent = '⏳ Đang kiểm tra…';
+  msg.style.color = '#64748b';
+  msg.textContent = 'Đang kết nối server…';
+
+  try {
+    const result = await licCheckOnline(key);
+    if (result.valid) {
+      licSaveCache(key, result);
+      msg.style.color = '#10b981';
+      msg.textContent = `✅ Xin chào ${result.user}! Đang vào app…`;
+      setTimeout(() => licHideGate(result, key), 800);
+    } else {
+      btn.disabled = false;
+      btn.textContent = '✦ Kích hoạt';
+      const reasons = {
+        not_found: '❌ Key không tồn tại',
+        blocked:   '🚫 Key đã bị khóa. Liên hệ Mr Duong',
+        expired:   '⏰ Key đã hết hạn. Liên hệ Mr Duong để gia hạn',
+        invalid_request: '❌ Key không hợp lệ',
+      };
+      msg.style.color = '#ef4444';
+      msg.textContent = reasons[result.reason] || '❌ Lỗi không xác định';
+    }
+  } catch(e) {
+    // Lỗi mạng → check cache
+    const cache = licLoadCache();
+    if (cache && cache.key === key) {
+      msg.style.color = '#f59e0b';
+      msg.textContent = '⚠ Offline — dùng cache 24h';
+      setTimeout(() => licHideGate(cache.data, key), 800);
+    } else {
+      btn.disabled = false;
+      btn.textContent = '✦ Kích hoạt';
+      msg.style.color = '#ef4444';
+      msg.textContent = '❌ Không kết nối được server. Kiểm tra mạng.';
+    }
+  }
+}
+
+async function licInit() {
+  const cache = licLoadCache();
+  if (!cache) { licShowGate(); return; }
+
+  const key = cache.key;
+  // Thử verify online
+  try {
+    const result = await licCheckOnline(key);
+    if (result.valid) {
+      licSaveCache(key, result); // refresh cache
+      licHideGate(result, key);
+    } else {
+      licClearCache();
+      const reasons = {
+        blocked: 'Tài khoản của bạn đã bị khóa. Liên hệ Mr Duong.',
+        expired: 'License đã hết hạn. Liên hệ Mr Duong để gia hạn.',
+      };
+      licShowGate(reasons[result.reason] || 'License không hợp lệ.');
+    }
+  } catch(e) {
+    // Offline → dùng cache
+    licHideGate(cache.data, key);
+  }
+}
+
+// Khởi động check license khi load xong
+window.addEventListener('DOMContentLoaded', () => {
+  licInit();
+});
+
+
 </script>
 </body>
 </html>
