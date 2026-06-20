@@ -1752,7 +1752,7 @@ const API_TTS    = 'https://api.shopaikey.com'; // shopaikey — TTS only
 // ✅ Gemini 3.1 → Agent Platform, bắt buộc dùng global endpoint
 const API_VERTEX_GLOBAL   = 'https://aiplatform.googleapis.com';
 const API_VERTEX_REGIONAL = 'https://us-central1-aiplatform.googleapis.com';
-const VERTEX_PROJECT_ID   = 'gen-lang-client-0682538223';
+// _cachedProjectId tự động detect qua getVertexProjectId()
 
 const VERTEX_MODELS = {
   [MODEL_TEXT]:        { id: 'gemini-3.1-flash-lite',        region: 'global'      },
@@ -1766,7 +1766,7 @@ function getVertexUrl(model){
   const vModel   = entry ? entry.id     : model;
   const location = entry ? entry.region : 'global';
   const base     = location === 'global' ? API_VERTEX_GLOBAL : API_VERTEX_REGIONAL;
-  return `${base}/v1/projects/${VERTEX_PROJECT_ID}/locations/${location}/publishers/google/models/${vModel}:generateContent`;
+  return `${base}/v1/projects/${_cachedProjectId}/locations/${location}/publishers/google/models/${vModel}:generateContent`;
 }
 
 async function getVertexAccessToken(){
@@ -1859,11 +1859,13 @@ async function vertexLogin(){
   const btn=$('vertexLoginBtn');
   const status=$('vertexAuthStatus');
   if(btn){btn.disabled=true;btn.textContent='⏳ Đang mở trình duyệt...';}
+  if(status){status.textContent='⏳ Đang đăng nhập và tự động cấu hình Vertex AI...';status.style.color='var(--accent2)';}
   if(status){status.textContent='Đang chờ đăng nhập Google...';status.style.color='var(--accent2)';}
   try{
     const res=await window.electronAPI.googleOAuthLogin();
     if(res.success){
-      if(status){status.textContent='✅ Đã kết nối! Image Gen sẽ dùng $300 credit';status.style.color='var(--green)';}
+      const pid = res.projectId || await getVertexProjectId();
+      if(status){status.textContent=`✅ Đã kết nối! Project: ${pid} — Vertex AI sẵn sàng`;status.style.color='var(--green)';}
       const loginBtn=$('vertexLoginBtn');
       const logoutBtn=$('vertexLogoutBtn');
       if(loginBtn)loginBtn.style.display='none';
@@ -1891,7 +1893,16 @@ async function getVertexToken(){
 
 function saveVertexConfig(){}
 function loadVertexConfig(){ vertexCheckAuth(); }
-function getVertexProjectId(){ return 'gen-lang-client-0682538223'; }
+// Project ID tự động từ main process (sau OAuth login)
+let _cachedProjectId = 'gen-lang-client-0682538223'; // fallback
+
+async function getVertexProjectId() {
+  try {
+    const pid = await window.electronAPI?.googleGetProject?.();
+    if (pid) { _cachedProjectId = pid; return pid; }
+  } catch(e) {}
+  return _cachedProjectId;
+}
 
 function saveApiKey(){
   const key=$('apiKey').value.trim();
@@ -3972,7 +3983,7 @@ async function igRunAll(){
   if(!igParsedPrompts.length){alert('Chưa có prompt. Dán hoặc sync từ Storyboard.');return;}
 
   const total=igParsedPrompts.length;
-  let igDelay=20000,igConsecOK=0; // adaptive delay
+  let igDelay=30000; // delay cố định 30s/ảnh
 
   $('igBtnRun').disabled=true;
   $('igProgWrap').style.display='block';
@@ -4113,9 +4124,7 @@ async function igRunAll(){
     if(i+PARALLEL<total&&!igStopped){
       // Adaptive delay: OK liên tiếp → giảm, 429 → tăng
       const lastOK=igGeneratedImages[i]!=null;
-      if(lastOK){igConsecOK++;if(igConsecOK>=3){igDelay=Math.max(12000,igDelay-2000);igConsecOK=0;}}
-      else{igConsecOK=0;igDelay=Math.min(40000,igDelay+8000);}
-      $('igProgLabel').textContent=`🎨 ${igGeneratedImages.filter(Boolean).length}/${total} xong… delay ${Math.round(igDelay/1000)}s`;
+      $('igProgLabel').textContent=`🎨 ${igGeneratedImages.filter(Boolean).length}/${total} xong… chờ 30s`;
       await new Promise(r=>setTimeout(r,igDelay));
     }
   }
@@ -4267,9 +4276,13 @@ async function igRegenOne(i){
   if(!apiKey){alert('Vui lòng nhập API key.');return;}
   const p=igParsedPrompts[i];
   if(!p)return;
-  // Đọc prompt từ textarea nếu user đã sửa
+
+  // Đọc prompt từ textarea — ưu tiên textarea nếu user đã sửa
   var editedTA=$('igprompt_'+i);
-  if(editedTA&&editedTA.value) p.raw=editedTA.value;
+  const userPrompt=(editedTA&&editedTA.value.trim())?editedTA.value.trim():p.text;
+  // Lưu lại để lần sau dùng
+  p.text=userPrompt;
+  p.raw=userPrompt;
 
   const imgApiKey=apiKey;
   const imgEndpoint=null; // Vertex only
@@ -4279,26 +4292,29 @@ async function igRegenOne(i){
   if(btn){btn.textContent='⏳ Đang tạo...';btn.classList.add('loading');}
   if(imgEl){imgEl.classList.add('loading');imgEl.innerHTML=`<div style="text-align:center;padding:16px;"><div style="font-size:20px;">🎨</div><div style="font-size:10px;color:var(--accent2);margin-top:4px;">Đang tạo lại...</div></div>`;}
 
-  // Build prompt
-  const refMatches=[...p.text.matchAll(/\[REF:\s*([^—\]]+)/gi)].map(m=>m[1].trim());
+  // Build prompt từ userPrompt (đã sửa) thay vì p.text gốc
+  const refMatches=[...userPrompt.matchAll(/\[REF:\s*([^—\]]+)/gi)].map(m=>m[1].trim());
   let primaryRefB64=null;
   const charDNAMap={};
-  for(const rname of refMatches){
-    const matchKey=Object.keys(igCharDNA).find(k=>k.toLowerCase().includes(rname.toLowerCase())||rname.toLowerCase().includes(k.toLowerCase()));
-    if(matchKey){
-      if(igCharDNA[matchKey])charDNAMap[matchKey]=igCharDNA[matchKey];
-      if(!primaryRefB64&&igRefImages[matchKey])primaryRefB64=igRefImages[matchKey].split(',')[1];
+  // Chỉ tìm ref image nếu prompt vẫn còn [REF:...]
+  if(refMatches.length>0){
+    for(const rname of refMatches){
+      const matchKey=Object.keys(igCharDNA).find(k=>k.toLowerCase().includes(rname.toLowerCase())||rname.toLowerCase().includes(k.toLowerCase()));
+      if(matchKey){
+        if(igCharDNA[matchKey])charDNAMap[matchKey]=igCharDNA[matchKey];
+        if(!primaryRefB64&&igRefImages[matchKey])primaryRefB64=igRefImages[matchKey].split(',')[1];
+      }
     }
   }
+  // Nếu prompt không còn [REF:...] → không gửi ảnh ref
   const aspectStr=igGetAspectPrompt();
-  const hasRef=refMatches.length>0 && primaryRefB64;
-  const styleDNA=igDNA_IG?`\nVisual Style: ${igDNA_IG}`:''; // Luôn thêm style
-  let finalPrompt=p.text;
+  const styleDNA=igDNA_IG?`\nVisual Style: ${igDNA_IG}`:'';
+  let finalPrompt;
   if(Object.keys(charDNAMap).length>0){
     const dnaSnippet=Object.entries(charDNAMap).map(([name,dna])=>`[${name}: ${dna?.visual_summary||dna?.hair||''}]`).join(' ');
-    finalPrompt=`[${aspectStr}]\n\n${p.text}\n\nCharacter DNA: ${dnaSnippet}\nMaintain character consistency.\n\nREMINDER: NO white margins, NO white padding, full bleed to all edges.`;
+    finalPrompt=`[${aspectStr}]\n\n${userPrompt}\n\nCharacter DNA: ${dnaSnippet}\nMaintain character consistency.\n\nREMINDER: NO white margins, NO white padding, full bleed to all edges.`;
   } else {
-    finalPrompt=`[${aspectStr}]\n\n${p.text}${styleDNA}\n\nREMINDER: NO white margins, NO white padding, full bleed to all edges.`;
+    finalPrompt=`[${aspectStr}]\n\n${userPrompt}${styleDNA}\n\nREMINDER: NO white margins, NO white padding, full bleed to all edges.`;
   }
 
   try{

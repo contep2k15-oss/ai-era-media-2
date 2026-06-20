@@ -5,6 +5,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   maximize: () => ipcRenderer.send('win-maximize'),
   close:    () => ipcRenderer.send('win-close'),
   toggleDevTools: () => ipcRenderer.send('toggle-devtools'),
+  googleGetProject: () => ipcRenderer.invoke('google-get-project'),
   renderVideoFFmpeg: (data) => ipcRenderer.invoke('render-video-ffmpeg', data),
   openFile: (filePath) => ipcRenderer.invoke('open-file', filePath),
   // Google OAuth2 for Vertex AI

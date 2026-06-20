@@ -103,6 +103,13 @@ async function getValidAccessToken() {
   return null;
 }
 
+// Project ID tự động detect sau login
+let vertexProjectId = 'gen-lang-client-0682538223'; // fallback default
+
+ipcMain.handle('google-get-project', async () => {
+  return vertexProjectId;
+});
+
 // OAuth2 login flow với local redirect server
 ipcMain.handle('google-oauth-login', async () => {
   return new Promise((resolve) => {
@@ -141,8 +148,67 @@ ipcMain.handle('google-oauth-login', async () => {
           if (tokenData.access_token) {
             tokenData.expires_at = Date.now() + (tokenData.expires_in * 1000);
             saveToken(tokenData);
+
+            // Tự động: detect project → enable Vertex AI API
+            try {
+              // Bước 1: Lấy Project ID
+              const projRes = await fetch(
+                'https://cloudresourcemanager.googleapis.com/v1/projects?filter=lifecycleState:ACTIVE',
+                { headers: { 'Authorization': `Bearer ${tokenData.access_token}` } }
+              );
+              const projData = await projRes.json();
+              const projects = projData.projects || [];
+              const best = projects.find(p => p.projectId.startsWith('gen-lang-client')) || projects[0];
+              if (best) {
+                vertexProjectId = best.projectId;
+                console.log('[Auto] Project detected:', vertexProjectId);
+              }
+
+              // Bước 2: Enable Vertex AI API (aiplatform.googleapis.com)
+              if (vertexProjectId) {
+                console.log('[Auto] Enabling Vertex AI API...');
+                const enableRes = await fetch(
+                  `https://serviceusage.googleapis.com/v1/projects/${vertexProjectId}/services/aiplatform.googleapis.com:enable`,
+                  {
+                    method: 'POST',
+                    headers: {
+                      'Authorization': `Bearer ${tokenData.access_token}`,
+                      'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({})
+                  }
+                );
+                const enableData = await enableRes.json();
+                if (enableData.error) {
+                  console.log('[Auto] Enable API warning:', enableData.error.message);
+                } else {
+                  console.log('[Auto] Vertex AI API enabled/already enabled');
+
+                  // Bước 3: Chờ API ready (poll tối đa 60s)
+                  let ready = false;
+                  for (let attempt = 0; attempt < 12; attempt++) {
+                    await new Promise(r => setTimeout(r, 5000));
+                    const checkRes = await fetch(
+                      `https://serviceusage.googleapis.com/v1/projects/${vertexProjectId}/services/aiplatform.googleapis.com`,
+                      { headers: { 'Authorization': `Bearer ${tokenData.access_token}` } }
+                    );
+                    const checkData = await checkRes.json();
+                    if (checkData.state === 'ENABLED') {
+                      ready = true;
+                      console.log('[Auto] Vertex AI API ready!');
+                      break;
+                    }
+                    console.log(`[Auto] Waiting for API... attempt ${attempt + 1}/12`);
+                  }
+                  if (!ready) console.log('[Auto] API may need more time to activate');
+                }
+              }
+            } catch(e) {
+              console.log('[Auto] Setup warning:', e.message);
+            }
+
             server.close();
-            resolve({ success: true });
+            resolve({ success: true, projectId: vertexProjectId });
           } else {
             server.close();
             resolve({ success: false, error: tokenData.error_description || 'Token exchange failed' });
