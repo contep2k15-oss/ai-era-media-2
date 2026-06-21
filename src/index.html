@@ -637,6 +637,9 @@ html,body{height:100%;overflow:hidden;background:var(--bg0);color:var(--text);fo
 </head>
 <body>
 
+<!-- input ẩn giữ apiKey dummy — app dùng Vertex AI, không cần AI Studio key -->
+<input type="hidden" id="apiKey" value="vertex-auth">
+
 <!-- ── LICENSE GATE ── -->
 <div id="licenseGate" style="position:fixed;inset:0;background:#080c12;z-index:99999;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:0;">
   <div style="text-align:center;margin-bottom:28px;">
@@ -859,25 +862,6 @@ html,body{height:100%;overflow:hidden;background:var(--bg0);color:var(--text);fo
     </div>
     <div class="settings-body">
       <div class="settings-section">
-        <div class="settings-label">API Key <span style="font-size:10px;font-weight:400;color:var(--text3);">— Google AI Studio (Text, TTS)</span></div>
-        <div class="api-row">
-          <div class="api-field">
-            <input class="api-input" id="apiKey" type="password" placeholder="Dán API key vào đây" autocomplete="off" style="padding-left:12px;" oninput="showProviderBadge('apiProviderBadge',this.value)"/>
-          </div>
-          <button class="btn-verify" id="verifyBtn" onclick="verifyKey()">
-            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/></svg>
-            Xác nhận
-          </button>
-        </div>
-        <div class="api-status" id="apiStatus"></div>
-        <div id="apiProviderBadge" style="margin-top:4px;"></div>
-        <div style="margin-top:8px;display:flex;align-items:center;gap:8px;">
-          <button onclick="saveApiKey()" style="padding:6px 14px;background:#10b981;border:none;border-radius:7px;color:#0a0f0e;font-size:12px;font-weight:700;cursor:pointer;">💾 Lưu</button>
-          <span id="saveStatus" style="font-size:11px;color:#10b981;display:none;">✓ Đã lưu!</span>
-        </div>
-      </div>
-
-      <div class="settings-section" style="margin-top:12px;padding-top:12px;border-top:1px solid var(--border2);">
         <div class="settings-label">Vertex AI <span style="font-size:10px;font-weight:400;color:var(--text3);">— Vertex AI Image Generation</span></div>
         <div id="vertexAuthStatus" style="margin-bottom:8px;font-size:12px;color:var(--text3);">Đang kiểm tra...</div>
         <div style="display:flex;gap:8px;">
@@ -1906,7 +1890,7 @@ async function getVertexProjectId() {
 
 function saveApiKey(){
   const key=$('apiKey').value.trim();
-  if(!key){alert('Vui lòng nhập API key trước.');return;}
+  // apiKey không cần — Vertex OAuth
   localStorage.setItem('aiera_apikey', key);
   const s=$('saveStatus');s.style.display='inline';
   setTimeout(()=>s.style.display='none',2000);
@@ -1933,7 +1917,7 @@ function selectStyle(s){
 // ── VERIFY KEY ──
 async function verifyKey(){
   const key=$('apiKey').value.trim();
-  if(!key){showVerify('fail','⚠','Vui lòng nhập API key trước.');return;}
+  // apiKey không cần — Vertex OAuth
   const p=detectProvider(key);
   showProviderBadge('apiProviderBadge',key);
   $('verifyBtn').disabled=true;
@@ -1998,7 +1982,7 @@ async function analyzeVideoStyle(){
   hideErr();
   const url=$('urlInput').value.trim();
   const apiKey=$('apiKey').value.trim();
-  if(!apiKey){showErr('Vui lòng nhập API key trước.');return;}
+  // apiKey không cần thiết — dùng Vertex OAuth
   if(!url){showErr('Vui lòng dán link YouTube vào ô trên.');return;}
   const vid=getVideoId(url);
   if(!vid){showErr('Không nhận ra video ID từ URL này.');return;}
@@ -2126,7 +2110,7 @@ async function generate(){
   hideErr();
   const url=$('urlInput').value.trim();
   const apiKey=$('apiKey').value.trim();
-  if(!apiKey){showErr('Vui lòng nhập và xác minh API key trước.');return;}
+  // apiKey không cần thiết — dùng Vertex OAuth
   if(!url){showErr('Vui lòng dán link YouTube vào ô trên.');return;}
   const vid=getVideoId(url);
   if(!vid){showErr('Không nhận ra video ID từ URL này. Vui lòng kiểm tra lại.');return;}
@@ -2430,7 +2414,7 @@ let currentYtUrl='';
 
 async function openRescanModal(){
   const apiKey=$('apiKey').value.trim();
-  if(!apiKey){alert('Cần nhập API key trước.');return;}
+  // apiKey không cần thiết — dùng Vertex OAuth
   if(!lastChars.length){alert('Chưa có nhân vật nào. Hãy generate trước.');return;}
 
   rescanCandidates=[];
@@ -2534,7 +2518,7 @@ function closeManualModal(){$('manualOverlay').classList.remove('show');}
 
 async function autoGenManualPrompt(){
   const apiKey=$('apiKey').value.trim();
-  if(!apiKey){alert('Cần nhập API key trước để auto-gen.');return;}
+  // apiKey không cần thiết — dùng Vertex OAuth
 
   const name=$('mName').value.trim()||'Unknown Character';
   const role=$('mRole').value;
@@ -2812,7 +2796,7 @@ function peSetProgress(done,total,label,sub){
 
 async function peGenerate(){
   const apiKey=$('apiKey').value.trim();
-  if(!apiKey){peShowErr('Vui lòng nhập API key ở tab Character Sheet trước.');return;}
+  // apiKey không cần thiết — dùng Vertex OAuth
   if(peSelectedChars.size===0){peShowErr('Vui lòng chọn ít nhất một nhân vật ở bước 1.');return;}
   const raw=$('peScript').value.trim();
   if(!raw){peShowErr('Vui lòng nhập kịch bản audio ở bước 4.');return;}
@@ -3282,7 +3266,7 @@ function ttsCountScript(){
 // ── REWRITE ──
 async function ttsRewrite(){
   const apiKey=$('apiKey').value.trim();
-  if(!apiKey){alert('Vui lòng nhập API key.');return;}
+  // apiKey không cần thiết — dùng Vertex OAuth
   const sub=$('ttsSubInput').value.trim();
   if(!sub){alert('Vui lòng dán phụ đề YouTube vào ô trên.');return;}
 
@@ -3838,7 +3822,7 @@ async function igUrlToB64(url){
 async function igGenerateAllRefs(){
   if(!lastChars.length){alert('Chưa có nhân vật.');return;}
   const apiKey=$('apiKey').value.trim();
-  if(!apiKey){alert('Cần API key.');return;}
+  // apiKey không cần — Vertex OAuth
 
   const btn=$('igBtnAllRefs');
   btn.disabled=true;
@@ -3896,7 +3880,7 @@ Full body standing pose, facing forward, arms slightly away from body so all lim
 
 async function igGenerateRef(idx){
   const apiKey=$('apiKey').value.trim();
-  if(!apiKey){alert('Cần API key.');return;}
+  // apiKey không cần — Vertex OAuth
   const c=lastChars[idx];if(!c)return;
   const name=c.name||'Unknown';
   const btn=$(`igrefbtn_${idx}`);
@@ -3972,7 +3956,7 @@ Full body standing pose, facing forward, arms slightly away from body so all lim
 // ── MAIN PIPELINE: Run All ──
 async function igRunAll(){
   const apiKey=$('apiKey').value.trim();
-  if(!apiKey){alert('Vui lòng nhập API key trong Cài đặt.');return;}
+  // apiKey không cần thiết — dùng Vertex OAuth
 
   // Detect provider từ image key
   const imgApiKey=apiKey;
@@ -4273,7 +4257,7 @@ function igTogglePrompt(i){
 
 async function igRegenOne(i){
   const apiKey=$('apiKey').value.trim();
-  if(!apiKey){alert('Vui lòng nhập API key.');return;}
+  // apiKey không cần thiết — dùng Vertex OAuth
   const p=igParsedPrompts[i];
   if(!p)return;
 
@@ -5088,7 +5072,7 @@ const AS_BATCH_DELAY=8000;
 
 async function asTranscribeAll(){
   const apiKey=$('apiKey').value.trim();
-  if(!apiKey){alert('Vui lòng nhập API key ở tab Character Sheet trước.');return;}
+  // apiKey không cần thiết — dùng Vertex OAuth
   if(!asSegs.length){alert('Chưa có đoạn nào. Hãy cắt audio trước.');return;}
 
   $('asBtnTranscribe').disabled=true;
@@ -5566,6 +5550,9 @@ async function licInit() {
 
 // Khởi động check license khi load xong
 window.addEventListener('DOMContentLoaded', () => {
+  // Set apiKey mặc định — app dùng Vertex OAuth, không cần AI Studio key
+  const ak = document.getElementById('apiKey');
+  if(ak) ak.value = 'vertex-auth';
   licInit();
 });
 
