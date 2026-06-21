@@ -872,6 +872,16 @@ html,body{height:100%;overflow:hidden;background:var(--bg0);color:var(--text);fo
             Ngắt kết nối
           </button>
         </div>
+        <div style="margin-top:10px;">
+          <div style="font-size:10px;color:var(--text3);margin-bottom:4px;">Project ID (nhập thủ công nếu auto-detect thất bại):</div>
+          <div style="display:flex;gap:6px;align-items:center;">
+            <input id="vertexProjectInput" type="text" placeholder="gen-lang-client-XXXXXXXXX"
+              style="flex:1;padding:6px 10px;background:var(--bg2);border:1px solid var(--border2);border-radius:7px;color:var(--text);font-size:11px;font-family:monospace;outline:none;"
+              oninput="this.value=this.value.trim()"/>
+            <button onclick="saveVertexProject()" style="padding:6px 12px;background:#10b981;border:none;border-radius:7px;color:#0a0f0e;font-size:11px;font-weight:700;cursor:pointer;">Lưu</button>
+          </div>
+          <div id="vertexProjectSaved" style="font-size:10px;color:var(--green);margin-top:4px;display:none;">✅ Đã lưu Project ID</div>
+        </div>
         <div style="margin-top:6px;font-size:10px;color:var(--text3);">Đăng nhập 1 lần · Token tự gia hạn · Image Gen qua Vertex AI</div>
       </div>
 
@@ -5470,6 +5480,27 @@ function licHideGate(data, key) {
   }
 }
 
+function saveVertexProject(){
+  const input = $('vertexProjectInput');
+  const pid = input?.value?.trim();
+  if(!pid){ alert('Vui lòng nhập Project ID'); return; }
+  _cachedProjectId = pid;
+  localStorage.setItem('vertexProjectId', pid);
+  const saved = $('vertexProjectSaved');
+  if(saved){ saved.style.display='block'; setTimeout(()=>saved.style.display='none', 2000); }
+  const status = $('vertexAuthStatus');
+  if(status){ status.textContent=`✅ Project: ${pid}`; status.style.color='var(--green)'; }
+}
+
+function loadVertexProject(){
+  const pid = localStorage.getItem('vertexProjectId');
+  if(pid){
+    _cachedProjectId = pid;
+    const input = $('vertexProjectInput');
+    if(input) input.value = pid;
+  }
+}
+
 function logoutLicense() {
   if (!confirm('Đăng xuất license? Bạn sẽ cần nhập lại key khi mở app.')) return;
   licClearCache();
@@ -5556,6 +5587,8 @@ window.addEventListener('DOMContentLoaded', () => {
   // Set apiKey mặc định — app dùng Vertex OAuth, không cần AI Studio key
   const ak = document.getElementById('apiKey');
   if(ak) ak.value = 'vertex-auth';
+  // Load Project ID đã lưu
+  loadVertexProject();
   licInit();
 });
 
