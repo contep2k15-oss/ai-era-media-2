@@ -1878,13 +1878,16 @@ async function getVertexToken(){
 function saveVertexConfig(){}
 function loadVertexConfig(){ vertexCheckAuth(); }
 // Project ID tự động từ main process (sau OAuth login)
-let _cachedProjectId = 'gen-lang-client-0682538223'; // fallback
+let _cachedProjectId = null; // detect tự động sau OAuth
 
 async function getVertexProjectId() {
   try {
     const pid = await window.electronAPI?.googleGetProject?.();
     if (pid) { _cachedProjectId = pid; return pid; }
   } catch(e) {}
+  if (!_cachedProjectId) {
+    throw new Error('Chưa detect được Project ID — vui lòng kết nối lại Google Cloud trong Cài đặt.');
+  }
   return _cachedProjectId;
 }
 

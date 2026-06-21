@@ -104,7 +104,7 @@ async function getValidAccessToken() {
 }
 
 // Project ID tự động detect sau login
-let vertexProjectId = 'gen-lang-client-0682538223'; // fallback default
+let vertexProjectId = null; // sẽ được detect tự động sau OAuth login
 
 ipcMain.handle('google-get-project', async () => {
   return vertexProjectId;
