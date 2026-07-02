@@ -1718,7 +1718,25 @@ html,body{height:100%;overflow:hidden;background:var(--bg0);color:var(--text);fo
 <!-- LIGHTBOX xem phóng to ảnh tham chiếu nhân vật (global, ngoài mọi tab) -->
 <div class="modal-overlay" id="igRefLightbox" onclick="igCloseRefLightbox(event)" style="z-index:10000;cursor:zoom-out;">
   <img id="igRefLightboxImg" src="" style="max-width:90vw;max-height:90vh;border-radius:8px;box-shadow:0 20px 60px rgba(0,0,0,.5);object-fit:contain;">
+  <button onclick="igDownloadRefImage(event)" title="Tải ảnh về" style="position:absolute;top:20px;right:70px;width:36px;height:36px;border-radius:50%;border:1px solid rgba(255,255,255,.25);background:rgba(0,0,0,.4);color:#fff;font-size:16px;cursor:pointer;display:flex;align-items:center;justify-content:center;">⬇️</button>
   <button onclick="igCloseRefLightbox(event)" title="Đóng" style="position:absolute;top:20px;right:24px;width:36px;height:36px;border-radius:50%;border:1px solid rgba(255,255,255,.25);background:rgba(0,0,0,.4);color:#fff;font-size:18px;cursor:pointer;display:flex;align-items:center;justify-content:center;">✕</button>
+</div>
+
+<!-- INPUT FILE ẨN + MODAL CROP ảnh tham chiếu tải lên (global, ngoài mọi tab) -->
+<input type="file" id="igRefUploadInput" accept="image/*" style="display:none" onchange="igHandleRefUploadFile(event)">
+<div class="modal-overlay" id="igCropModal" style="z-index:10001;">
+  <div style="background:var(--bg1);border:1px solid var(--border2);border-radius:var(--rs);padding:20px;max-width:400px;width:92vw;" onclick="event.stopPropagation()">
+    <div style="font-size:14px;font-weight:700;color:var(--text);margin-bottom:4px;">✂️ Cắt ảnh tham chiếu (vuông 1:1)</div>
+    <div style="font-size:12px;color:var(--text3);margin-bottom:12px;">Kéo để di chuyển, dùng thanh trượt để phóng to/thu nhỏ</div>
+    <div id="igCropBox" style="width:280px;height:280px;max-width:100%;overflow:hidden;position:relative;background:#000;border-radius:8px;margin:0 auto;cursor:grab;touch-action:none;" onmousedown="igCropPointerDown(event)" ontouchstart="igCropPointerDown(event)">
+      <img id="igCropImg" draggable="false" style="position:absolute;top:0;left:0;transform-origin:0 0;user-select:none;-webkit-user-drag:none;pointer-events:none;">
+    </div>
+    <input type="range" id="igCropZoom" min="1" max="3" step="0.01" value="1" style="width:100%;margin-top:14px;" oninput="igCropOnZoom(this.value)">
+    <div style="display:flex;gap:8px;margin-top:14px;">
+      <button class="btn-ig-ref" style="flex:1;" onclick="igCloseCropModal()">Hủy</button>
+      <button class="btn-vs-render" style="flex:1;" onclick="igConfirmCrop()">✅ Cắt & Lưu</button>
+    </div>
+  </div>
 </div>
 
 
@@ -3672,6 +3690,7 @@ function igRefreshCharGrid(){
         <div class="ig-char-role">${esc(getRoleLabelEN(c.role))} · ${esc(c.archetype||'')} · ${esc(c.gender||'')}</div>
       </div>
       <button class="btn-ig-ref${hasRef?' done':''}" id="igrefbtn_${i}" onclick="igGenerateRef(${i})">${hasRef?'✅ Tạo lại':'🍌 Generate Ref'}</button>
+      <button class="btn-ig-ref" title="Tải ảnh lên thay thế" style="padding:6px 8px;flex:0 0 auto;" onclick="igTriggerRefUpload(${i})">⬆️</button>
     </div>
     <div id="igrefprompt_wrap_${i}" style="display:none;padding:4px 8px 6px;border-top:1px solid var(--border2);">
       <textarea id="igrefprompt_${i}" rows="3" style="width:100%;font-size:10px;padding:4px 6px;background:var(--bg2);color:var(--text2);border:1px solid var(--border2);border-radius:4px;resize:vertical;box-sizing:border-box;"></textarea>
@@ -3681,9 +3700,11 @@ function igRefreshCharGrid(){
 }
 
 // ── LIGHTBOX: xem phóng to ảnh tham chiếu (chỉ hiển thị, KHÔNG đổi ảnh gửi vào prompt) ──
+let igCurrentLightboxName=null;
 function igOpenRefLightbox(name){
   const url=igRefImages[name];
   if(!url)return;
+  igCurrentLightboxName=name;
   $('igRefLightboxImg').src=url;
   $('igRefLightbox').classList.add('show');
 }
@@ -3691,9 +3712,131 @@ function igCloseRefLightbox(e){
   if(e && e.target && e.target.tagName==='IMG')return; // click ảnh thì không đóng
   $('igRefLightbox').classList.remove('show');
 }
+function igDownloadRefImage(e){
+  if(e){e.preventDefault();e.stopPropagation();}
+  const name=igCurrentLightboxName;
+  const url=name&&igRefImages[name];
+  if(!url)return;
+  const safeName=String(name).replace(/[^a-zA-Z0-9_\-À-ỹ]+/g,'_');
+  const a=document.createElement('a');
+  a.href=url;a.download=`${safeName}_ref.png`;
+  document.body.appendChild(a);a.click();document.body.removeChild(a);
+}
 document.addEventListener('keydown',e=>{
-  if(e.key==='Escape') $('igRefLightbox')?.classList.remove('show');
+  if(e.key==='Escape'){
+    $('igRefLightbox')?.classList.remove('show');
+    $('igCropModal')?.classList.remove('show');
+  }
 });
+
+// ── UPLOAD ẢNH THAM CHIẾU + CROP VUÔNG 1:1 (kéo/thả + zoom) ──
+let igRefUploadIdx=null;
+let igCropState={scale:1,minScale:1,offsetX:0,offsetY:0,natW:0,natH:0,boxSize:280,dragging:false,startX:0,startY:0,startOffX:0,startOffY:0};
+
+function igTriggerRefUpload(idx){
+  igRefUploadIdx=idx;
+  const inp=$('igRefUploadInput');
+  inp.value='';
+  inp.click();
+}
+function igHandleRefUploadFile(e){
+  const file=e.target.files&&e.target.files[0];
+  if(!file)return;
+  const fr=new FileReader();
+  fr.onload=ev=>igOpenCropModal(ev.target.result);
+  fr.readAsDataURL(file);
+}
+function igOpenCropModal(dataUrl){
+  const img=$('igCropImg');
+  img.onload=()=>{
+    const box=$('igCropBox');
+    const boxSize=box.clientWidth||280;
+    const s=igCropState;
+    s.boxSize=boxSize;
+    s.natW=img.naturalWidth;s.natH=img.naturalHeight;
+    const minScale=Math.max(boxSize/s.natW, boxSize/s.natH);
+    s.minScale=minScale;s.scale=minScale;
+    s.offsetX=(boxSize-s.natW*minScale)/2;
+    s.offsetY=(boxSize-s.natH*minScale)/2;
+    const zoom=$('igCropZoom');
+    zoom.min=minScale;zoom.max=minScale*3;zoom.step=(minScale*2)/100;zoom.value=minScale;
+    igApplyCropTransform();
+  };
+  img.src=dataUrl;
+  $('igCropModal').classList.add('show');
+}
+function igApplyCropTransform(){
+  const img=$('igCropImg');const s=igCropState;
+  img.style.width=s.natW+'px';img.style.height=s.natH+'px';
+  img.style.transform=`translate(${s.offsetX}px, ${s.offsetY}px) scale(${s.scale})`;
+}
+function igClampOffsets(){
+  const s=igCropState;
+  const dispW=s.natW*s.scale, dispH=s.natH*s.scale;
+  s.offsetX=Math.min(0,Math.max(s.boxSize-dispW,s.offsetX));
+  s.offsetY=Math.min(0,Math.max(s.boxSize-dispH,s.offsetY));
+}
+function igCropOnZoom(val){
+  const s=igCropState;const newScale=parseFloat(val);
+  const cx=s.boxSize/2, cy=s.boxSize/2;
+  const imgX=(cx-s.offsetX)/s.scale, imgY=(cy-s.offsetY)/s.scale;
+  s.scale=newScale;
+  s.offsetX=cx-imgX*newScale;s.offsetY=cy-imgY*newScale;
+  igClampOffsets();igApplyCropTransform();
+}
+function igCropPointerDown(e){
+  e.preventDefault();
+  const s=igCropState;s.dragging=true;
+  const pt=e.touches?e.touches[0]:e;
+  s.startX=pt.clientX;s.startY=pt.clientY;
+  s.startOffX=s.offsetX;s.startOffY=s.offsetY;
+}
+function igCropPointerMove(e){
+  const s=igCropState;
+  if(!s.dragging)return;
+  e.preventDefault();
+  const pt=e.touches?e.touches[0]:e;
+  s.offsetX=s.startOffX+(pt.clientX-s.startX);
+  s.offsetY=s.startOffY+(pt.clientY-s.startY);
+  igClampOffsets();igApplyCropTransform();
+}
+function igCropPointerUp(){igCropState.dragging=false;}
+window.addEventListener('mousemove',igCropPointerMove);
+window.addEventListener('mouseup',igCropPointerUp);
+window.addEventListener('touchmove',igCropPointerMove,{passive:false});
+window.addEventListener('touchend',igCropPointerUp);
+
+function igCloseCropModal(){
+  $('igCropModal').classList.remove('show');
+  igRefUploadIdx=null;
+}
+function igConfirmCrop(){
+  const s=igCropState;
+  const idx=igRefUploadIdx;
+  const c=lastChars&&lastChars[idx];
+  if(!c){igCloseCropModal();return;}
+  const outputSize=800;
+  const canvas=document.createElement('canvas');
+  canvas.width=outputSize;canvas.height=outputSize;
+  const ctx=canvas.getContext('2d');
+  const sx=-s.offsetX/s.scale, sy=-s.offsetY/s.scale;
+  const swh=s.boxSize/s.scale;
+  const img=$('igCropImg');
+  ctx.drawImage(img, sx, sy, swh, swh, 0, 0, outputSize, outputSize);
+  const dataUrl=canvas.toDataURL('image/png');
+  const name=c.name||'Unknown';
+  igRefImages[name]=dataUrl;
+  igCharDNA[name]=null; // ảnh đổi → xoá cache DNA cũ
+  const thumb=$(`igthumb_${idx}`);
+  if(thumb){
+    thumb.innerHTML=`<img src="${dataUrl}">`;
+    thumb.style.cursor='zoom-in';
+    thumb.onclick=()=>igOpenRefLightbox(name);
+  }
+  const btn=$(`igrefbtn_${idx}`);
+  if(btn){btn.textContent='✅ Tạo lại';btn.classList.add('done');}
+  igCloseCropModal();
+}
 
 // ── VISUAL DNA CACHE: {charName → dnaString} ──
 let igCharDNA={};
