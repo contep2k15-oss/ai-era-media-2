@@ -854,6 +854,11 @@ html,body{height:100%;overflow:hidden;background:var(--bg0);color:var(--text);fo
 
 
 <!-- ══ SETTINGS MODAL ══ -->
+<div class="modal-overlay" id="igRefLightbox" onclick="igCloseRefLightbox(event)" style="z-index:10000;cursor:zoom-out;">
+  <img id="igRefLightboxImg" src="" style="max-width:90vw;max-height:90vh;border-radius:8px;box-shadow:0 20px 60px rgba(0,0,0,.5);object-fit:contain;">
+  <button onclick="igCloseRefLightbox(event)" title="Đóng" style="position:absolute;top:20px;right:24px;width:36px;height:36px;border-radius:50%;border:1px solid rgba(255,255,255,.25);background:rgba(0,0,0,.4);color:#fff;font-size:18px;cursor:pointer;display:flex;align-items:center;justify-content:center;">✕</button>
+</div>
+
 <div class="settings-overlay" id="settingsOverlay">
   <div class="settings-modal">
     <div class="settings-head">
@@ -3659,7 +3664,7 @@ function igRefreshCharGrid(){
     const name=c.name||'Unknown';
     const hasRef=!!igRefImages[name];
     return `<div class="ig-char-row">
-      <div class="ig-ref-thumb" id="igthumb_${i}">${hasRef?`<img src="${igRefImages[name]}">`:'👤'}</div>
+      <div class="ig-ref-thumb"${hasRef?` style="cursor:zoom-in;" onclick="igOpenRefLightbox('${esc(name).replace(/"/g,'&quot;').replace(/'/g,"\\'")}')"`:''} id="igthumb_${i}">${hasRef?`<img src="${igRefImages[name]}">`:'👤'}</div>
       <div class="ig-char-info">
         <div class="ig-char-name">${esc(name)}</div>
         <div class="ig-char-role">${esc(getRoleLabelEN(c.role))} · ${esc(c.archetype||'')} · ${esc(c.gender||'')}</div>
@@ -3672,6 +3677,21 @@ function igRefreshCharGrid(){
     <button id="igrefedibtn_${i}" onclick="igToggleRefPrompt(${i})" style="width:100%;padding:3px;background:none;border:none;border-top:1px solid var(--border2);color:var(--text3);font-size:10px;cursor:pointer;">✏️ Sửa prompt ref</button>`;
   }).join('');
 }
+
+// ── LIGHTBOX: xem phóng to ảnh tham chiếu (chỉ hiển thị, KHÔNG đổi ảnh gửi vào prompt) ──
+function igOpenRefLightbox(name){
+  const url=igRefImages[name];
+  if(!url)return;
+  $('igRefLightboxImg').src=url;
+  $('igRefLightbox').classList.add('show');
+}
+function igCloseRefLightbox(e){
+  if(e && e.target && e.target.tagName==='IMG')return; // click ảnh thì không đóng
+  $('igRefLightbox').classList.remove('show');
+}
+document.addEventListener('keydown',e=>{
+  if(e.key==='Escape') $('igRefLightbox')?.classList.remove('show');
+});
 
 // ── VISUAL DNA CACHE: {charName → dnaString} ──
 let igCharDNA={};
@@ -3942,7 +3962,11 @@ Full body standing pose, facing forward, arms slightly away from body so all lim
     igCharDNA[name]=null;
 
     const thumb=$(`igthumb_${idx}`);
-    if(thumb)thumb.innerHTML=`<img src="${dataUrl}">`;
+    if(thumb){
+      thumb.innerHTML=`<img src="${dataUrl}">`;
+      thumb.style.cursor='zoom-in';
+      thumb.onclick=()=>igOpenRefLightbox(name);
+    }
     btn.textContent='✅ Tạo lại';btn.classList.add('done');
     btn.disabled=false;
 
