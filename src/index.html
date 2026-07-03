@@ -3375,6 +3375,26 @@ function ttsCountScript(){
 // ── REWRITE ──
 // Nếu kịch bản viết ra ngắn hơn nhiều so với mục tiêu, tự động gọi thêm
 // để "viết tiếp" cho đủ, thay vì chấp nhận bản ngắn
+// Nếu kịch bản viết ra dài hơn nhiều so với mục tiêu, cắt bớt tại ranh giới câu
+// gần đúng target nhất — tránh audio dài gấp đôi ngoài ý muốn
+function ttsTrimToTarget(text, durWords){
+  if(!durWords || durWords<=0) return text;
+  const trimmed=text.trim();
+  const totalWords=trimmed.split(/\s+/).filter(Boolean).length;
+  if(totalWords<=durWords*1.15) return trimmed; // trong ngưỡng chấp nhận, giữ nguyên
+
+  const sentences=trimmed.replace(/([.!?])\s+/g,'$1\n').split('\n').map(s=>s.trim()).filter(Boolean);
+  const acc=[];
+  let wc=0;
+  for(const s of sentences){
+    const sw=s.split(/\s+/).filter(Boolean).length;
+    if(wc>=durWords && acc.length>0) break;
+    acc.push(s);
+    wc+=sw;
+  }
+  return acc.length?acc.join(' '):trimmed;
+}
+
 async function ttsExpandToTarget(text, durWords, stylePrompt, apiKey, progressCb){
   let current=text.trim();
   let attempts=0;
@@ -3417,7 +3437,7 @@ async function ttsRewrite(){
 
   const durWords=TTS_DUR_WORDS[ttsSelectedDur];
   const durInstruction=durWords>0
-    ?`TARGET LENGTH: approximately ${durWords} words (${ttsSelectedDur} of spoken audio at natural pace). This is a STRICT requirement. You MUST write enough content to reach this length — even if it means adding more descriptive detail, background context, examples, sensory description, or elaboration beyond the bare facts in the source material. Do NOT stop early just because you've covered the source content — keep expanding and elaborating in the same style until you reach the target word count. Undershooting the target length is a failure.`
+    ?`TARGET LENGTH: approximately ${durWords} words (${ttsSelectedDur} of spoken audio at natural pace). Acceptable range: ${Math.round(durWords*0.9)}–${Math.round(durWords*1.1)} words. This is a STRICT requirement — do not undershoot OR overshoot significantly. If the source material is thin, elaborate with more descriptive detail, context, or examples to reach the target. If the source material is rich, be selective and concise rather than including everything — do NOT pad excessively or ramble past the target. Stop writing once you are within the acceptable range.`
     :`Keep a similar length to the original, removing only filler and ads.`;
 
   const stylePrompt=TTS_REWRITE_PROMPTS[ttsSelectedStyle];
@@ -3468,8 +3488,9 @@ ${subTruncated}`;
       const text=data.candidates?.[0]?.content?.parts?.map(p=>p.text||'').join('')||'';
       if(!text) throw new Error('API trả về nội dung trống');
 
-      const finalText=await ttsExpandToTarget(text,durWords,stylePrompt,apiKey,
+      const expanded=await ttsExpandToTarget(text,durWords,stylePrompt,apiKey,
         (msg)=>{$('ttsBtnRewrite').textContent=msg;});
+      const finalText=ttsTrimToTarget(expanded,durWords);
 
       $('ttsScriptOut').value=finalText;
       ttsCountScript();
