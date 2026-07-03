@@ -351,7 +351,7 @@ ipcMain.handle('render-video-ffmpeg', async (event, { imageList, audioData, fps,
 
   function cleanup() {
     tmpFiles.forEach(f => { try { fs.unlinkSync(f); } catch(e) {} });
-    try { fs.rmdirSync(framesDir); } catch(e) {}
+    try { fs.rmdirSync(framesDir, { recursive: true }); } catch(e) {}
   }
 
   if (saveResult.canceled || !saveResult.filePath) {
@@ -360,29 +360,34 @@ ipcMain.handle('render-video-ffmpeg', async (event, { imageList, audioData, fps,
 
   const outPath = saveResult.filePath;
 
-  // Build FFmpeg args: mỗi ảnh loop đúng thời lượng
-  // ffmpeg -loop 1 -t DUR -i img1 -loop 1 -t DUR -i img2 ... -i audio
-  //        -filter_complex "[0][1][2]concat=n=N:v=1:a=0[v]" -map "[v]" -map N:a ...
-  const args = [];
+  // ── CONCAT DEMUXER: dùng 1 file danh sách ảnh+thời lượng thay vì N input riêng ──
+  // Cách cũ (N input "-loop -t -i" + filter concat) không mở rộng tốt khi có nhiều ảnh
+  // (video dài, nhiều cảnh) → dễ lỗi/treo khi render. Concat demuxer là cách FFmpeg
+  // khuyến nghị chính thức cho slideshow nhiều ảnh, chỉ cần 1 input duy nhất.
+  const listPath = path.join(framesDir, `concat_${sessionId}.txt`);
+  const escapeForConcat = p => p.replace(/\\/g, '/').replace(/'/g, "'\\''");
+  let listContent = '';
   preparedImages.forEach(img => {
-    args.push('-loop', '1', '-t', String(img.dur), '-i', img.filePath);
+    listContent += `file '${escapeForConcat(img.filePath)}'\nduration ${img.dur}\n`;
   });
-  args.push('-i', audioPath);
+  // Quirk của concat demuxer: duration của file CUỐI hay bị bỏ qua → lặp lại file cuối
+  // thêm 1 lần (không kèm duration) để FFmpeg giữ đúng thời lượng khung hình cuối
+  if (preparedImages.length) {
+    listContent += `file '${escapeForConcat(preparedImages[preparedImages.length - 1].filePath)}'\n`;
+  }
+  fs.writeFileSync(listPath, listContent, 'utf8');
+  tmpFiles.push(listPath);
 
-  const n = preparedImages.length;
-  const audioIdx = n;
+  const vf = `scale=${width}:${height}:force_original_aspect_ratio=decrease,pad=${width}:${height}:(ow-iw)/2:(oh-ih)/2,setsar=1,fps=${fps}`;
 
-  // Filter: scale tất cả ảnh về cùng resolution rồi concat
-  const scaleFilters = preparedImages.map((_, i) =>
-    `[${i}:v]scale=${width}:${height}:force_original_aspect_ratio=decrease,pad=${width}:${height}:(ow-iw)/2:(oh-ih)/2,setsar=1,fps=${fps}[v${i}]`
-  ).join(';');
-  const concatInputs = preparedImages.map((_,i) => `[v${i}]`).join('');
-  const filterComplex = `${scaleFilters};${concatInputs}concat=n=${n}:v=1:a=0[vout]`;
-
-  args.push(
-    '-filter_complex', filterComplex,
-    '-map', '[vout]',
-    '-map', `${audioIdx}:a`,
+  const args = [
+    '-f', 'concat',
+    '-safe', '0',
+    '-i', listPath,
+    '-i', audioPath,
+    '-vf', vf,
+    '-map', '0:v',
+    '-map', '1:a',
     '-c:v', 'libx264',
     '-preset', 'fast',
     '-crf', '18',
@@ -393,7 +398,7 @@ ipcMain.handle('render-video-ffmpeg', async (event, { imageList, audioData, fps,
     '-shortest',
     '-y',
     outPath
-  );
+  ];
 
   return new Promise((resolve) => {
     const proc = spawn(ffmpegPath, args);
