@@ -1799,6 +1799,7 @@ html,body{height:100%;overflow:hidden;background:var(--bg0);color:var(--text);fo
 // ── MODEL ASSIGNMENT ──
 const MODEL_TEXT    = 'gemini-3.1-flash-lite';  // Character Sheet, Prompt Engineer, DNA, mọi tác vụ text khác
 const MODEL_TEXT_SCRIPT = 'gemini-3.5-flash';   // Riêng cho viết lại kịch bản Voiceover — cần bám sát độ dài & mạch văn tốt hơn
+const MODEL_TEXT_VIDEO  = 'gemini-3.5-flash';   // Riêng cho phân tích video YouTube (Character Sheet, Style Analysis, Rescan) — nhận diện phong cách/hình ảnh chuẩn hơn
 const MODEL_TTS     = 'gemini-3.1-flash-tts-preview'; // TTS voice generation (full)
 const MODEL_TTS_PREVIEW = 'gemini-2.5-flash-preview-tts'; // Preview nghe thử giọng
 const MODEL_IMAGE   = 'gemini-2.5-flash-image'; // Nano Banana
@@ -2037,14 +2038,16 @@ function showVerify(type,icon,msg){
 }
 
 // ── GEMINI TEXT CALL ──
-async function callGeminiText(parts,apiKey){
+async function callGeminiText(parts,apiKey,modelList){
   let lastErr=null;
-  for(const modelId of FREE_TEXT_MODELS){
+  for(const modelId of (modelList||FREE_TEXT_MODELS)){
     try{
       showStatus(`Đang dùng ${MODEL_LABELS[modelId]||modelId}…`,'Phân tích video & thiết kế nhân vật');
+      const generationConfig={temperature:0.5,maxOutputTokens:16384,responseMimeType:'application/json'};
+      if(/^gemini-3/.test(modelId)) generationConfig.thinkingConfig={thinkingLevel:'low'};
       const body={
         contents:[{role:'user',parts}],
-        generationConfig:{temperature:0.5,maxOutputTokens:8192,responseMimeType:'application/json'},
+        generationConfig,
         systemInstruction:{parts:[{text:'You are a professional anime/film character designer and AI prompt engineer. Always respond with ONLY valid JSON. No markdown, no explanation.'}]}
       };
       const data=await callVertexOrStudio(modelId,body,apiKey);
@@ -2086,22 +2089,36 @@ async function analyzeVideoStyle(){
 
   const schema=`{"style_analysis":{"medium":"string","genre":"string","style":"string","niche":"string","visual_dna":"string — 20-40 từ keyword cho AI image generation"},"project":{"title":"string","tone":"string","target_audience":"string","setting":"string","time_period":"string","pacing":"fast|medium|slow","cinematography":"string"}}`;
 
-  const promptText=`Analyze this YouTube video (URL: ${url}) and its thumbnail.
+  const promptText=`Watch this video carefully — analyze the ACTUAL visual footage (not just the thumbnail).
 
-Perform a DEEP 5-LAYER STYLE ANALYSIS:
+Perform a DEEP 5-LAYER STYLE ANALYSIS based on what you actually see across multiple points in the video:
 1. medium: Overall format (Anime / Live Action / 2D Animation / Documentary / etc)
 2. genre: Specific genre (Action Shonen / Historical Drama / Political Thriller / etc)
 3. style: Named visual style (Dark Military Dystopia / Ghibli Pastoral / Neo-noir / etc)
 4. niche: Specific niche within that style (Titan horror / Palace intrigue / Samurai revenge / etc)
-5. visual_dna: 20-40 AI image generation keywords capturing the EXACT visual language of this video
+5. visual_dna: 20-40 AI image generation keywords capturing the EXACT visual language seen in the actual footage — art style, line quality, color palette, lighting, rendering technique, recurring visual motifs
 
-Return ONLY valid JSON: ${schema}`;
+Base your analysis on the real visual content across the video's duration, not just a single frame. Return ONLY valid JSON: ${schema}`;
 
-  const parts=[{text:promptText}];
-  if(thumbB64) parts.unshift({inlineData:{mimeType:'image/jpeg',data:thumbB64}});
+  // Ưu tiên gửi thẳng link YouTube cho Gemini xem video thật (khung hình + âm thanh thật xuyên suốt),
+  // thay vì chỉ đoán từ 1 ảnh thumbnail tĩnh — thumbnail thường không đại diện đúng phong cách video.
+  let parts=[
+    {fileData:{fileUri:url,mimeType:'video/*'}},
+    {text:promptText}
+  ];
 
   try{
-    const raw=await callGeminiText(parts,apiKey);
+    let raw;
+    try{
+      raw=await callGeminiText(parts,apiKey,[MODEL_TEXT_VIDEO]);
+    }catch(videoErr){
+      // Fallback: video có thể bị hạn chế (riêng tư/tuổi/khu vực) → quay lại phân tích qua thumbnail
+      console.warn('[Video Style] Không đọc được video thật, fallback sang thumbnail:',videoErr.message);
+      const fallbackPrompt=`Analyze this YouTube video (URL: ${url}) based on its thumbnail — the actual video could not be accessed directly.\n\n${promptText}`;
+      const fallbackParts=[{text:fallbackPrompt}];
+      if(thumbB64)fallbackParts.unshift({inlineData:{mimeType:'image/jpeg',data:thumbB64}});
+      raw=await callGeminiText(fallbackParts,apiKey,[MODEL_TEXT_VIDEO]);
+    }
     const cleaned=raw.replace(/```json\n?|\n?```/g,'').trim();
     const parsed=JSON.parse(cleaned);
     const sa=parsed.style_analysis||{};
@@ -2256,13 +2273,24 @@ ${visualDNAInject}
 
 Return ONLY valid JSON matching this schema: ${schema}`;
 
-  const parts=thumbB64
-    ?[{inlineData:{mimeType:'image/jpeg',data:thumbB64}},{text:promptText}]
-    :[{text:promptText}];
+  const parts=[
+    {fileData:{fileUri:url,mimeType:'video/*'}},
+    {text:promptText.replace('Analyze this YouTube video (URL: '+url+') thumbnail and context.','Watch this video carefully — analyze the ACTUAL visual footage across the video (not just the thumbnail).')}
+  ];
 
   try{
     showStatus('AI đang thiết kế nhân vật…','Tạo character cards & prompts');
-    const raw=await callGeminiText(parts,apiKey);
+    let raw;
+    try{
+      raw=await callGeminiText(parts,apiKey,[MODEL_TEXT_VIDEO]);
+    }catch(videoErr){
+      // Fallback: video có thể bị hạn chế → quay lại phân tích qua thumbnail
+      console.warn('[Character Sheet] Không đọc được video thật, fallback sang thumbnail:',videoErr.message);
+      const fallbackParts=thumbB64
+        ?[{inlineData:{mimeType:'image/jpeg',data:thumbB64}},{text:promptText}]
+        :[{text:promptText}];
+      raw=await callGeminiText(fallbackParts,apiKey,[MODEL_TEXT_VIDEO]);
+    }
     const parsed=JSON.parse(raw.replace(/```json|```/g,'').trim());
     lastChars=parsed.characters||[];
 
@@ -2538,12 +2566,23 @@ RULES:
 5. If no new characters found, return {"new_characters":[]}
 Return ONLY valid JSON: ${schema}`;
 
-  const parts=thumbB64
-    ?[{inlineData:{mimeType:'image/jpeg',data:thumbB64}},{text:promptText}]
-    :[{text:promptText}];
+  const parts=[
+    {fileData:{fileUri:url,mimeType:'video/*'}},
+    {text:promptText.replace(`Analyze this YouTube video (URL: ${url}).`,'Watch this video carefully — analyze the ACTUAL visual footage across the video (not just the thumbnail).')}
+  ];
 
   try{
-    const raw=await callGeminiText(parts,apiKey);
+    let raw;
+    try{
+      raw=await callGeminiText(parts,apiKey,[MODEL_TEXT_VIDEO]);
+    }catch(videoErr){
+      // Fallback: video có thể bị hạn chế → quay lại phân tích qua thumbnail
+      console.warn('[Rescan] Không đọc được video thật, fallback sang thumbnail:',videoErr.message);
+      const fallbackParts=thumbB64
+        ?[{inlineData:{mimeType:'image/jpeg',data:thumbB64}},{text:promptText}]
+        :[{text:promptText}];
+      raw=await callGeminiText(fallbackParts,apiKey,[MODEL_TEXT_VIDEO]);
+    }
     const parsed=JSON.parse(raw.replace(/```json|```/g,'').trim());
     rescanCandidates=parsed.new_characters||[];
 
