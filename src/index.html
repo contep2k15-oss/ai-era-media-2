@@ -4164,7 +4164,7 @@ RULES:
 // Supports both text-only and image+text (ref image) inputs
 const IG_MODEL=MODEL_IMAGE;
 
-async function igCallGeminiImage(apiKey, optimizedPrompt, refImageBase64, endpoint, extraRefBase64){
+async function igCallGeminiImage(apiKey, optimizedPrompt, refImageBase64, endpoint, extraRefBase64, videoUrl){
   // Thử Vertex AI trước nếu đã đăng nhập
   const vertexToken = await getVertexToken();
   if(vertexToken){
@@ -4172,6 +4172,7 @@ async function igCallGeminiImage(apiKey, optimizedPrompt, refImageBase64, endpoi
     console.log(`[Vertex Image] Request at ${new Date().toISOString()}`);
 
     const parts=[];
+    if(videoUrl) parts.push({fileData:{fileUri:videoUrl,mimeType:'video/*'}});
     if(refImageBase64) parts.push({inlineData:{mimeType:'image/png',data:refImageBase64}});
     if(extraRefBase64) parts.push({inlineData:{mimeType:'image/png',data:extraRefBase64}});
     parts.push({text:optimizedPrompt});
@@ -4279,8 +4280,12 @@ function igToggleRefPrompt(idx){
   if(!ta.value.trim()&&lastChars&&lastChars[idx]){
     const c=lastChars[idx];
     const name=c.name||'Unknown';
+    const videoUrl=$('urlInput')?.value.trim()||'';
+    const videoRefNote=(!!videoUrl && !!getVideoId(videoUrl))
+      ?`\n\nIMPORTANT: A reference video is attached — base ${name}'s exact appearance (face, hair, outfit, colors, distinguishing features) on how they actually look in that video footage. Match the real visual details seen in the video as closely as possible.`
+      :'';
     ta.value=`Character reference sheet of ${name}. ${c.ai_prompt||''}
-Full body standing pose, facing forward, arms slightly away from body so all limbs clearly visible. Plain white background. Studio lighting, even and flat. Complete figure from head to toe, no cropping. High quality character illustration. Small name label "${name}" at the very bottom center.`;
+Full body standing pose, facing forward, arms slightly away from body so all limbs clearly visible. Plain white background. Studio lighting, even and flat. Complete figure from head to toe, no cropping. High quality character illustration. Small name label "${name}" at the very bottom center.${videoRefNote}`;
   }
 
   if(wrap.style.display==='none'){
@@ -4300,10 +4305,18 @@ async function igGenerateRef(idx){
   const btn=$(`igrefbtn_${idx}`);
   btn.disabled=true;btn.textContent='⏳ Generating…';
 
+  // Lấy link video gốc (nếu còn) để tạo ảnh dựa trên hình ảnh thật trong video,
+  // thay vì chỉ đoán từ mô tả text — chính xác hơn nhiều cho ngoại hình nhân vật
+  const videoUrl=$('urlInput')?.value.trim()||'';
+  const useVideoRef=!!videoUrl && !!getVideoId(videoUrl);
+  const videoRefNote=useVideoRef
+    ?`\n\nIMPORTANT: A reference video is attached — base ${name}'s exact appearance (face, hair, outfit, colors, distinguishing features) on how they actually look in that video footage. Match the real visual details seen in the video as closely as possible.`
+    :'';
+
   // Dùng prompt từ textarea nếu user đã sửa, nếu không dùng prompt mặc định
   const editedTA=$(`igrefprompt_${idx}`);
   const defaultRefPrompt=`Character reference sheet of ${name}. ${c.ai_prompt||''}
-Full body standing pose, facing forward, arms slightly away from body so all limbs clearly visible. Plain white background. Studio lighting, even and flat. Complete figure from head to toe, no cropping. High quality character illustration. Small name label "${name}" at the very bottom center.`;
+Full body standing pose, facing forward, arms slightly away from body so all limbs clearly visible. Plain white background. Studio lighting, even and flat. Complete figure from head to toe, no cropping. High quality character illustration. Small name label "${name}" at the very bottom center.${videoRefNote}`;
   const refPrompt=(editedTA&&editedTA.value.trim())?editedTA.value.trim():defaultRefPrompt;
   // Điền vào textarea để user thấy prompt đang dùng
   if(editedTA&&!editedTA.value.trim()) editedTA.value=defaultRefPrompt;
@@ -4312,15 +4325,22 @@ Full body standing pose, facing forward, arms slightly away from body so all lim
     const imgApiKey=apiKey;
     const imgEndpoint=null; // Image dùng Vertex AI hoàn toàn
 
-    let imgB64=null, attempts=0;
+    let imgB64=null, attempts=0, videoRefFailed=false;
     while(attempts<4 && !imgB64){
       attempts++;
       try{
         btn.textContent=attempts>1?`🔄 Retry ${attempts}/4…`:'🎨 Đang tạo ảnh...';
-        imgB64=await igCallGeminiImage(imgApiKey, refPrompt, null, imgEndpoint);
+        imgB64=await igCallGeminiImage(imgApiKey, refPrompt, null, imgEndpoint, null, (useVideoRef&&!videoRefFailed)?videoUrl:null);
       }catch(e){
         const isExhaustedRef=(e.message||'').match(/exhausted|quota|limit|429|resource/i);
         const isRetry=(e.message||'').match(/demand|retry|500|503|overload|temporarily/i);
+        if(useVideoRef&&!videoRefFailed&&!isExhaustedRef&&!isRetry){
+          // Video có thể không truy cập được (riêng tư/hạn chế) → bỏ video ref, thử lại bằng text-only ngay
+          console.warn('[igGenerateRef] Video ref thất bại, chuyển sang text-only:',e.message);
+          videoRefFailed=true;
+          attempts--; // không tính lần này vào số lần thử
+          continue;
+        }
         if(isExhaustedRef && attempts<4){
           const wait=attempts*30;
           for(let s=wait;s>0;s--){
