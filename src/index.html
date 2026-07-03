@@ -3653,7 +3653,9 @@ function addWavHeader(pcmData, sampleRate=24000, numChannels=1, bitsPerSample=16
   return new Uint8Array(buf);
 }
 
-const TTS_SENTENCES_PER_CHUNK=6; // Edge TTS xử lý nhanh hơn
+const TTS_WORDS_PER_SEC=2.5; // tốc độ đọc ước tính, dùng chung với phần tính thời lượng khác trong app
+const TTS_TARGET_CHUNK_SEC=180; // mỗi đoạn gọi Edge TTS ~3 phút audio là hợp lý
+const TTS_TARGET_CHUNK_WORDS=TTS_WORDS_PER_SEC*TTS_TARGET_CHUNK_SEC; // ≈450 từ/đoạn
 
 function ttsChunkText(text){
   const sentences=text
@@ -3664,9 +3666,13 @@ function ttsChunkText(text){
 
   if(!sentences.length)return[text];
 
+  const totalWords=text.trim().split(/\s+/).filter(Boolean).length;
+  const numChunks=Math.max(1,Math.min(sentences.length,Math.round(totalWords/TTS_TARGET_CHUNK_WORDS)));
+  const perChunk=Math.ceil(sentences.length/numChunks);
+
   const chunks=[];
-  for(let i=0;i<sentences.length;i+=TTS_SENTENCES_PER_CHUNK){
-    const group=sentences.slice(i,i+TTS_SENTENCES_PER_CHUNK).join(' ');
+  for(let i=0;i<sentences.length;i+=perChunk){
+    const group=sentences.slice(i,i+perChunk).join(' ');
     if(group.trim())chunks.push(group.trim());
   }
   return chunks.length?chunks:[text];
