@@ -1417,6 +1417,36 @@ html,body{height:100%;overflow:hidden;background:var(--bg0);color:var(--text);fo
     </div>
   </div>
 
+  <!-- STEP 5: TỐC ĐỘ ĐỌC & CẮT KHOẢNG LẶNG -->
+  <div class="block tts-step" id="ttsPaceBlock" style="display:none;">
+    <div class="section-head">
+      <div class="section-num">5</div>
+      <div class="section-title">Tốc độ đọc & Khoảng nghỉ</div>
+      <div class="section-sub">Khắc phục hiện tượng nghỉ hơi lâu sau mỗi câu</div>
+    </div>
+    <div class="block-body">
+      <div style="margin-bottom:14px;">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;">
+          <span class="as-label" style="margin:0;">Tốc độ đọc</span>
+          <span id="ttsRateVal" style="font-size:12px;font-weight:700;color:var(--accent2);">+0%</span>
+        </div>
+        <input type="range" id="ttsRateSlider" min="-20" max="30" step="1" value="0" style="width:100%;" oninput="ttsOnRateChange(this.value)">
+        <div style="display:flex;justify-content:space-between;font-size:10px;color:var(--text3);"><span>Chậm hơn</span><span>Bình thường</span><span>Nhanh hơn</span></div>
+      </div>
+      <div>
+        <label style="display:flex;align-items:center;gap:8px;cursor:pointer;margin-bottom:6px;">
+          <input type="checkbox" id="ttsSilenceTrimEnable" checked onchange="ttsOnSilenceToggle(this.checked)">
+          <span class="as-label" style="margin:0;">Tự động cắt ngắn khoảng lặng dài</span>
+        </label>
+        <div id="ttsSilenceTrimRow" style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;">
+          <span style="font-size:11px;color:var(--text3);">Cắt khoảng lặng xuống còn:</span>
+          <span id="ttsSilenceTrimVal" style="font-size:12px;font-weight:700;color:var(--accent2);">220ms</span>
+        </div>
+        <input type="range" id="ttsSilenceTrimMs" min="100" max="400" step="10" value="220" style="width:100%;" oninput="ttsOnSilenceMsChange(this.value)">
+      </div>
+    </div>
+  </div>
+
   <!-- GENERATE -->
   <div id="ttsGenerateBlock" style="display:none;">
     <button class="btn-action-primary" id="ttsBtnGen" onclick="ttsGenerate()">
@@ -3093,6 +3123,45 @@ const TTS_DUR_WORDS={
 let ttsSelectedStyle='documentary';
 let ttsSelectedDur='1min';
 let ttsSelectedVoice='en-US-AndrewNeural';
+let ttsRate=0; // % tốc độ đọc, truyền cho Edge TTS
+let ttsSilenceTrimEnable=true;
+let ttsSilenceTrimMs=220; // cắt khoảng lặng dài xuống còn bao nhiêu ms
+function ttsOnRateChange(v){
+  ttsRate=parseInt(v,10);
+  $('ttsRateVal').textContent=(ttsRate>=0?'+':'')+ttsRate+'%';
+}
+function ttsOnSilenceToggle(checked){
+  ttsSilenceTrimEnable=checked;
+  $('ttsSilenceTrimRow').style.opacity=checked?'1':'.4';
+  $('ttsSilenceTrimMs').disabled=!checked;
+}
+function ttsOnSilenceMsChange(v){
+  ttsSilenceTrimMs=parseInt(v,10);
+  $('ttsSilenceTrimVal').textContent=ttsSilenceTrimMs+'ms';
+}
+// Quét PCM Int16 mono, cắt các khoảng lặng dài hơn maxMs xuống còn maxMs
+function ttsTrimSilence(int16, sampleRate, maxMs){
+  const silenceThresh=600; // ngưỡng biên độ coi là im lặng (thang 0-32767)
+  const maxSamples=Math.round(sampleRate*maxMs/1000);
+  const minRunToTrim=Math.round(sampleRate*0.12); // chỉ xử lý khoảng lặng > 120ms, tránh cắt nhịp nghỉ tự nhiên trong từ
+  const out=new Int16Array(int16.length);
+  let outLen=0;
+  let i=0;
+  while(i<int16.length){
+    if(Math.abs(int16[i])<silenceThresh){
+      let j=i;
+      while(j<int16.length && Math.abs(int16[j])<silenceThresh) j++;
+      const runLen=j-i;
+      const keep=(runLen>minRunToTrim)?Math.min(runLen,maxSamples):runLen;
+      out.set(int16.subarray(i,i+keep),outLen);
+      outLen+=keep;
+      i=j;
+    } else {
+      out[outLen++]=int16[i++];
+    }
+  }
+  return out.subarray(0,outLen);
+}
 let ttsPreviewAudio=null;
 let ttsAudioUrl=null;
 
@@ -3368,6 +3437,7 @@ ${subTruncated}`;
       ttsCountScript();
       $('ttsRewriteBlock').style.display='block';
       $('ttsVoiceBlock').style.display='block';
+      $('ttsPaceBlock').style.display='block';
       $('ttsGenerateBlock').style.display='block';
       ttsInitVoices();
       const words=text.trim().split(/\s+/).length;
@@ -3463,17 +3533,18 @@ async function ttsGenerate(){
 
   $('ttsProgLabel').textContent='Ghép audio…';$('ttsProgBar').style.width='95%';
 
-  // WAV/PCM data — if single chunk use as-is, else merge
-  let blob;
-  if(allWavBuffers.length===1){
-    blob=new Blob([allWavBuffers[0]],{type:'audio/wav'});
-  } else {
-    // Extract PCM data from each WAV (skip 44-byte header) and re-wrap
-    const pcmArrays=allWavBuffers.map(buf=>buf.slice(44));
-    const merged=mergePcm(pcmArrays);
-    const wav=pcmToWav(merged,24000);
-    blob=new Blob([wav],{type:'audio/wav'});
+  // Luôn tách PCM (bỏ 44-byte header) rồi ghép — kể cả khi chỉ có 1 chunk,
+  // để có thể áp dụng bước cắt khoảng lặng đồng nhất
+  const pcmArrays=allWavBuffers.map(buf=>buf.slice(44));
+  let merged=mergePcm(pcmArrays);
+  if(ttsSilenceTrimEnable){
+    $('ttsProgLabel').textContent='Đang cắt khoảng lặng…';
+    const int16=new Int16Array(merged.buffer,merged.byteOffset,Math.floor(merged.byteLength/2));
+    const trimmed=ttsTrimSilence(int16,24000,ttsSilenceTrimMs);
+    merged=new Uint8Array(trimmed.buffer,trimmed.byteOffset,trimmed.byteLength);
   }
+  const wav=pcmToWav(merged,24000);
+  const blob=new Blob([wav],{type:'audio/wav'});
   if(ttsAudioUrl)URL.revokeObjectURL(ttsAudioUrl);
   ttsAudioUrl=URL.createObjectURL(blob);
 
@@ -3500,7 +3571,7 @@ async function ttsCallAPI(apiKey,text,voice,stylePrompt){
   if(!window.electronAPI||!window.electronAPI.edgeTTS){
     throw new Error('Edge TTS cần chạy trong app desktop');
   }
-  var result=await window.electronAPI.edgeTTS({text:text,voice:voice,rate:'+0%',pitch:'+0Hz'});
+  var result=await window.electronAPI.edgeTTS({text:text,voice:voice,rate:(ttsRate>=0?'+':'')+ttsRate+'%',pitch:'+0Hz'});
   if(!result||!result.ok) throw new Error(result?result.error:'Edge TTS lỗi');
   var mp3Bytes=Uint8Array.from(atob(result.data),function(c){return c.charCodeAt(0);});
   var audioCtx=new (window.AudioContext||window.webkitAudioContext)();
