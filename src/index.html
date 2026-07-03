@@ -3415,7 +3415,7 @@ EXISTING SCRIPT (do not repeat this, continue naturally from here):
     try{
       const data=await callVertexOrStudio(MODEL_TEXT_SCRIPT,{
         contents:[{role:'user',parts:[{text:expandPrompt}]}],
-        generationConfig:{temperature:0.7,maxOutputTokens:4096}
+        generationConfig:{temperature:0.7,maxOutputTokens:8192,thinkingConfig:{thinkingLevel:'low'}}
       },apiKey);
       if(data.error)break;
       const more=data.candidates?.[0]?.content?.parts?.map(p=>p.text||'').join('')||'';
@@ -3473,7 +3473,7 @@ ${subTruncated}`;
       $('ttsBtnRewrite').textContent=`⏳ Đang viết lại (${model})...`;
       const data=await callVertexOrStudio(model,{
         contents:[{role:'user',parts:[{text:prompt}]}],
-        generationConfig:{temperature:0.7,maxOutputTokens:8192}
+        generationConfig:{temperature:0.7,maxOutputTokens:16384,thinkingConfig:{thinkingLevel:'low'}}
       },apiKey);
       if(data.error){
         const msg=data.error.message||'';
