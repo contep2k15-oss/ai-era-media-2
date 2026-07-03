@@ -1777,7 +1777,8 @@ html,body{height:100%;overflow:hidden;background:var(--bg0);color:var(--text);fo
 
 <script>
 // ── MODEL ASSIGNMENT ──
-const MODEL_TEXT    = 'gemini-3.1-flash-lite';  // Character Sheet, Prompt Engineer, Rewrite, DNA, mọi tác vụ text
+const MODEL_TEXT    = 'gemini-3.1-flash-lite';  // Character Sheet, Prompt Engineer, DNA, mọi tác vụ text khác
+const MODEL_TEXT_SCRIPT = 'gemini-3.5-flash';   // Riêng cho viết lại kịch bản Voiceover — cần bám sát độ dài & mạch văn tốt hơn
 const MODEL_TTS     = 'gemini-3.1-flash-tts-preview'; // TTS voice generation (full)
 const MODEL_TTS_PREVIEW = 'gemini-2.5-flash-preview-tts'; // Preview nghe thử giọng
 const MODEL_IMAGE   = 'gemini-2.5-flash-image'; // Nano Banana
@@ -1805,6 +1806,7 @@ const API_VERTEX_REGIONAL = 'https://us-central1-aiplatform.googleapis.com';
 
 const VERTEX_MODELS = {
   [MODEL_TEXT]:        { id: 'gemini-3.1-flash-lite',        region: 'global'      },
+  [MODEL_TEXT_SCRIPT]: { id: 'gemini-3.5-flash',              region: 'global'      },
   [MODEL_TTS]:         { id: 'gemini-3.1-flash-tts-preview', region: 'global'      },
   [MODEL_TTS_PREVIEW]: { id: 'gemini-2.5-flash-preview-tts', region: 'us-central1' },
   [MODEL_IMAGE]:       { id: 'gemini-3.1-flash-image',       region: 'global'      },
@@ -3371,6 +3373,39 @@ function ttsCountScript(){
 }
 
 // ── REWRITE ──
+// Nếu kịch bản viết ra ngắn hơn nhiều so với mục tiêu, tự động gọi thêm
+// để "viết tiếp" cho đủ, thay vì chấp nhận bản ngắn
+async function ttsExpandToTarget(text, durWords, stylePrompt, apiKey, progressCb){
+  let current=text.trim();
+  let attempts=0;
+  while(durWords>0 && attempts<3){
+    const words=current.split(/\s+/).filter(Boolean).length;
+    if(words>=durWords*0.85) break;
+    attempts++;
+    const needMore=durWords-words;
+    if(progressCb)progressCb(`⏳ Đang mở rộng thêm nội dung (${words}/${durWords} từ, lần ${attempts})...`);
+    const expandPrompt=`${stylePrompt}
+
+You are continuing/expanding a voiceover script that is currently too short. It currently has ${words} words but needs approximately ${durWords} words total.
+
+Write approximately ${Math.max(needMore,80)} MORE words that continue naturally from where the script leaves off — elaborate with more descriptive detail, examples, context, or additional relevant content in the same style and tone. Do NOT summarize or repeat what was already said. Do NOT add headers, markers, or meta-commentary. Output ONLY the additional continuation text — it will be appended directly after the existing text.
+
+EXISTING SCRIPT (do not repeat this, continue naturally from here):
+...${current.slice(-1500)}`;
+    try{
+      const data=await callVertexOrStudio(MODEL_TEXT_SCRIPT,{
+        contents:[{role:'user',parts:[{text:expandPrompt}]}],
+        generationConfig:{temperature:0.7,maxOutputTokens:4096}
+      },apiKey);
+      if(data.error)break;
+      const more=data.candidates?.[0]?.content?.parts?.map(p=>p.text||'').join('')||'';
+      if(!more.trim())break;
+      current=current+' '+more.trim();
+    }catch(e){break;}
+  }
+  return current;
+}
+
 async function ttsRewrite(){
   const apiKey=$('apiKey').value.trim();
   // apiKey không cần thiết — dùng Vertex OAuth
@@ -3382,7 +3417,7 @@ async function ttsRewrite(){
 
   const durWords=TTS_DUR_WORDS[ttsSelectedDur];
   const durInstruction=durWords>0
-    ?`Target length: approximately ${durWords} words (${ttsSelectedDur} of audio at natural speaking pace).`
+    ?`TARGET LENGTH: approximately ${durWords} words (${ttsSelectedDur} of spoken audio at natural pace). This is a STRICT requirement. You MUST write enough content to reach this length — even if it means adding more descriptive detail, background context, examples, sensory description, or elaboration beyond the bare facts in the source material. Do NOT stop early just because you've covered the source content — keep expanding and elaborating in the same style until you reach the target word count. Undershooting the target length is a failure.`
     :`Keep a similar length to the original, removing only filler and ads.`;
 
   const stylePrompt=TTS_REWRITE_PROMPTS[ttsSelectedStyle];
@@ -3409,14 +3444,14 @@ CRITICAL RULES:
 SOURCE SUBTITLE:
 ${subTruncated}`;
 
-  // Danh sách model fallback khi high demand
-  const REWRITE_MODELS=[MODEL_TEXT];
+  // Chỉ dùng gemini-3.5-flash — không fallback về Lite
+  const REWRITE_MODELS=[MODEL_TEXT_SCRIPT];
 
   let lastErr='';
   for(const model of REWRITE_MODELS){
     try{
       $('ttsBtnRewrite').textContent=`⏳ Đang viết lại (${model})...`;
-      const data=await callVertexOrStudio(MODEL_TEXT,{
+      const data=await callVertexOrStudio(model,{
         contents:[{role:'user',parts:[{text:prompt}]}],
         generationConfig:{temperature:0.7,maxOutputTokens:8192}
       },apiKey);
@@ -3433,14 +3468,17 @@ ${subTruncated}`;
       const text=data.candidates?.[0]?.content?.parts?.map(p=>p.text||'').join('')||'';
       if(!text) throw new Error('API trả về nội dung trống');
 
-      $('ttsScriptOut').value=text.trim();
+      const finalText=await ttsExpandToTarget(text,durWords,stylePrompt,apiKey,
+        (msg)=>{$('ttsBtnRewrite').textContent=msg;});
+
+      $('ttsScriptOut').value=finalText;
       ttsCountScript();
       $('ttsRewriteBlock').style.display='block';
       $('ttsVoiceBlock').style.display='block';
       $('ttsPaceBlock').style.display='block';
       $('ttsGenerateBlock').style.display='block';
       ttsInitVoices();
-      const words=text.trim().split(/\s+/).length;
+      const words=finalText.trim().split(/\s+/).length;
       $('ttsRewriteMeta').textContent=`${words} từ · ${model} · phong cách: ${ttsSelectedStyle}${sub.length>MAX_INPUT?' (đã cắt bớt input)':''} · chỉnh sửa nếu cần`;
       $('ttsRewriteBlock').scrollIntoView({behavior:'smooth',block:'start'});
       lastErr=''; // success
