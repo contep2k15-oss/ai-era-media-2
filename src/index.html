@@ -2198,6 +2198,16 @@ function renderStyleAnalysisCard(sa, proj){
 
 // ── THUMBNAIL ──
 function getVideoId(url){const m=url.match(/(?:v=|youtu\.be\/|shorts\/)([a-zA-Z0-9_-]{11})/);return m?m[1]:null;}
+
+// Ghi chú gửi kèm khi tạo ảnh tham chiếu có video làm ngữ cảnh — ép model:
+// 1) bỏ qua ảnh thật/kiến thức có sẵn về người nổi tiếng (VD tổng thống, nhân vật lịch sử)
+// 2) vẫn bám đúng phong cách vẽ chung của video kể cả khi nhân vật xuất hiện ít/mờ
+function buildVideoRefNote(name){
+  return `\n\nIMPORTANT — VIDEO IS THE ONLY VISUAL TRUTH: A reference video is attached. Base ${name}'s exact appearance (face, hair, outfit, colors, distinguishing features) ONLY on how they are drawn/depicted in that video footage.
+- If you recognize this name from real-world knowledge (e.g. a historical or public figure) and have other mental images of real photographs of them, IGNORE those — they are IRRELEVANT here. Do NOT default to a photorealistic or documentary-photo rendering of this person.
+- Match the video's specific illustrated art style, line quality, color palette, shading technique, and rendering method — the SAME visual style used for every other character in this video.
+- If this character has limited or unclear screen time in the video, still strictly match the overall illustration style/technique shown throughout the video (do not fall back to generic or realistic rendering).`;
+}
 async function loadThumb(vid){
   for(const q of['maxresdefault','hqdefault','mqdefault']){
     try{
@@ -4282,7 +4292,7 @@ function igToggleRefPrompt(idx){
     const name=c.name||'Unknown';
     const videoUrl=$('urlInput')?.value.trim()||'';
     const videoRefNote=(!!videoUrl && !!getVideoId(videoUrl))
-      ?`\n\nIMPORTANT: A reference video is attached — base ${name}'s exact appearance (face, hair, outfit, colors, distinguishing features) on how they actually look in that video footage. Match the real visual details seen in the video as closely as possible.`
+      ?buildVideoRefNote(name)
       :'';
     ta.value=`Character reference sheet of ${name}. ${c.ai_prompt||''}
 Full body standing pose, facing forward, arms slightly away from body so all limbs clearly visible. Plain white background. Studio lighting, even and flat. Complete figure from head to toe, no cropping. High quality character illustration. Small name label "${name}" at the very bottom center.${videoRefNote}`;
@@ -4310,7 +4320,7 @@ async function igGenerateRef(idx){
   const videoUrl=$('urlInput')?.value.trim()||'';
   const useVideoRef=!!videoUrl && !!getVideoId(videoUrl);
   const videoRefNote=useVideoRef
-    ?`\n\nIMPORTANT: A reference video is attached — base ${name}'s exact appearance (face, hair, outfit, colors, distinguishing features) on how they actually look in that video footage. Match the real visual details seen in the video as closely as possible.`
+    ?buildVideoRefNote(name)
     :'';
 
   // Dùng prompt từ textarea nếu user đã sửa, nếu không dùng prompt mặc định
