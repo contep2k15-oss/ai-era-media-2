@@ -1079,6 +1079,26 @@ html,body{height:100%;overflow:hidden;background:var(--bg0);color:var(--text);fo
     </div>
   </div>
 
+  <!-- STEP 2.5: GIỮ KHUNG HÌNH (tùy chọn, mặc định tắt) -->
+  <div class="block pe-section">
+    <div class="section-head">
+      <div class="section-num">2b</div>
+      <div class="section-title">Giữ khung hình (tùy chọn)</div>
+      <div class="section-sub">Một số cảnh giữ nguyên bối cảnh, chỉ đổi tư thế nhân vật</div>
+    </div>
+    <div class="block-body">
+      <label style="display:flex;align-items:center;gap:8px;cursor:pointer;margin-bottom:8px;">
+        <input type="checkbox" id="peSameFrameEnable" onchange="peOnSameFrameToggle(this.checked)">
+        <span class="as-label" style="margin:0;">Bật tính năng giữ khung hình</span>
+      </label>
+      <div id="peSameFrameRow" style="display:none;align-items:center;gap:8px;">
+        <span style="font-size:12px;color:var(--text3);">Số lần áp dụng (N):</span>
+        <input type="number" id="peSameFrameN" min="1" max="20" value="3" style="width:70px;padding:5px 10px;font-size:13px;font-family:var(--sans);background:var(--bg3);border:1px solid var(--border2);border-radius:var(--rs);color:var(--text);outline:none;">
+        <span style="font-size:10px;color:var(--text3);">AI tự chọn cảnh phù hợp (ưu tiên cảnh tĩnh/giải thích)</span>
+      </div>
+    </div>
+  </div>
+
   <!-- STEP 3: PHONG CÁCH -->
   <div class="block pe-section">
     <div class="section-head">
@@ -2744,6 +2764,15 @@ function switchTab(tab){
 // PROMPT ENGINEER — STATE
 // ══════════════════════════════════════════
 let peDensity=3, peStyle='cinematic', peSelectedChars=new Set(), peScenes=[], peBatchSize=3, peAllOutput='';
+let peSameFrameEnable=false, peSameFrameN=3;
+function peOnSameFrameToggle(checked){
+  peSameFrameEnable=checked;
+  $('peSameFrameRow').style.display=checked?'flex':'none';
+}
+$('peSameFrameN')?.addEventListener('input',()=>{
+  const v=parseInt($('peSameFrameN').value,10);
+  peSameFrameN=(v>0)?Math.min(v,20):3;
+});
 
 const PE_STYLE_PROMPTS={
   auto:'',  // resolved at runtime from lastProject.art_style
@@ -2895,7 +2924,13 @@ async function peGenerate(){
       `Nhân vật: ${charNames} · Đoạn ${batch*peBatchSize+1}–${Math.min((batch+1)*peBatchSize,peScenes.length)}`
     );
     try{
-      await peRunBatch(apiKey,batch,totalBatches);
+      const batchStart0=batch*peBatchSize;
+      const batchEnd0=Math.min(batchStart0+peBatchSize,peScenes.length);
+      const batchSceneCount=batchEnd0-batchStart0;
+      const batchSameFrameN=(peSameFrameEnable&&peSameFrameN>0)
+        ? Math.max(0,Math.round(peSameFrameN*batchSceneCount/peScenes.length))
+        : 0;
+      await peRunBatch(apiKey,batch,totalBatches,batchSameFrameN);
     }catch(e){
       peShowErr(`Lỗi đợt ${batch+1}: ${e.message||'Không xác định'}`);
       $('peBtnGenerate').disabled=false;
@@ -2937,7 +2972,7 @@ async function peGenerate(){
   setTimeout(()=>$('peResults').scrollIntoView({behavior:'smooth',block:'start'}),200);
 }
 
-async function peRunBatch(apiKey,batchIndex,totalBatches){
+async function peRunBatch(apiKey,batchIndex,totalBatches,batchSameFrameN=0){
   const allDNA=buildAllDNA();
 
   // Resolve style: auto → use lastProject.art_style, fallback to cinematic
@@ -3013,7 +3048,8 @@ RULES:
 2. B/C/D — correct REF tag(s) at the very start, then vivid scene description
 3. Same scene: same location, outfit, time of day across all shots — only camera angle differs
 4. CRITICAL: refer notes at end of B/C/D MUST match ONLY the [REF: name] tags used in that specific prompt
-5. Output: plain text, labels [N.X] on own line, prompts separated by ---, no extra headers`;
+5. Output: plain text, labels [N.X] on own line, prompts separated by ---, no extra headers${batchSameFrameN>0?`
+6. SAME-FRAME MODE: Among the B/C/D shots in this batch, select approximately ${batchSameFrameN} shot(s) where the character stays in the exact same background/framing as the immediately preceding shot in the same scene, only changing pose/gesture/expression (e.g. a hand moving, a head turning) — PRIORITIZE static, explanatory, or dialogue-heavy scenes for this; AVOID fast action or scene-transition moments. For each selected shot, append ":SF" to its label, e.g. "[2.C:SF]", and write its description as an explicit continuation of the previous shot (describe ONLY what changes — the new pose/gesture — assuming background/lighting/camera stay identical). Do not use SF on [N.A] establishing shots or on the first shot (B) of any scene (there must be a preceding shot in the same scene to continue from).`:''}`;
 
   const densityMap={1:'1 prompt per scene: [N.A] only — single action shot',2:'2 prompts per scene: [N.A] establishing shot, then [N.B] action shot',3:'3 prompts per scene: [N.A] establishing, [N.B] action, [N.C] close-up/detail',4:'4 prompts per scene: [N.A] establishing, [N.B] action, [N.C] close-up, [N.D] bonus reaction/detail',5:'5 prompts per scene: [N.A] establishing, [N.B] action, [N.C] close-up, [N.D] detail shot, [N.E] emotional beat'};
 
@@ -3520,6 +3556,19 @@ ${subTruncated}`;
 }
 
 // ── GENERATE FULL VOICE ──
+const TTS_SAFE_SENTENCES_PER_CALL=6; // giới hạn an toàn mỗi LẦN GỌI Edge TTS thực tế — tách riêng khỏi số "đoạn" hiển thị tiến trình
+
+function ttsSplitSafe(text){
+  const sentences=text.replace(/([.!?])\s+/g,'$1\n').split('\n').map(s=>s.trim()).filter(Boolean);
+  if(!sentences.length)return[text];
+  const pieces=[];
+  for(let i=0;i<sentences.length;i+=TTS_SAFE_SENTENCES_PER_CALL){
+    const group=sentences.slice(i,i+TTS_SAFE_SENTENCES_PER_CALL).join(' ');
+    if(group.trim())pieces.push(group.trim());
+  }
+  return pieces.length?pieces:[text];
+}
+
 async function ttsGenerate(){
   const apiKey=$('apiKey').value.trim();
   const script=$('ttsScriptOut').value.trim();
@@ -3546,40 +3595,49 @@ async function ttsGenerate(){
     $('ttsProgPct').textContent=pct+'%';
     $('ttsProgLabel').textContent=`Chunk ${i+1}/${chunks.length} đang xử lý…`;
 
-    let wavBuf=null;let attempts=0;
-    while(attempts<5&&!wavBuf){
-      attempts++;
-      try{
-        wavBuf=await ttsCallAPI(apiKey,chunks[i],ttsSelectedVoice,stylePrompt);
-        if(!wavBuf||wavBuf.length<100){
-          // API trả về empty/rỗng — retry
-          wavBuf=null;
-          throw new Error('Audio data rỗng, thử lại...');
-        }
-      }catch(e){
-        const msg=e.message||'';
-        const isRetry=msg.match(/quota|demand|retry|500|503|429|rỗng|empty/i);
-        if(attempts<5){
-          const wait=isRetry?20:8; // 20s nếu quota, 8s nếu lỗi khác
-          for(let s=wait;s>0;s--){
-            if(ttsStopped)break;
-            $('ttsProgLabel').textContent=`Chunk ${i+1}: Thử lại sau ${s}s (lần ${attempts}/5)…`;
-            await new Promise(r=>setTimeout(r,1000));
+    // Chia nhỏ đoạn lớn thành các lần gọi Edge TTS an toàn (nội bộ, không đổi UI hiển thị)
+    const safePieces=ttsSplitSafe(chunks[i]);
+    for(let p=0;p<safePieces.length;p++){
+      if(ttsStopped)break;
+      while(ttsPaused){await new Promise(r=>setTimeout(r,200));if(ttsStopped)break;}
+      if(ttsStopped)break;
+
+      let wavBuf=null;let attempts=0;
+      while(attempts<5&&!wavBuf){
+        attempts++;
+        try{
+          wavBuf=await ttsCallAPI(apiKey,safePieces[p],ttsSelectedVoice,stylePrompt);
+          if(!wavBuf||wavBuf.length<100){
+            // API trả về empty/rỗng — retry
+            wavBuf=null;
+            throw new Error('Audio data rỗng, thử lại...');
           }
-        }else{
-          // Sau 5 lần vẫn lỗi → bỏ qua chunk này và tiếp tục
-          $('ttsErrEl').textContent=`⚠ Chunk ${i+1} lỗi sau 5 lần thử: ${msg} — Bỏ qua và tiếp tục`;
-          $('ttsErrEl').classList.add('show');
-          break;
+        }catch(e){
+          const msg=e.message||'';
+          const isRetry=msg.match(/quota|demand|retry|500|503|429|rỗng|empty/i);
+          if(attempts<5){
+            const wait=isRetry?20:8; // 20s nếu quota, 8s nếu lỗi khác
+            for(let s=wait;s>0;s--){
+              if(ttsStopped)break;
+              $('ttsProgLabel').textContent=`Chunk ${i+1}: Thử lại sau ${s}s (lần ${attempts}/5)…`;
+              await new Promise(r=>setTimeout(r,1000));
+            }
+          }else{
+            // Sau 5 lần vẫn lỗi → bỏ qua phần này và tiếp tục
+            $('ttsErrEl').textContent=`⚠ Chunk ${i+1} lỗi sau 5 lần thử: ${msg} — Bỏ qua và tiếp tục`;
+            $('ttsErrEl').classList.add('show');
+            break;
+          }
         }
+      }
+      if(ttsStopped)break;
+      if(wavBuf)allWavBuffers.push(wavBuf);
+      // 10 RPM limit → cần ít nhất vài giây giữa các lần gọi thực tế
+      if(!(i===chunks.length-1 && p===safePieces.length-1)){
+        await new Promise(r=>setTimeout(r,500));
       }
     }
     if(ttsStopped)break;
-    if(wavBuf)allWavBuffers.push(wavBuf);
-    // 10 RPM limit → cần ít nhất 6s giữa requests
-    if(i<chunks.length-1){
-      await new Promise(r=>setTimeout(r,500));
-    }
   }
 
   if(ttsStopped){
@@ -3798,16 +3856,18 @@ function igParsePrompts(){
   if(!raw){$('igParseInfo').textContent='';igParsedPrompts=[];return;}
   const blocks=raw.split(/\n?---\n?/).map(b=>b.trim()).filter(Boolean);
   igParsedPrompts=blocks.map(block=>{
-    const labelMatch=block.match(/^\[(\d+\.[A-E])\]/);
+    const labelMatch=block.match(/^\[(\d+\.[A-E])(:SF)?\]/i);
     const label=labelMatch?labelMatch[1]:'?';
-    const text=block.replace(/^\[\d+\.[A-E]\]\s*/,'').trim();
+    const sameFrame=!!(labelMatch&&labelMatch[2]);
+    const text=block.replace(/^\[\d+\.[A-E](:SF)?\]\s*/i,'').trim();
     const refMatch=text.match(/\[REF:\s*([^—\]]+)/i);
     const refName=refMatch?refMatch[1].trim():null;
-    return {label,text,refName};
+    return {label,text,refName,sameFrame};
   });
   const withRef=igParsedPrompts.filter(p=>p.refName).length;
+  const withSF=igParsedPrompts.filter(p=>p.sameFrame).length;
   const scenes=new Set(igParsedPrompts.map(p=>p.label.split('.')[0])).size;
-  $('igParseInfo').textContent=`→ ${igParsedPrompts.length} prompt · ${scenes} đoạn · ${withRef} có ref nhân vật`;
+  $('igParseInfo').textContent=`→ ${igParsedPrompts.length} prompt · ${scenes} đoạn · ${withRef} có ref nhân vật${withSF?` · ${withSF} giữ khung hình`:''}`;
 }
 
 function igRefreshCharGrid(){
@@ -4065,7 +4125,7 @@ RULES:
 // Supports both text-only and image+text (ref image) inputs
 const IG_MODEL=MODEL_IMAGE;
 
-async function igCallGeminiImage(apiKey, optimizedPrompt, refImageBase64, endpoint){
+async function igCallGeminiImage(apiKey, optimizedPrompt, refImageBase64, endpoint, extraRefBase64){
   // Thử Vertex AI trước nếu đã đăng nhập
   const vertexToken = await getVertexToken();
   if(vertexToken){
@@ -4074,6 +4134,7 @@ async function igCallGeminiImage(apiKey, optimizedPrompt, refImageBase64, endpoi
 
     const parts=[];
     if(refImageBase64) parts.push({inlineData:{mimeType:'image/png',data:refImageBase64}});
+    if(extraRefBase64) parts.push({inlineData:{mimeType:'image/png',data:extraRefBase64}});
     parts.push({text:optimizedPrompt});
 
     const res=await fetch(url,{
@@ -4311,7 +4372,7 @@ async function igRunAll(){
           ${p.refName?`<div style="font-size:10px;color:var(--accent2);margin-top:3px;">REF: ${esc(p.refName)}</div>`:`<div style="font-size:10px;color:var(--text3);margin-top:3px;">🌍 Establishing</div>`}
         </div>
       </div>
-      <div class="ig-card-label" id="iglabel_${i}"><span>${esc(p.label)}${p.refName?' · '+esc(p.refName):''}</span></div>
+      <div class="ig-card-label" id="iglabel_${i}"><span>${esc(p.label)}${p.refName?' · '+esc(p.refName):''}${p.sameFrame?' · 🔗SF':''}</span></div>
       <textarea class="ig-prompt-edit" id="igprompt_${i}" rows="2" style="width:100%;font-size:10px;padding:4px 6px;background:var(--bg2);color:var(--text2);border:1px solid var(--border2);border-radius:4px;resize:vertical;margin-top:2px;display:none;">${esc(p.raw)}</textarea>
       <button class="btn-ig-edit" id="igediBtn_${i}" onclick="igTogglePrompt(${i})" style="width:100%;padding:3px;background:none;border:1px solid var(--border2);border-radius:4px;color:var(--text3);font-size:10px;cursor:pointer;margin-top:2px;">✏️ Sửa prompt</button>
     </div>`).join('');
@@ -4348,13 +4409,33 @@ async function igRunAll(){
     // Chỉ inject DNA khi KHÔNG có ref image — ref image tự handle style
     const styleDNA=igDNA_IG?`\nVisual Style: ${igDNA_IG}`:''; // Luôn thêm style
 
+    // ── GIỮ KHUNG HÌNH: tìm ảnh trước đó cùng cảnh, dùng làm tham chiếu DUY NHẤT ──
+    // (ảnh trước đã tự chứa đúng ngoại hình nhân vật rồi, không cần gửi thêm ảnh ref nhân vật riêng)
+    let usedSameFrameRef=false;
+    if(p.sameFrame){
+      const sceneNum=p.label.split('.')[0];
+      for(let j=i-1;j>=0;j--){
+        const prevP=igParsedPrompts[j];
+        if(!prevP)continue;
+        if(prevP.label.split('.')[0]!==sceneNum)break; // sang cảnh khác thì dừng
+        if(igGeneratedImages[j]?.dataUrl){
+          primaryRefB64=igGeneratedImages[j].dataUrl.split(',')[1]; // thay thế ref nhân vật bằng ảnh cảnh trước
+          usedSameFrameRef=true;
+          break;
+        }
+      }
+    }
+    const sameFrameNote=usedSameFrameRef
+      ?`\n\nSAME-FRAME REFERENCE: The attached reference image is the previous shot in this scene — keep the EXACT same background, camera angle, framing, and lighting as that image. Only change the character's pose/gesture/expression as described above.`
+      :'';
+
     if(Object.keys(charDNAMap).length>0){
       const dnaSnippet=Object.entries(charDNAMap).map(([name,dna])=>
         `[${name}: ${dna.visual_summary||dna.hair||''}]`
       ).join(' ');
-      finalPrompt=`[${aspectStr}]\n\n${p.text}\n\nCharacter DNA: ${dnaSnippet}\nMaintain character consistency.\n\nREMINDER: NO white margins, NO white padding, full bleed to all edges.`;
+      finalPrompt=`[${aspectStr}]\n\n${p.text}\n\nCharacter DNA: ${dnaSnippet}\nMaintain character consistency.${sameFrameNote}\n\nREMINDER: NO white margins, NO white padding, full bleed to all edges.`;
     } else {
-      finalPrompt=`[${aspectStr}]\n\n${p.text}${styleDNA}\n\nREMINDER: NO white margins, NO white padding, full bleed to all edges.`;
+      finalPrompt=`[${aspectStr}]\n\n${p.text}${styleDNA}${sameFrameNote}\n\nREMINDER: NO white margins, NO white padding, full bleed to all edges.`;
     }
 
     $(`igimg_${i}`).querySelector('div').innerHTML=`<div style="font-size:10px;color:var(--accent2)">🎨 Generating...</div>`;
