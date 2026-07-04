@@ -2096,7 +2096,7 @@ Perform a DEEP 5-LAYER STYLE ANALYSIS based on what you actually see across mult
 2. genre: Specific genre (Action Shonen / Historical Drama / Political Thriller / etc)
 3. style: Named visual style (Dark Military Dystopia / Ghibli Pastoral / Neo-noir / etc)
 4. niche: Specific niche within that style (Titan horror / Palace intrigue / Samurai revenge / etc)
-5. visual_dna: 20-40 AI image generation keywords capturing the EXACT visual language seen in the actual footage — art style, line quality, color palette, lighting, rendering technique, recurring visual motifs
+5. visual_dna: 20-40 AI image generation keywords capturing the EXACT visual language seen in the actual footage — art style, line quality, color palette, lighting, rendering technique, recurring visual motifs. Explicitly include how limbs (arms/hands/legs) are rendered — e.g. "simple stick-like limbs, minimal linework" vs "detailed shaded limbs with folds" — this must stay identical across every character regardless of how famous or minor they are.
 
 Base your analysis on the real visual content across the video's duration, not just a single frame. Return ONLY valid JSON: ${schema}`;
 
@@ -2204,8 +2204,9 @@ function getVideoId(url){const m=url.match(/(?:v=|youtu\.be\/|shorts\/)([a-zA-Z0
 // 2) vẫn bám đúng phong cách vẽ chung của video kể cả khi nhân vật xuất hiện ít/mờ
 function buildVideoRefNote(name){
   return `\n\nIMPORTANT — VIDEO IS THE ONLY VISUAL TRUTH: A reference video is attached. Base ${name}'s exact appearance (face, hair, outfit, colors, distinguishing features) ONLY on how they are drawn/depicted in that video footage.
-- If you recognize this name from real-world knowledge (e.g. a historical or public figure) and have other mental images of real photographs of them, IGNORE those — they are IRRELEVANT here. Do NOT default to a photorealistic or documentary-photo rendering of this person.
+- If you recognize this name from real-world knowledge (e.g. a historical or public figure) and have other mental images of real photographs of them, IGNORE those — they are IRRELEVANT here. Do NOT default to a photorealistic or documentary-photo rendering of this person. This applies EQUALLY regardless of how famous or historically significant the person is — do not render well-known figures with more polish, detail, or realism than other characters in this same video.
 - Match the video's specific illustrated art style, line quality, color palette, shading technique, and rendering method — the SAME visual style used for every other character in this video.
+- Pay close attention to how LIMBS specifically are drawn (arms, hands, legs): if the video uses simple/minimal "stick-figure" style limbs with few lines and little shading, replicate that exact simplicity — do NOT add extra bulk, folds, musculature, or realistic sleeve/fabric detail that isn't present in the source art style. If the video's limbs are more detailed, match that level of detail instead. The complexity of limb rendering must be IDENTICAL across all characters in this project.
 - If this character has limited or unclear screen time in the video, still strictly match the overall illustration style/technique shown throughout the video (do not fall back to generic or realistic rendering).`;
 }
 async function loadThumb(vid){
@@ -2262,7 +2263,7 @@ Analyze deeply:
 - genre: specific genre (Action Shonen/Historical Drama/Political Thriller/etc)  
 - style: named visual style (Dark Military/Ghibli Pastoral/Neo-noir/etc)
 - niche: specific niche (Dystopian horror/Titan threat/Palace intrigue/etc)
-- visual_dna: 20-40 keyword string for AI image generation that captures the EXACT visual language of this video — art style, line quality, color palette, lighting, rendering technique (HOW things are drawn/rendered)
+- visual_dna: 20-40 keyword string for AI image generation that captures the EXACT visual language of this video — art style, line quality, color palette, lighting, rendering technique (HOW things are drawn/rendered). Explicitly include how limbs (arms/hands/legs) are rendered — e.g. "simple stick-like limbs, minimal linework" vs "detailed shaded limbs with folds" — this detail must stay identical across every character generated for this project, regardless of how famous or minor the character is.
 
 TASK 2 — SETTING/BACKGROUND ANALYSIS (setting_dna):
 Scan the ENTIRE video carefully for recurring environments, locations, architecture, and props — this is about WHAT is shown, not how it's drawn. Look across multiple scenes/timestamps, not just one frame. Capture in setting_dna (20-40 keywords):
