@@ -2252,9 +2252,9 @@ async function generate(){
     ?`\n\nVISUAL DNA (MUST apply to ALL character ai_prompt fields): ${igDNA_CHAR}`
     :'';
 
-  const schema=`{"project":{"title":"string","genre":"string","video_genre":"documentary|drama|action|comedy|horror|romance|sci-fi|historical|educational|vlog|other","content_style":"string","tone":"string","target_audience":"string","setting":"string","time_period":"string","art_style":"string","color_palette":"string","cinematography":"string","pacing":"fast|medium|slow","style_analysis":{"medium":"string — Anime|Live Action|Animation|Motion Graphics|Documentary|Mixed","genre":"string — thể loại cụ thể: Action/Shonen/Historical Drama/etc","style":"string — phong cách cụ thể: Dark Military/Ghibli Pastoral/Neo-noir/etc","niche":"string — ngách cụ thể: Dystopian horror/Titan threat/Political thriller/etc","visual_dna":"string — 20-40 từ keyword cho AI image generation, VD: dark shonen anime, military dystopia, high contrast shadows, muted earth tones, dramatic Dutch angles, speed lines, intense facial expressions"}},"characters":[{"id":1,"role":"main|sub|villain|crowd|soldier|support|other","name":"string","archetype":"string","gender":"male|female|unknown","age_range":"string","appearance":{"hair":"string","eyes":"string","skin":"string","build":"string","height":"string"},"outfit":"string","personality_tags":["string"],"role_in_story":"string","ai_prompt":"Full 80-120 word AI image generation prompt. MUST include: full body standing pose, complete limbs visible (both arms and hands, both legs and feet), character standing alone, white or simple background, character name label written at the bottom of the image. Self-contained paste-ready for Midjourney/SDXL/Gemini Imagen","negative_prompt":"string — MUST include: cropped body, missing limbs, missing hands, missing feet, cut-off legs, multiple characters, group shot, partial body"}]}`;
+  const schema=`{"project":{"title":"string","genre":"string","video_genre":"documentary|drama|action|comedy|horror|romance|sci-fi|historical|educational|vlog|other","content_style":"string","tone":"string","target_audience":"string","setting":"string — short summary","setting_dna":"string — 20-40 từ keyword mô tả CHI TIẾT bối cảnh/môi trường lặp lại xuyên suốt video: kiến trúc, nội thất, đồ vật đặc trưng, địa hình, thời tiết/ánh sáng ngoại cảnh, trang phục nền, đồ dùng thời đại — dùng để giữ bối cảnh nhất quán khi tạo ảnh AI cho các cảnh khác nhau. Tách biệt với art_style (đây là NỘI DUNG bối cảnh, không phải kỹ thuật vẽ). VD: 1930s rural America, wooden farmhouses, dust bowl fields, dirt roads, vintage automobiles, gas lanterns, worn overalls, telephone poles, grain silos","time_period":"string","art_style":"string","color_palette":"string","cinematography":"string","pacing":"fast|medium|slow","style_analysis":{"medium":"string — Anime|Live Action|Animation|Motion Graphics|Documentary|Mixed","genre":"string — thể loại cụ thể: Action/Shonen/Historical Drama/etc","style":"string — phong cách cụ thể: Dark Military/Ghibli Pastoral/Neo-noir/etc","niche":"string — ngách cụ thể: Dystopian horror/Titan threat/Political thriller/etc","visual_dna":"string — 20-40 từ keyword cho AI image generation, VD: dark shonen anime, military dystopia, high contrast shadows, muted earth tones, dramatic Dutch angles, speed lines, intense facial expressions"}},"characters":[{"id":1,"role":"main|sub|villain|crowd|soldier|support|other","name":"string","archetype":"string","gender":"male|female|unknown","age_range":"string","appearance":{"hair":"string","eyes":"string","skin":"string","build":"string","height":"string"},"outfit":"string","personality_tags":["string"],"role_in_story":"string","ai_prompt":"Full 80-120 word AI image generation prompt. MUST include: full body standing pose, complete limbs visible (both arms and hands, both legs and feet), character standing alone, white or simple background, character name label written at the bottom of the image. Self-contained paste-ready for Midjourney/SDXL/Gemini Imagen","negative_prompt":"string — MUST include: cropped body, missing limbs, missing hands, missing feet, cut-off legs, multiple characters, group shot, partial body"}]}`;
 
-  const promptText=`Analyze this YouTube video (URL: ${url}) thumbnail and context.
+  const promptText=`Watch this video carefully — analyze the ACTUAL visual footage across the video's full duration (not just the thumbnail).
 
 TASK 1 — VIDEO STYLE ANALYSIS (5 layers):
 Analyze deeply:
@@ -2262,9 +2262,17 @@ Analyze deeply:
 - genre: specific genre (Action Shonen/Historical Drama/Political Thriller/etc)  
 - style: named visual style (Dark Military/Ghibli Pastoral/Neo-noir/etc)
 - niche: specific niche (Dystopian horror/Titan threat/Palace intrigue/etc)
-- visual_dna: 20-40 keyword string for AI image generation that captures the EXACT visual language of this video
+- visual_dna: 20-40 keyword string for AI image generation that captures the EXACT visual language of this video — art style, line quality, color palette, lighting, rendering technique (HOW things are drawn/rendered)
 
-TASK 2 — CHARACTER SHEET:
+TASK 2 — SETTING/BACKGROUND ANALYSIS (setting_dna):
+Scan the ENTIRE video carefully for recurring environments, locations, architecture, and props — this is about WHAT is shown, not how it's drawn. Look across multiple scenes/timestamps, not just one frame. Capture in setting_dna (20-40 keywords):
+- Recurring architecture/locations (interiors, exteriors, landmarks)
+- Era-specific objects, vehicles, furniture, tools
+- Terrain/environment type (urban/rural/indoor/outdoor, climate, lighting conditions of the world itself)
+- Background clothing/props typical of unnamed/crowd characters
+This will be used to keep backgrounds and supporting scenes visually consistent across many separately-generated AI images, so be specific and concrete (not just "historical setting" — name actual recurring visual elements you observed).
+
+TASK 3 — CHARACTER SHEET:
 Generate a complete Character Reference Sheet for ALL character types in this video's universe.
 
 RULES:
@@ -2381,6 +2389,7 @@ function getRoleLabelEN(role){
 function renderResults(data,url,styleName){
   const proj=data.project||{};
   lastProject=proj;
+  igSettingDNA=proj.setting_dna||''; // Bối cảnh chi tiết — dùng khi tạo ảnh cảnh để giữ nhất quán
   $('resultTitle').textContent=proj.title||'Character Reference Sheet';
 
   // Build meta tags
@@ -4090,6 +4099,7 @@ let igProjectStyleDNA=''; // flag tổng (backward compat)
 let igDNA_CHAR='';  // Character Sheet
 let igDNA_PE='';    // Prompt Engineer
 let igDNA_IG='';    // Image Generator
+let igSettingDNA=''; // Bối cảnh/môi trường (kiến trúc, đồ vật, địa hình...) — tách biệt khỏi phong cách vẽ
 
 // ── STEP 1: Extract Visual DNA from ref image via Gemini Vision ──
 async function igExtractDNA(imgApiKey, charName, refBase64){
@@ -4294,15 +4304,8 @@ function igToggleRefPrompt(idx){
     const videoRefNote=(!!videoUrl && !!getVideoId(videoUrl))
       ?buildVideoRefNote(name)
       :'';
-    let styleAnchorName=null;
-    for(const otherName of Object.keys(igRefImages)){
-      if(otherName!==name && igRefImages[otherName]){styleAnchorName=otherName;break;}
-    }
-    const styleAnchorNote=styleAnchorName
-      ?`\n\nSTYLE ANCHOR: An additional reference image showing "${styleAnchorName}", another character already established in this same project, is attached. Match its EXACT art style, line quality, shading technique, and color palette — all characters in this project must share one consistent visual style, even if ${name}'s own appearance/outfit/features are different.`
-      :'';
     ta.value=`Character reference sheet of ${name}. ${c.ai_prompt||''}
-Full body standing pose, facing forward, arms slightly away from body so all limbs clearly visible. Plain white background. Studio lighting, even and flat. Complete figure from head to toe, no cropping. High quality character illustration. Small name label "${name}" at the very bottom center.${videoRefNote}${styleAnchorNote}`;
+Full body standing pose, facing forward, arms slightly away from body so all limbs clearly visible. Plain white background. Studio lighting, even and flat. Complete figure from head to toe, no cropping. High quality character illustration. Small name label "${name}" at the very bottom center.${videoRefNote}`;
   }
 
   if(wrap.style.display==='none'){
@@ -4330,24 +4333,10 @@ async function igGenerateRef(idx){
     ?buildVideoRefNote(name)
     :'';
 
-  // Tìm 1 ảnh nhân vật KHÁC đã tạo thành công trong cùng dự án để làm "neo phong cách"
-  // (đảm bảo mọi nhân vật dùng chung 1 phong cách vẽ nhất quán, không phụ thuộc riêng lẻ vào video)
-  let styleAnchorB64=null, styleAnchorName=null;
-  for(const otherName of Object.keys(igRefImages)){
-    if(otherName!==name && igRefImages[otherName]){
-      styleAnchorB64=igRefImages[otherName].split(',')[1];
-      styleAnchorName=otherName;
-      break;
-    }
-  }
-  const styleAnchorNote=styleAnchorB64
-    ?`\n\nSTYLE ANCHOR: An additional reference image showing "${styleAnchorName}", another character already established in this same project, is attached. Match its EXACT art style, line quality, shading technique, and color palette — all characters in this project must share one consistent visual style, even if ${name}'s own appearance/outfit/features are different.`
-    :'';
-
   // Dùng prompt từ textarea nếu user đã sửa, nếu không dùng prompt mặc định
   const editedTA=$(`igrefprompt_${idx}`);
   const defaultRefPrompt=`Character reference sheet of ${name}. ${c.ai_prompt||''}
-Full body standing pose, facing forward, arms slightly away from body so all limbs clearly visible. Plain white background. Studio lighting, even and flat. Complete figure from head to toe, no cropping. High quality character illustration. Small name label "${name}" at the very bottom center.${videoRefNote}${styleAnchorNote}`;
+Full body standing pose, facing forward, arms slightly away from body so all limbs clearly visible. Plain white background. Studio lighting, even and flat. Complete figure from head to toe, no cropping. High quality character illustration. Small name label "${name}" at the very bottom center.${videoRefNote}`;
   const refPrompt=(editedTA&&editedTA.value.trim())?editedTA.value.trim():defaultRefPrompt;
   // Điền vào textarea để user thấy prompt đang dùng
   if(editedTA&&!editedTA.value.trim()) editedTA.value=defaultRefPrompt;
@@ -4361,7 +4350,7 @@ Full body standing pose, facing forward, arms slightly away from body so all lim
       attempts++;
       try{
         btn.textContent=attempts>1?`🔄 Retry ${attempts}/4…`:'🎨 Đang tạo ảnh...';
-        imgB64=await igCallGeminiImage(imgApiKey, refPrompt, null, imgEndpoint, styleAnchorB64, (useVideoRef&&!videoRefFailed)?videoUrl:null);
+        imgB64=await igCallGeminiImage(imgApiKey, refPrompt, null, imgEndpoint, null, (useVideoRef&&!videoRefFailed)?videoUrl:null);
       }catch(e){
         const isExhaustedRef=(e.message||'').match(/exhausted|quota|limit|429|resource/i);
         const isRetry=(e.message||'').match(/demand|retry|500|503|overload|temporarily/i);
@@ -4484,7 +4473,6 @@ async function igRunAll(){
     // Find ref image for this prompt
     const refMatches=[...p.text.matchAll(/\[REF:\s*([^—\]]+)/gi)].map(m=>m[1].trim());
     let primaryRefB64=null;
-    let isStyleFallbackRef=false;
     const charDNAMap={};
     for(const rname of refMatches){
       const matchKey=Object.keys(igCharDNA).find(k=>k.toLowerCase().includes(rname.toLowerCase())||rname.toLowerCase().includes(k.toLowerCase()));
@@ -4493,24 +4481,13 @@ async function igRunAll(){
         if(!primaryRefB64&&igRefImages[matchKey])primaryRefB64=igRefImages[matchKey].split(',')[1];
       }
     }
-    // Cảnh không có nhân vật chính nào gắn REF (thiết lập bối cảnh, nhân vật phụ/quần chúng không tên)
-    // → dùng bất kỳ ảnh nhân vật nào đã tạo làm neo phong cách chung, tránh trôi phong cách vẽ/bối cảnh
-    if(!primaryRefB64){
-      const anyRefName=Object.keys(igRefImages).find(k=>igRefImages[k]);
-      if(anyRefName){
-        primaryRefB64=igRefImages[anyRefName].split(',')[1];
-        isStyleFallbackRef=true;
-      }
-    }
 
     let finalPrompt=p.text;
     const aspectStr=igGetAspectPrompt();
-    const hasRef=refMatches.length>0 && primaryRefB64 && !isStyleFallbackRef;
-    const styleFallbackNote=isStyleFallbackRef
-      ?`\n\nSTYLE REFERENCE: An attached reference image shows a character from this same project — it does NOT need to appear in this scene. Use it ONLY as a visual style guide: match its exact art style, line quality, shading technique, and color palette for the background, supporting/crowd characters, and overall rendering of this scene.`
-      :'';
+    const hasRef=refMatches.length>0 && primaryRefB64;
     // Chỉ inject DNA khi KHÔNG có ref image — ref image tự handle style
     const styleDNA=igDNA_IG?`\nVisual Style: ${igDNA_IG}`:''; // Luôn thêm style
+    const settingDNA=igSettingDNA?`\nSetting/Environment: ${igSettingDNA}`:'';
 
     // ── GIỮ KHUNG HÌNH: tìm ảnh trước đó cùng cảnh, dùng làm tham chiếu DUY NHẤT ──
     // (ảnh trước đã tự chứa đúng ngoại hình nhân vật rồi, không cần gửi thêm ảnh ref nhân vật riêng)
@@ -4536,9 +4513,9 @@ async function igRunAll(){
       const dnaSnippet=Object.entries(charDNAMap).map(([name,dna])=>
         `[${name}: ${dna.visual_summary||dna.hair||''}]`
       ).join(' ');
-      finalPrompt=`[${aspectStr}]\n\n${p.text}\n\nCharacter DNA: ${dnaSnippet}\nMaintain character consistency.${sameFrameNote}${styleFallbackNote}\n\nREMINDER: NO white margins, NO white padding, full bleed to all edges.`;
+      finalPrompt=`[${aspectStr}]\n\n${p.text}\n\nCharacter DNA: ${dnaSnippet}\nMaintain character consistency.${settingDNA}${sameFrameNote}\n\nREMINDER: NO white margins, NO white padding, full bleed to all edges.`;
     } else {
-      finalPrompt=`[${aspectStr}]\n\n${p.text}${styleDNA}${sameFrameNote}${styleFallbackNote}\n\nREMINDER: NO white margins, NO white padding, full bleed to all edges.`;
+      finalPrompt=`[${aspectStr}]\n\n${p.text}${styleDNA}${settingDNA}${sameFrameNote}\n\nREMINDER: NO white margins, NO white padding, full bleed to all edges.`;
     }
 
     $(`igimg_${i}`).querySelector('div').innerHTML=`<div style="font-size:10px;color:var(--accent2)">🎨 Generating...</div>`;
@@ -4661,7 +4638,6 @@ async function igRunAll(){
       // Build prompt (giống generateOne)
       const refMatches=[...p.text.matchAll(/\[REF:\s*([^—\]]+)/gi)].map(m=>m[1].trim());
       let primaryRefB64=null;
-      let isStyleFallbackRef=false;
       const charDNAMap={};
       for(const rname of refMatches){
         const matchKey=Object.keys(igCharDNA).find(k=>k.toLowerCase().includes(rname.toLowerCase())||rname.toLowerCase().includes(k.toLowerCase()));
@@ -4670,18 +4646,11 @@ async function igRunAll(){
           if(!primaryRefB64&&igRefImages[matchKey])primaryRefB64=igRefImages[matchKey].split(',')[1];
         }
       }
-      if(!primaryRefB64){
-        const anyRefName=Object.keys(igRefImages).find(k=>igRefImages[k]);
-        if(anyRefName){primaryRefB64=igRefImages[anyRefName].split(',')[1];isStyleFallbackRef=true;}
-      }
-      const styleFallbackNote=isStyleFallbackRef
-        ?`
-
-STYLE REFERENCE: An attached reference image shows a character from this same project — it does NOT need to appear in this scene. Use it ONLY as a visual style guide: match its exact art style, line quality, shading technique, and color palette for the background, supporting/crowd characters, and overall rendering of this scene.`
-        :'';
       const aspectStr=igGetAspectPrompt();
       const styleDNA=igDNA_IG?`
 Visual Style: ${igDNA_IG}`:'';
+      const settingDNA=igSettingDNA?`
+Setting/Environment: ${igSettingDNA}`:'';
       let finalPrompt;
       if(Object.keys(charDNAMap).length>0){
         const dnaSnippet=Object.entries(charDNAMap).map(([name,dna])=>`[${name}: ${dna.visual_summary||dna.hair||''}]`).join(' ');
@@ -4690,13 +4659,13 @@ Visual Style: ${igDNA_IG}`:'';
 ${p.text}
 
 Character DNA: ${dnaSnippet}
-Maintain character consistency.${styleFallbackNote}
+Maintain character consistency.${settingDNA}
 
 REMINDER: NO white margins, NO white padding, full bleed to all edges.`;
       } else {
         finalPrompt=`[${aspectStr}]
 
-${p.text}${styleDNA}${styleFallbackNote}
+${p.text}${styleDNA}${settingDNA}
 
 REMINDER: NO white margins, NO white padding, full bleed to all edges.`;
       }
@@ -4791,7 +4760,6 @@ async function igRegenOne(i){
   // Build prompt từ userPrompt (đã sửa) thay vì p.text gốc
   const refMatches=[...userPrompt.matchAll(/\[REF:\s*([^—\]]+)/gi)].map(m=>m[1].trim());
   let primaryRefB64=null;
-  let isStyleFallbackRef=false;
   const charDNAMap={};
   // Chỉ tìm ref image nếu prompt vẫn còn [REF:...]
   if(refMatches.length>0){
@@ -4803,22 +4771,16 @@ async function igRegenOne(i){
       }
     }
   }
-  // Nếu prompt không còn [REF:...] hoặc không match được ai → dùng ảnh nhân vật bất kỳ làm neo phong cách
-  if(!primaryRefB64){
-    const anyRefName=Object.keys(igRefImages).find(k=>igRefImages[k]);
-    if(anyRefName){primaryRefB64=igRefImages[anyRefName].split(',')[1];isStyleFallbackRef=true;}
-  }
-  const styleFallbackNote=isStyleFallbackRef
-    ?`\n\nSTYLE REFERENCE: An attached reference image shows a character from this same project — it does NOT need to appear in this scene. Use it ONLY as a visual style guide: match its exact art style, line quality, shading technique, and color palette for the background, supporting/crowd characters, and overall rendering of this scene.`
-    :'';
+  // Nếu prompt không còn [REF:...] → không gửi ảnh ref
   const aspectStr=igGetAspectPrompt();
   const styleDNA=igDNA_IG?`\nVisual Style: ${igDNA_IG}`:'';
+  const settingDNA=igSettingDNA?`\nSetting/Environment: ${igSettingDNA}`:'';
   let finalPrompt;
   if(Object.keys(charDNAMap).length>0){
     const dnaSnippet=Object.entries(charDNAMap).map(([name,dna])=>`[${name}: ${dna?.visual_summary||dna?.hair||''}]`).join(' ');
-    finalPrompt=`[${aspectStr}]\n\n${userPrompt}\n\nCharacter DNA: ${dnaSnippet}\nMaintain character consistency.${styleFallbackNote}\n\nREMINDER: NO white margins, NO white padding, full bleed to all edges.`;
+    finalPrompt=`[${aspectStr}]\n\n${userPrompt}\n\nCharacter DNA: ${dnaSnippet}\nMaintain character consistency.${settingDNA}\n\nREMINDER: NO white margins, NO white padding, full bleed to all edges.`;
   } else {
-    finalPrompt=`[${aspectStr}]\n\n${userPrompt}${styleDNA}${styleFallbackNote}\n\nREMINDER: NO white margins, NO white padding, full bleed to all edges.`;
+    finalPrompt=`[${aspectStr}]\n\n${userPrompt}${styleDNA}${settingDNA}\n\nREMINDER: NO white margins, NO white padding, full bleed to all edges.`;
   }
 
   try{
