@@ -3086,7 +3086,7 @@ async function peRunBatch(apiKey,batchIndex,totalBatches,batchSameFrameN=0){
     ?`Multiple characters available: ${selectedCharList.join(', ')}. For B/C/D shots, include only the REF tag(s) of character(s) present in that scene.`
     :`Single character: ${selectedCharList[0]}.`;
 
-  const compositionRule=`wide cinematic composition, environment fills both sides of frame, NO tight portrait framing`;
+  const compositionRule=`wide cinematic composition by default, environment visible, but breaking from this for dramatic impact is encouraged where noted`;
 
   const systemPrompt=`You are Imagen Prompt Engineer v4. ${multiCharNote}
 
@@ -3094,12 +3094,12 @@ CHARACTER REFERENCE TAGS: ${refTags}
 These tags reference uploaded character images for appearance consistency. Place at start of B/C/D shots only.
 ${refNoteInstruction}
 ${igDNA_PE?`\nVISUAL DNA (apply to ALL prompts): ${igDNA_PE}\n`:''}
-COMPOSITION RULE: ALL shots must use wide cinematic framing. Even close-up shots must show environmental context on both sides. NEVER use tight portrait framing.
+COMPOSITION RULE: Default to wide cinematic framing where environment fills both sides of frame — this keeps setting and context visible. HOWEVER, for high-emotion, high-drama, or climactic beats (especially [N.C] Emotion/Detail shots), you MAY deliberately break from wide framing: use a tighter dramatic crop, an unusual angle, or an asymmetric composition if it better serves that specific moment. Vary this choice deliberately across the batch — do not apply the exact same framing/angle/pose to every shot. NEVER let characters default to the same flat, centered, front-facing pose scene after scene; vary body language, angle, and framing so the visuals don't feel repetitive or templated.
 
 PROMPT STRUCTURE:
 - [N.A] Establishing Shot: wide environment/location ONLY, camera pulls back far to show full setting. No REF tags. No character names or appearance. 50-70 words. End with: "${styleMatchNote} No text. No watermarks."
 - [N.B] Action Shot: REF tag(s) first, then exact action/pose/expression from the audio, wide shot showing character in environment context. 40-60 words. End with: "${styleMatchNote} ${compositionRule}. [add refer note ONLY for characters tagged in this prompt] No text. No watermarks."
-- [N.C] Emotion/Detail Shot: REF tag(s) first, medium close-up showing character face AND surrounding environment visible on both sides (NOT tight crop). 40-60 words. End with: "${styleMatchNote} ${compositionRule}. [add refer note ONLY for characters tagged in this prompt] No text. No watermarks."
+- [N.C] Emotion/Detail Shot: REF tag(s) first — this shot exists to land an emotional beat, so a tighter, more dramatic crop is welcome here when it fits (does not have to show environment on both sides like B/D). 40-60 words. End with: "${styleMatchNote} [add refer note ONLY for characters tagged in this prompt] No text. No watermarks."
 - [N.D] Bonus Angle: REF tag(s) first, creative angle (overhead/low/silhouette) in wide cinematic frame. 40-60 words. End with: "${styleMatchNote} ${compositionRule}. [add refer note ONLY for characters tagged in this prompt] No text. No watermarks."
 
 RULES:
@@ -3107,8 +3107,9 @@ RULES:
 2. B/C/D — correct REF tag(s) at the very start, then vivid scene description
 3. Same scene: same location, outfit, time of day across all shots — only camera angle differs
 4. CRITICAL: refer notes at end of B/C/D MUST match ONLY the [REF: name] tags used in that specific prompt
-5. Output: plain text, labels [N.X] on own line, prompts separated by ---, no extra headers${batchSameFrameN>0?`
-6. SAME-FRAME MODE: Among the B/C/D shots in this batch, select approximately ${batchSameFrameN} shot(s) where the character stays in the exact same background/framing as the immediately preceding shot in the same scene, only changing pose/gesture/expression (e.g. a hand moving, a head turning) — PRIORITIZE static, explanatory, or dialogue-heavy scenes for this; AVOID fast action or scene-transition moments. For each selected shot, append ":SF" to its label, e.g. "[2.C:SF]", and write its description as an explicit continuation of the previous shot (describe ONLY what changes — the new pose/gesture — assuming background/lighting/camera stay identical). Do not use SF on [N.A] establishing shots or on the first shot (B) of any scene (there must be a preceding shot in the same scene to continue from).`:''}`;
+5. Output: plain text, labels [N.X] on own line, prompts separated by ---, no extra headers
+6. Avoid visual repetition across the whole batch: do not reuse the same pose, camera angle, or composition pattern scene after scene — vary body language, framing, and angle choices creatively so the batch doesn't feel templated${batchSameFrameN>0?`
+7. SAME-FRAME MODE: Among the B/C/D shots in this batch, select approximately ${batchSameFrameN} shot(s) where the character stays in the exact same background/framing as the immediately preceding shot in the same scene, only changing pose/gesture/expression (e.g. a hand moving, a head turning) — PRIORITIZE static, explanatory, or dialogue-heavy scenes for this; AVOID fast action or scene-transition moments. For each selected shot, append ":SF" to its label, e.g. "[2.C:SF]", and write its description as an explicit continuation of the previous shot (describe ONLY what changes — the new pose/gesture — assuming background/lighting/camera stay identical). Do not use SF on [N.A] establishing shots or on the first shot (B) of any scene (there must be a preceding shot in the same scene to continue from).`:''}`;
 
   const densityMap={1:'1 prompt per scene: [N.A] only — single action shot',2:'2 prompts per scene: [N.A] establishing shot, then [N.B] action shot',3:'3 prompts per scene: [N.A] establishing, [N.B] action, [N.C] close-up/detail',4:'4 prompts per scene: [N.A] establishing, [N.B] action, [N.C] close-up, [N.D] bonus reaction/detail',5:'5 prompts per scene: [N.A] establishing, [N.B] action, [N.C] close-up, [N.D] detail shot, [N.E] emotional beat'};
 
@@ -3200,6 +3201,17 @@ const TTS_STYLE_PROMPTS={
   sarcastic:`You are deeply sarcastic. [sarcastically] Oh sure, this is VERY important information. Deliver with dry wit and raised eyebrow energy.`,
   asmr:`[whispering] You speak in a soft, gentle ASMR voice. [very slowly] Every word is deliberate and calming. [softly] So peaceful...`,
 };
+
+// Chỉ dẫn chống văn phong AI sáo rỗng/dập khuôn — dùng chung cho mọi phong cách viết kịch bản
+const TTS_CREATIVITY_GUARDRAIL=`
+
+CREATIVITY & HUMAN VOICE — MANDATORY:
+- AVOID generic AI-writing patterns entirely: no "In today's fast-paced world", "Have you ever wondered", "Let's dive in", "At the end of the day", "In conclusion", "Moreover", "Furthermore", "It's worth noting that", "Little did they know", overused rhetorical questions as openers, or symmetric "not only X but also Y" constructions.
+- Vary sentence rhythm deliberately: mix short punchy sentences with longer flowing ones. Do NOT write every sentence at roughly the same length/structure — that reads as robotic.
+- Use concrete, specific, sensory details instead of vague generalizations — name actual things, numbers, textures, sounds, comparisons, not just abstract descriptions.
+- Write with a genuine voice/perspective suited to the chosen style — a wry observation, a moment of surprise, a pointed opinion where appropriate — not flat neutral narration throughout.
+- Avoid formulaic openings and closings — do not start with a generic rhetorical question or scene-setter, and do not end with a tidy summary/moral statement unless the source material specifically calls for it.
+- The result should read like it was written by a skilled human writer who genuinely finds this topic interesting, not like a templated AI-generated summary.`;
 
 const TTS_REWRITE_PROMPTS={
   documentary:`Rewrite as a professional documentary narration script. Remove all ads, sponsors, CTAs, personal opinions, audience engagement requests ("like and subscribe", "comment below"), self-promotion. Keep facts, historical events, and core information. Formal, authoritative tone.`,
@@ -3621,7 +3633,7 @@ async function ttsRewrite(){
     ?`TARGET LENGTH: approximately ${durWords} words (${ttsSelectedDur} of spoken audio at natural pace). Acceptable range: ${Math.round(durWords*0.9)}–${Math.round(durWords*1.1)} words. This is a STRICT requirement — do not undershoot OR overshoot significantly. If the source material is thin, elaborate with more descriptive detail, context, or examples to reach the target. If the source material is rich, be selective and concise rather than including everything — do NOT pad excessively or ramble past the target. Stop writing once you are within the acceptable range.`
     :`Keep a similar length to the original, removing only filler and ads.`;
 
-  const stylePrompt=TTS_REWRITE_PROMPTS[ttsSelectedStyle];
+  const stylePrompt=TTS_REWRITE_PROMPTS[ttsSelectedStyle]+TTS_CREATIVITY_GUARDRAIL;
 
   // Truncate nếu quá dài (Gemini có limit ~30k token input)
   const MAX_INPUT=12000;
