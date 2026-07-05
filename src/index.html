@@ -3297,8 +3297,16 @@ async function ttsPreviewVoice(voiceId){
     const cached=localStorage.getItem(cacheKey);
     if(cached){
       const bin=atob(cached);
-      pcmBuf=new Uint8Array(bin.length);
-      for(let i=0;i<bin.length;i++)pcmBuf[i]=bin.charCodeAt(i);
+      const buf=new Uint8Array(bin.length);
+      for(let i=0;i<bin.length;i++)buf[i]=bin.charCodeAt(i);
+      // Chỉ tin cache nếu đúng định dạng WAV hợp lệ (đủ dài + đúng header RIFF/WAVE)
+      // — phòng trường hợp cache cũ bị hỏng do lỗi trước đây
+      const isValidWav=buf.length>44 && buf[0]===0x52&&buf[1]===0x49&&buf[2]===0x46&&buf[3]===0x46;
+      if(isValidWav){
+        pcmBuf=buf;
+      } else {
+        localStorage.removeItem(cacheKey); // dọn cache hỏng
+      }
     }
   }catch(e){}
 
@@ -3320,17 +3328,6 @@ async function ttsPreviewVoice(voiceId){
       for(var k2=0;k2<outLen2;k2++){var sv=ch[Math.floor(k2*ratio2)]||0;int16b[k2]=Math.max(-32768,Math.min(32767,Math.round(sv*32767)));}
       ctx2.close();
       pcmBuf=addWavHeader(new Uint8Array(int16b.buffer),24000,1,16);
-      var found=true;
-      var parts=[{inlineData:{data:'dummy'}}]; // skip loop below
-      for(const part of parts){
-        if(part.inlineData?.data){
-          const raw=atob(part.inlineData.data);
-          pcmBuf=new Uint8Array(raw.length);
-          for(let i=0;i<raw.length;i++)pcmBuf[i]=raw.charCodeAt(i);
-          found=true;break;
-        }
-      }
-      if(!found)throw new Error('TTS không trả về audio data');
       // Cache
       try{
         let binary='';
@@ -3490,6 +3487,95 @@ function ttsTrimToTarget(text, durWords){
   return acc.length?acc.join(' '):trimmed;
 }
 
+// ── KỊCH BẢN RẤT DÀI: chia thành nhiều đoạn theo kế hoạch, gọi tuần tự, nối mạch ──
+const TTS_LONG_SCRIPT_THRESHOLD_WORDS=1500; // ~10 phút — vượt ngưỡng này mới chia đoạn
+const TTS_SEGMENT_TARGET_WORDS=750; // mỗi đoạn nhắm ~5 phút
+
+// Chia nguồn tư liệu (subtitle) thành N phần theo tỉ lệ ký tự, cắt tại ranh giới khoảng trắng
+// gần nhất — để mỗi đoạn viết về ĐÚNG phần nội dung của nó, không lặp/không bỏ sót
+function ttsSplitSourceIntoSegments(sourceText, numSegments){
+  const len=sourceText.length;
+  const segSize=Math.ceil(len/numSegments);
+  const segments=[];
+  let pos=0;
+  for(let s=0;s<numSegments;s++){
+    if(s===numSegments-1){
+      segments.push(sourceText.slice(pos).trim());
+      break;
+    }
+    let end=Math.min(pos+segSize,len);
+    // Lùi về khoảng trắng gần nhất để không cắt giữa từ
+    const nextSpace=sourceText.indexOf(' ',end);
+    const boundary=(nextSpace!==-1 && nextSpace-end<200)?nextSpace:end;
+    segments.push(sourceText.slice(pos,boundary).trim());
+    pos=boundary;
+  }
+  return segments.filter(s=>s.length>0);
+}
+
+// Tạo 1 đoạn trong kịch bản dài — nhận ngữ cảnh đuôi đoạn trước để nối mạch liền lạc
+async function ttsGenerateSegment(sourceChunk, segWords, stylePrompt, apiKey, prevTailText, segIndex, totalSegs, progressCb){
+  const durInstruction=`TARGET LENGTH for THIS SEGMENT: approximately ${segWords} words. Acceptable range: ${Math.round(segWords*0.9)}–${Math.round(segWords*1.1)} words. This is a STRICT requirement — do not undershoot OR overshoot significantly. If the source material for this segment is thin, elaborate with more descriptive detail, context, or examples to reach the target. Do NOT pad excessively or ramble past the target.`;
+
+  const continuityNote=prevTailText
+    ?`\n\nCONTINUITY — THIS IS A DIRECT CONTINUATION, NOT A NEW SECTION:
+This is segment ${segIndex+1} of ${totalSegs} of one continuous script. The previous segment just ended with:
+"...${prevTailText}"
+
+Your output must continue DIRECTLY from that point, as if it were the same uninterrupted piece of writing:
+- Do NOT re-introduce the topic, re-greet the listener, or write any kind of recap/summary of what came before.
+- Do NOT use transition phrases like "Now let's talk about...", "Moving on...", "In this part..." — just continue the narrative/explanation naturally.
+- Match the exact tone, sentence rhythm, and voice already established.
+- Output ONLY the new continuation text (do not repeat the quoted ending above).`
+    :'';
+
+  const prompt=`${stylePrompt}
+
+${durInstruction}${continuityNote}
+
+CRITICAL RULES:
+- Remove ALL: advertisements, sponsor segments, "like and subscribe" CTAs, self-promotion, channel plugs, merchandise mentions, Patreon plugs, viewer comments/shoutouts
+- Remove policy-violating content: hate speech, discrimination, dangerous misinformation, self-harm content, explicit content
+- Output ONLY the rewritten script text for this segment, no headers, no meta-commentary
+- Write for spoken audio — no bullet points, no markdown, continuous flowing prose
+
+SOURCE SUBTITLE FOR THIS SEGMENT:
+${sourceChunk}`;
+
+  if(progressCb)progressCb(`⏳ Đang viết đoạn ${segIndex+1}/${totalSegs}...`);
+  const data=await callVertexOrStudio(MODEL_TEXT_SCRIPT,{
+    contents:[{role:'user',parts:[{text:prompt}]}],
+    generationConfig:{temperature:0.7,maxOutputTokens:16384,thinkingConfig:{thinkingLevel:'low'}}
+  },apiKey);
+  if(data.error) throw new Error(data.error.message||'Lỗi API');
+  const text=data.candidates?.[0]?.content?.parts?.map(p=>p.text||'').join('')||'';
+  if(!text) throw new Error(`Đoạn ${segIndex+1}/${totalSegs}: API trả về nội dung trống`);
+
+  const expanded=await ttsExpandToTarget(text,segWords,stylePrompt,apiKey,progressCb);
+  return ttsTrimToTarget(expanded,segWords);
+}
+
+// Điều phối toàn bộ: chia nguồn, tính target từng đoạn, gọi tuần tự, ghép lại
+async function ttsRewriteLongScript(sourceTruncated, durWords, stylePrompt, apiKey, progressCb){
+  const numSegments=Math.max(2,Math.ceil(durWords/TTS_SEGMENT_TARGET_WORDS));
+  const sourceSegments=ttsSplitSourceIntoSegments(sourceTruncated,numSegments);
+  const baseWords=Math.floor(durWords/numSegments);
+  const remainder=durWords-baseWords*numSegments;
+
+  let fullText='';
+  for(let i=0;i<sourceSegments.length;i++){
+    const segWords=baseWords+(i===sourceSegments.length-1?remainder:0);
+    const prevTailText=fullText
+      ?fullText.trim().split(/\s+/).slice(-120).join(' ')
+      :'';
+    const segText=await ttsGenerateSegment(
+      sourceSegments[i],segWords,stylePrompt,apiKey,prevTailText,i,sourceSegments.length,progressCb
+    );
+    fullText=fullText?(fullText.trim()+' '+segText.trim()):segText.trim();
+  }
+  return fullText;
+}
+
 async function ttsExpandToTarget(text, durWords, stylePrompt, apiKey, progressCb){
   let current=text.trim();
   let attempts=0;
@@ -3558,6 +3644,32 @@ CRITICAL RULES:
 
 SOURCE SUBTITLE:
 ${subTruncated}`;
+
+  // ── KỊCH BẢN RẤT DÀI (>10 phút): chia thành nhiều đoạn theo kế hoạch, gọi tuần tự ──
+  if(durWords>TTS_LONG_SCRIPT_THRESHOLD_WORDS){
+    try{
+      const rawSource=sub.length>MAX_INPUT?sub.slice(0,MAX_INPUT):sub;
+      const finalText=await ttsRewriteLongScript(rawSource,durWords,stylePrompt,apiKey,
+        (msg)=>{$('ttsBtnRewrite').textContent=msg;});
+
+      $('ttsScriptOut').value=finalText;
+      ttsCountScript();
+      $('ttsRewriteBlock').style.display='block';
+      $('ttsVoiceBlock').style.display='block';
+      $('ttsPaceBlock').style.display='block';
+      $('ttsGenerateBlock').style.display='block';
+      ttsInitVoices();
+      const words=finalText.trim().split(/\s+/).length;
+      const numSegs=Math.max(2,Math.ceil(durWords/TTS_SEGMENT_TARGET_WORDS));
+      $('ttsRewriteMeta').textContent=`${words} từ · ${MODEL_TEXT_SCRIPT} · phong cách: ${ttsSelectedStyle} · chia ${numSegs} đoạn${sub.length>MAX_INPUT?' (đã cắt bớt input)':''} · chỉnh sửa nếu cần`;
+      $('ttsRewriteBlock').scrollIntoView({behavior:'smooth',block:'start'});
+    }catch(e){
+      alert('Viết lại thất bại: '+e.message);
+    }
+    $('ttsBtnRewrite').disabled=false;
+    $('ttsBtnRewrite').innerHTML='<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg> Viết lại kịch bản';
+    return;
+  }
 
   // Chỉ dùng gemini-3.5-flash — không fallback về Lite
   const REWRITE_MODELS=[MODEL_TEXT_SCRIPT];
@@ -4428,6 +4540,14 @@ async function igRunAll(){
   const total=igParsedPrompts.length;
   let igDelay=30000; // delay cố định 30s/ảnh
 
+  // ── CƠ CHẾ BẢO VỆ: không xoá ảnh đã tạo trước đó nếu bấm "Tạo tất cả" lần nữa ──
+  const hasExisting=igGeneratedImages && igGeneratedImages.length===total && igGeneratedImages.some(x=>x&&x.dataUrl);
+  let keepExisting=false;
+  if(hasExisting){
+    const doneCount=igGeneratedImages.filter(x=>x&&x.dataUrl).length;
+    keepExisting=confirm(`Đã có ${doneCount}/${total} ảnh được tạo trước đó.\n\nBấm OK để GIỮ các ảnh đã có, chỉ tạo tiếp những ảnh còn thiếu/lỗi.\nBấm Cancel để TẠO LẠI TỪ ĐẦU (xoá hết ảnh cũ).`);
+  }
+
   $('igBtnRun').disabled=true;
   $('igProgWrap').style.display='block';
 
@@ -4436,27 +4556,38 @@ async function igRunAll(){
   const emptyEl=$('igEmptyState');
   if(emptyEl)emptyEl.style.display='none';
   $('igErrEl').classList.remove('show');
-  igGeneratedImages=new Array(total).fill(null);
+  if(!keepExisting){
+    igGeneratedImages=new Array(total).fill(null);
+  }
   igResetControls();
 
   // Pre-populate grid — phải sau khi igResultsWrap đã visible
-  $('igGrid').innerHTML=igParsedPrompts.map((p,i)=>`
+  // Nếu giữ ảnh cũ: card đã có ảnh sẽ hiện luôn ảnh đó, không về trạng thái "đang tải"
+  $('igGrid').innerHTML=igParsedPrompts.map((p,i)=>{
+    const existing=keepExisting?igGeneratedImages[i]:null;
+    const imgInner=(existing&&existing.dataUrl)
+      ?`<img src="${existing.dataUrl}" style="width:100%;height:100%;object-fit:cover;object-position:center;display:block;">`
+      :`<div style="text-align:center;padding:16px;">
+          <div style="font-size:22px;margin-bottom:6px;">⏳</div>
+          <div style="font-size:11px;font-weight:600;">${esc(p.label)}</div>
+          ${p.refName?`<div style="font-size:10px;color:var(--accent2);margin-top:3px;">REF: ${esc(p.refName)}</div>`:`<div style="font-size:10px;color:var(--text3);margin-top:3px;">🌍 Establishing</div>`}
+        </div>`;
+    return `
     <div class="ig-card" id="igcard_${i}">
       <div class="ig-card-overlay" id="igoverlay_${i}">
         <button class="btn-ig-regen" id="igregenBtn_${i}" onclick="igRegenOne(${i})">🔄 Tạo lại</button>
       </div>
-      <div class="ig-card-img loading" id="igimg_${i}" style="aspect-ratio:${igCurrentAspectRatio};">
-        <div style="text-align:center;padding:16px;">
-          <div style="font-size:22px;margin-bottom:6px;">⏳</div>
-          <div style="font-size:11px;font-weight:600;">${esc(p.label)}</div>
-          ${p.refName?`<div style="font-size:10px;color:var(--accent2);margin-top:3px;">REF: ${esc(p.refName)}</div>`:`<div style="font-size:10px;color:var(--text3);margin-top:3px;">🌍 Establishing</div>`}
-        </div>
+      <div class="ig-card-img${existing?'':' loading'}" id="igimg_${i}" style="aspect-ratio:${igCurrentAspectRatio};">
+        ${imgInner}
       </div>
-      <div class="ig-card-label" id="iglabel_${i}"><span>${esc(p.label)}${p.refName?' · '+esc(p.refName):''}${p.sameFrame?' · 🔗SF':''}</span></div>
+      <div class="ig-card-label" id="iglabel_${i}"><span>${esc(p.label)}${p.refName?' · '+esc(p.refName):''}${p.sameFrame?' · 🔗SF':''}</span>${existing?`<button class="btn-ig-dl" onclick="igDlOne('${existing.dataUrl}','${p.label.replace(/\./g,'_')}.png')" title="Download">⬇</button>`:''}</div>
       <textarea class="ig-prompt-edit" id="igprompt_${i}" rows="2" style="width:100%;font-size:10px;padding:4px 6px;background:var(--bg2);color:var(--text2);border:1px solid var(--border2);border-radius:4px;resize:vertical;margin-top:2px;display:none;">${esc(p.raw)}</textarea>
       <button class="btn-ig-edit" id="igediBtn_${i}" onclick="igTogglePrompt(${i})" style="width:100%;padding:3px;background:none;border:1px solid var(--border2);border-radius:4px;color:var(--text3);font-size:10px;cursor:pointer;margin-top:2px;">✏️ Sửa prompt</button>
-    </div>`).join('');
-  $('igResultsTitle').textContent=`Đang khởi động pipeline… 0/${total}`;
+    </div>`;
+  }).join('');
+  $('igResultsTitle').textContent=keepExisting
+    ?`Tiếp tục pipeline… ${igGeneratedImages.filter(Boolean).length}/${total} đã có`
+    :`Đang khởi động pipeline… 0/${total}`;
 
   // DNA đã được extract khi user bấm "Tạo lại" cho từng nhân vật
   // Không cần extract lại ở đây — bắt đầu generate ảnh ngay
@@ -4468,6 +4599,15 @@ async function igRunAll(){
   async function generateOne(i){
     if(igStopped)return;
     while(igPaused){await new Promise(r=>setTimeout(r,200));if(igStopped)return;}
+    // CƠ CHẾ BẢO VỆ: nếu đang giữ ảnh cũ và ảnh này đã có sẵn → bỏ qua, không tạo lại
+    if(keepExisting && igGeneratedImages[i] && igGeneratedImages[i].dataUrl){
+      completed++;
+      const pctSkip=Math.min(Math.round(completed/total*100),100);
+      $('igProgBar').style.width=(10+Math.min(completed,total)/total*88)+'%';
+      $('igProgPct').textContent=pctSkip+'%';
+      $('igProgLabel').textContent=`🎨 ${completed}/${total} ảnh xong (đã có sẵn ${igParsedPrompts[i].label})…`;
+      return;
+    }
     const p=igParsedPrompts[i];
     const isEstablishing=!p.refName;
 
