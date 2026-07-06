@@ -368,6 +368,8 @@ ipcMain.handle('gemini-web-generate-image', async (event, { prompt, refImageBase
       throw new Error('Chưa đăng nhập Gemini Web. Vào Cài đặt → bấm "Đăng nhập Gemini Web" trước.');
     }
 
+    win.show(); // Hiện cửa sổ trong lúc tạo ảnh để có thể theo dõi/debug
+
     // KHÔNG tải lại URL gốc (tránh làm mất trạng thái phiên) — chỉ thử bấm "New chat"
     // nếu tìm thấy, còn không thì tạo ảnh ngay trong cuộc trò chuyện hiện tại
     await wc.executeJavaScript(`
