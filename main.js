@@ -255,6 +255,174 @@ ipcMain.handle('google-auth-status', async () => {
   return { loggedIn: !!token };
 });
 
+// ══════════════════════════════════════════════════
+//  GEMINI WEB SIMULATION — tự động hóa gemini.google.com
+//  Dùng quota MIỄN PHÍ của tài khoản Google cá nhân, KHÔNG
+//  dùng Vertex AI / không tốn credit $300.
+//  ⚠️ Thử nghiệm: selector có thể cần chỉnh lại khi Google đổi giao diện.
+// ══════════════════════════════════════════════════
+let geminiWebWin = null;
+
+function getGeminiWebWindow() {
+  if (geminiWebWin && !geminiWebWin.isDestroyed()) return geminiWebWin;
+  geminiWebWin = new BrowserWindow({
+    width: 1100, height: 850,
+    title: 'Gemini Web (Chế độ Giả lập)',
+    webPreferences: {
+      partition: 'persist:gemini-automation', // giữ đăng nhập lâu dài, tách biệt session app chính
+      contextIsolation: true,
+      nodeIntegration: false,
+    },
+  });
+  geminiWebWin.on('closed', () => { geminiWebWin = null; });
+  return geminiWebWin;
+}
+
+// Điều khiển gán file vào input[type=file] qua Chrome DevTools Protocol
+// (JS thường không thể gán file vào input vì lý do bảo mật của trình duyệt)
+async function attachFileViaCDP(win, filePath) {
+  const wc = win.webContents;
+  if (!wc.debugger.isAttached()) wc.debugger.attach('1.3');
+  // Tìm input[type=file] trong DOM qua Runtime + DOM domain
+  await wc.debugger.sendCommand('DOM.enable');
+  const doc = await wc.debugger.sendCommand('DOM.getDocument', { depth: -1, pierce: true });
+  const nodeIdResult = await wc.debugger.sendCommand('DOM.querySelector', {
+    nodeId: doc.root.nodeId,
+    selector: 'input[type="file"]',
+  });
+  if (!nodeIdResult.nodeId) throw new Error('Không tìm thấy input[type=file] trên trang Gemini — giao diện có thể đã đổi.');
+  await wc.debugger.sendCommand('DOM.setFileInputFiles', {
+    files: [filePath],
+    nodeId: nodeIdResult.nodeId,
+  });
+}
+
+function sleepMs(ms) { return new Promise(r => setTimeout(r, ms)); }
+
+ipcMain.handle('gemini-web-generate-image', async (event, { prompt, refImageBase64 }) => {
+  const win = getGeminiWebWindow();
+  const wc = win.webContents;
+  let tmpImgPath = null;
+
+  try {
+    win.show();
+
+    // Mở cuộc trò chuyện mới bằng cách nạp lại trang gốc
+    await wc.loadURL('https://gemini.google.com/app');
+    await sleepMs(3000); // chờ trang tải xong hoàn toàn
+
+    // ── BƯỚC 1: chọn model "3.5 Flash" ──
+    // Thử tìm nút chọn model (thường hiển thị tên model hiện tại) rồi bấm vào lựa chọn "3.5 Flash"
+    const modelSelectResult = await wc.executeJavaScript(`
+      (function(){
+        try{
+          const btns=[...document.querySelectorAll('button, [role="button"]')];
+          const modelBtn=btns.find(b=>/flash|pro|model/i.test(b.textContent||'') && b.offsetParent!==null);
+          if(modelBtn){ modelBtn.click(); return {clicked:true}; }
+          return {clicked:false};
+        }catch(e){return {error:e.message};}
+      })();
+    `);
+    if (modelSelectResult && modelSelectResult.clicked) {
+      await sleepMs(800);
+      await wc.executeJavaScript(`
+        (function(){
+          const opts=[...document.querySelectorAll('[role="menuitem"], [role="option"], li, button')];
+          const target=opts.find(o=>/3\\.5\\s*flash/i.test(o.textContent||''));
+          if(target){ target.click(); return true; }
+          return false;
+        })();
+      `);
+      await sleepMs(500);
+    }
+    // Nếu không tìm được nút chọn model, bỏ qua bước này — dùng model mặc định hiện tại của trang
+
+    // ── BƯỚC 2: đính kèm ảnh tham chiếu (nếu có) ──
+    if (refImageBase64) {
+      tmpImgPath = path.join(os.tmpdir(), `gemini_ref_${Date.now()}.png`);
+      fs.writeFileSync(tmpImgPath, Buffer.from(refImageBase64, 'base64'));
+      // Cần bấm nút "đính kèm/upload" trước để input[type=file] xuất hiện trong DOM (nếu bị ẩn/lazy-render)
+      await wc.executeJavaScript(`
+        (function(){
+          const btns=[...document.querySelectorAll('button, [role="button"]')];
+          const attachBtn=btns.find(b=>/attach|upload|add file|hình ảnh|tệp/i.test(b.getAttribute('aria-label')||''));
+          if(attachBtn){ attachBtn.click(); return true; }
+          return false;
+        })();
+      `);
+      await sleepMs(500);
+      await attachFileViaCDP(win, tmpImgPath);
+      await sleepMs(1500); // chờ ảnh upload xong lên giao diện
+    }
+
+    // ── BƯỚC 3: gõ prompt vào ô chat ──
+    const typeResult = await wc.executeJavaScript(`
+      (function(){
+        const input = document.querySelector('[contenteditable="true"]') || document.querySelector('textarea');
+        if(!input) return {ok:false, reason:'khong tim thay o nhap prompt'};
+        input.focus();
+        if(input.isContentEditable){
+          input.innerText = ${JSON.stringify(prompt)};
+        } else {
+          input.value = ${JSON.stringify(prompt)};
+        }
+        input.dispatchEvent(new InputEvent('input', {bubbles:true}));
+        return {ok:true};
+      })();
+    `);
+    if (!typeResult || !typeResult.ok) {
+      throw new Error('Không tìm thấy ô nhập prompt trên trang Gemini — giao diện có thể đã đổi. Chi tiết: ' + (typeResult && typeResult.reason));
+    }
+    await sleepMs(500);
+
+    // ── BƯỚC 4: bấm Gửi ──
+    const sendResult = await wc.executeJavaScript(`
+      (function(){
+        const btns=[...document.querySelectorAll('button, [role="button"]')];
+        const sendBtn=btns.find(b=>/send|gửi/i.test(b.getAttribute('aria-label')||'') && !b.disabled);
+        if(sendBtn){ sendBtn.click(); return true; }
+        return false;
+      })();
+    `);
+    if (!sendResult) throw new Error('Không tìm thấy nút Gửi trên trang Gemini — giao diện có thể đã đổi.');
+
+    // ── BƯỚC 5: đợi ảnh xuất hiện trong câu trả lời (tối đa 60s) ──
+    let imageDataUrl = null;
+    const deadline = Date.now() + 60000;
+    while (Date.now() < deadline) {
+      await sleepMs(2000);
+      imageDataUrl = await wc.executeJavaScript(`
+        (async function(){
+          const imgs=[...document.querySelectorAll('img')];
+          const genImg=imgs.reverse().find(im=>im.naturalWidth>200 && im.naturalHeight>200);
+          if(!genImg) return null;
+          try{
+            const res=await fetch(genImg.src, {credentials:'include'});
+            const blob=await res.blob();
+            return await new Promise((resolve,reject)=>{
+              const fr=new FileReader();
+              fr.onload=()=>resolve(fr.result);
+              fr.onerror=reject;
+              fr.readAsDataURL(blob);
+            });
+          }catch(e){ return null; }
+        })();
+      `);
+      if (imageDataUrl) break;
+    }
+
+    if (!imageDataUrl) {
+      throw new Error('Hết thời gian chờ (60s) mà không thấy ảnh được tạo ra. Có thể Gemini web từ chối yêu cầu, hoặc giao diện đã đổi.');
+    }
+
+    return { success: true, imageDataUrl };
+  } catch (e) {
+    return { success: false, error: e.message };
+  } finally {
+    if (tmpImgPath) { try { fs.unlinkSync(tmpImgPath); } catch (e) {} }
+  }
+});
+
 function createWindow() {
   const win = new BrowserWindow({
     width: 1280, height: 820, minWidth: 900, minHeight: 600,

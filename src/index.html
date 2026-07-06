@@ -917,6 +917,15 @@ html,body{height:100%;overflow:hidden;background:var(--bg0);color:var(--text);fo
         </button>
         <div style="margin-top:5px;font-size:10px;color:var(--text3);">Mở bảng kiểm tra lỗi (Console) — chỉ dùng khi cần debug</div>
       </div>
+
+      <div class="settings-section" style="margin-top:12px;padding-top:12px;border-top:1px solid var(--border2);">
+        <div class="settings-label">⚗️ Chế độ Giả lập (Thử nghiệm)</div>
+        <label style="display:flex;align-items:center;gap:8px;cursor:pointer;margin-top:6px;">
+          <input type="checkbox" id="igWebSimEnable" onchange="igOnWebSimToggle(this.checked)">
+          <span style="font-size:12px;color:var(--text2);">Tạo ảnh nhân vật qua Gemini Web (miễn phí, không tốn credit Vertex)</span>
+        </label>
+        <div style="margin-top:5px;font-size:10px;color:var(--text3);">Mở cửa sổ gemini.google.com riêng, tự động gõ prompt + đính kèm ảnh tham chiếu. Tính năng thử nghiệm — có thể lỗi nếu Google đổi giao diện.</div>
+      </div>
     </div>
   </div>
 </div>
@@ -4326,7 +4335,24 @@ RULES:
 // Supports both text-only and image+text (ref image) inputs
 const IG_MODEL=MODEL_IMAGE;
 
+// ── CHẾ ĐỘ GIẢ LẬP: tạo ảnh qua Gemini Web thay vì Vertex API (miễn phí, thử nghiệm) ──
+let igWebSimEnable=false;
+function igOnWebSimToggle(checked){
+  igWebSimEnable=checked;
+}
+
 async function igCallGeminiImage(apiKey, optimizedPrompt, refImageBase64, endpoint, extraRefBase64, videoUrl){
+  // Chế độ Giả lập: đi qua Gemini Web (gemini.google.com) thay vì Vertex AI
+  if(igWebSimEnable && window.electronAPI?.geminiWebGenerateImage){
+    const res=await window.electronAPI.geminiWebGenerateImage({
+      prompt:optimizedPrompt,
+      refImageBase64:refImageBase64||null
+    });
+    if(!res||!res.success) throw new Error('Gemini Web: '+(res?.error||'lỗi không xác định'));
+    // res.imageDataUrl dạng "data:image/png;base64,...." → tách lấy phần base64
+    return res.imageDataUrl.split(',')[1];
+  }
+
   // Thử Vertex AI trước nếu đã đăng nhập
   const vertexToken = await getVertexToken();
   if(vertexToken){
