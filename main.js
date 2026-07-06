@@ -446,54 +446,81 @@ ipcMain.handle('gemini-web-generate-image', async (event, { prompt, refImageBase
     }
     await sleepMs(500);
 
-    // ── BƯỚC 4: bấm Gửi ── (chỉ tìm trong khu vực ô soạn tin, không tìm khắp trang)
+    // ── BƯỚC 4: bấm Gửi ── (tìm theo VỊ TRÍ trên màn hình — cùng hàng ngang với ô nhập,
+    // nằm bên phải — không phụ thuộc cấu trúc HTML lồng nhau, đáng tin cậy hơn nhiều)
     const sendResult = await wc.executeJavaScript(`
       (function(){
         const input = document.querySelector('[contenteditable="true"]') || document.querySelector('textarea');
-        if(!input) return false;
-        // Đi lên vài cấp cha để lấy đúng khu vực thanh soạn tin (chứa cả nút Gửi cạnh ô nhập)
-        let container = input.closest('form')
-          || input.parentElement?.parentElement?.parentElement?.parentElement
-          || input.parentElement;
-        if(!container) return false;
-        const btns=[...container.querySelectorAll('button')].filter(b=>!b.disabled && b.offsetParent!==null);
-        // Ưu tiên nút có aria-label rõ ràng chứa send/gửi
-        let sendBtn=btns.find(b=>/send|gửi/i.test(b.getAttribute('aria-label')||''));
-        // Nếu không thấy, lấy nút CUỐI CÙNG trong khu vực soạn tin (thường đúng là nút Gửi)
-        if(!sendBtn && btns.length) sendBtn=btns[btns.length-1];
-        if(sendBtn){ sendBtn.click(); return true; }
-        return false;
+        if(!input) return {ok:false, reason:'khong tim thay lai o nhap'};
+        const inputRect = input.getBoundingClientRect();
+        const midY = (inputRect.top + inputRect.bottom) / 2;
+
+        // Ưu tiên nút có aria-label rõ ràng chứa send/gửi, ở BẤT KỲ đâu trên trang,
+        // miễn là nằm cùng hàng ngang (trong khoảng chiều cao) với ô nhập
+        const allBtns=[...document.querySelectorAll('button, [role="button"]')]
+          .filter(b=>!b.disabled && b.offsetParent!==null)
+          .map(b=>({el:b, rect:b.getBoundingClientRect()}))
+          .filter(o=>o.rect.top < inputRect.bottom + 60 && o.rect.bottom > inputRect.top - 10 && o.rect.width>0);
+
+        let target = allBtns.find(o=>/send|gửi/i.test(o.el.getAttribute('aria-label')||''));
+
+        // Nếu không có aria-label rõ ràng, chọn nút NẰM BÊN PHẢI NHẤT cùng hàng ngang
+        // (mẫu hình phổ biến: [+] [ô nhập.......] [model] [mic] [GỬI] — Gửi luôn ở cuối cùng bên phải)
+        if(!target && allBtns.length){
+          allBtns.sort((a,b)=>b.rect.right - a.rect.right);
+          target = allBtns[0];
+        }
+
+        if(target){ target.el.click(); return {ok:true}; }
+        return {ok:false, reason:'khong tim thay nut nao cung hang voi o nhap', candidates: allBtns.length};
       })();
     `);
-    if (!sendResult) throw new Error('Không tìm thấy nút Gửi trên trang Gemini — giao diện có thể đã đổi.');
+    if (!sendResult || !sendResult.ok) {
+      throw new Error('Không tìm thấy nút Gửi trên trang Gemini — giao diện có thể đã đổi. Chi tiết: ' + JSON.stringify(sendResult));
+    }
 
-    // ── BƯỚC 5: đợi ảnh xuất hiện trong câu trả lời (tối đa 60s) ──
+    // ── BƯỚC 5: đợi ảnh xuất hiện trong câu trả lời (tối đa 90s) ──
     let imageDataUrl = null;
-    const deadline = Date.now() + 60000;
+    let lastDiag = null;
+    const deadline = Date.now() + 90000;
     while (Date.now() < deadline) {
       await sleepMs(2000);
-      imageDataUrl = await wc.executeJavaScript(`
+      const result = await wc.executeJavaScript(`
         (async function(){
-          const imgs=[...document.querySelectorAll('img')];
-          const genImg=imgs.reverse().find(im=>im.naturalWidth>200 && im.naturalHeight>200);
-          if(!genImg) return null;
-          try{
-            const res=await fetch(genImg.src, {credentials:'include'});
-            const blob=await res.blob();
-            return await new Promise((resolve,reject)=>{
-              const fr=new FileReader();
-              fr.onload=()=>resolve(fr.result);
-              fr.onerror=reject;
-              fr.readAsDataURL(blob);
-            });
-          }catch(e){ return null; }
+          // Ưu tiên tìm <img> đủ lớn (ảnh thật), quét từ cuối DOM lên (ảnh mới nhất thường ở cuối)
+          const imgs=[...document.querySelectorAll('img')].reverse();
+          const genImg=imgs.find(im=>im.naturalWidth>200 && im.naturalHeight>200);
+          if(genImg){
+            try{
+              const res=await fetch(genImg.src, {credentials:'include'});
+              if(!res.ok) return {ok:false, reason:'fetch anh that bai, status='+res.status, srcPreview:genImg.src.slice(0,60)};
+              const blob=await res.blob();
+              const dataUrl=await new Promise((resolve,reject)=>{
+                const fr=new FileReader();
+                fr.onload=()=>resolve(fr.result);
+                fr.onerror=reject;
+                fr.readAsDataURL(blob);
+              });
+              return {ok:true, dataUrl};
+            }catch(e){ return {ok:false, reason:'loi fetch/doc anh: '+e.message}; }
+          }
+          // Fallback: ảnh có thể được vẽ vào <canvas> thay vì <img>
+          const canvases=[...document.querySelectorAll('canvas')].filter(c=>c.width>200&&c.height>200);
+          if(canvases.length){
+            try{
+              const dataUrl=canvases[canvases.length-1].toDataURL('image/png');
+              return {ok:true, dataUrl};
+            }catch(e){ return {ok:false, reason:'canvas bi khoa CORS: '+e.message}; }
+          }
+          return {ok:false, reason:'chua thay img hoac canvas nao du lon', totalImgs:imgs.length, totalCanvas:document.querySelectorAll('canvas').length};
         })();
-      `);
-      if (imageDataUrl) break;
+      `).catch(e => ({ok:false, reason:'loi thuc thi JS: '+e.message}));
+      lastDiag = result;
+      if (result && result.ok && result.dataUrl) { imageDataUrl = result.dataUrl; break; }
     }
 
     if (!imageDataUrl) {
-      throw new Error('Hết thời gian chờ (60s) mà không thấy ảnh được tạo ra. Có thể Gemini web từ chối yêu cầu, hoặc giao diện đã đổi.');
+      throw new Error('Hết thời gian chờ (90s) mà không lấy được ảnh. Chẩn đoán: ' + JSON.stringify(lastDiag));
     }
 
     return { success: true, imageDataUrl };
