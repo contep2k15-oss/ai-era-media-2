@@ -15,4 +15,6 @@ contextBridge.exposeInMainWorld('electronAPI', {
   googleAuthStatus: () => ipcRenderer.invoke('google-auth-status'),
   edgeTTS: (params) => ipcRenderer.invoke('edge-tts', params),
   geminiWebGenerateImage: (params) => ipcRenderer.invoke('gemini-web-generate-image', params),
+  geminiWebLogin: () => ipcRenderer.invoke('gemini-web-login'),
+  geminiWebCheckSession: () => ipcRenderer.invoke('gemini-web-check-session'),
 });

@@ -260,23 +260,84 @@ ipcMain.handle('google-auth-status', async () => {
 //  Dùng quota MIỄN PHÍ của tài khoản Google cá nhân, KHÔNG
 //  dùng Vertex AI / không tốn credit $300.
 //  ⚠️ Thử nghiệm: selector có thể cần chỉnh lại khi Google đổi giao diện.
+//
+//  THIẾT KẾ: Đăng nhập tách riêng khỏi tạo ảnh —
+//  - "Đăng nhập" (gemini-web-login): hiện cửa sổ, chờ bạn đăng nhập tay,
+//    xong thì ẨN cửa sổ (không đóng/hủy) để giữ nguyên phiên.
+//  - "Tạo ảnh" (gemini-web-generate-image): dùng LẠI đúng cửa sổ đó,
+//    không tải lại URL gốc mỗi lần (tránh làm mất trạng thái phiên).
 // ══════════════════════════════════════════════════
 let geminiWebWin = null;
+let geminiWebLoggedIn = false;
+
+function sleepMs(ms) { return new Promise(r => setTimeout(r, ms)); }
 
 function getGeminiWebWindow() {
   if (geminiWebWin && !geminiWebWin.isDestroyed()) return geminiWebWin;
   geminiWebWin = new BrowserWindow({
     width: 1100, height: 850,
     title: 'Gemini Web (Chế độ Giả lập)',
+    show: false,
     webPreferences: {
       partition: 'persist:gemini-automation', // giữ đăng nhập lâu dài, tách biệt session app chính
       contextIsolation: true,
       nodeIntegration: false,
     },
   });
-  geminiWebWin.on('closed', () => { geminiWebWin = null; });
+  // QUAN TRỌNG: khi bạn bấm nút X đóng cửa sổ, KHÔNG hủy thật — chỉ ẩn đi,
+  // để giữ nguyên phiên đăng nhập/trạng thái trang cho lần tạo ảnh tiếp theo
+  geminiWebWin.on('close', (e) => {
+    e.preventDefault();
+    geminiWebWin.hide();
+  });
   return geminiWebWin;
 }
+
+async function isGeminiPageReady(wc) {
+  return await wc.executeJavaScript(`
+    !!(document.querySelector('[contenteditable="true"]') || document.querySelector('textarea'))
+  `).catch(() => false);
+}
+
+// Đăng nhập: hiện cửa sổ, chờ bạn tự đăng nhập, phát hiện khi trang chat sẵn sàng
+ipcMain.handle('gemini-web-login', async () => {
+  const win = getGeminiWebWindow();
+  const wc = win.webContents;
+  win.show();
+  win.focus();
+  try {
+    await wc.loadURL('https://gemini.google.com/app');
+  } catch (e) {}
+
+  const deadline = Date.now() + 5 * 60 * 1000; // tối đa 5 phút chờ bạn đăng nhập
+  while (Date.now() < deadline) {
+    if (win.isDestroyed()) return { success: false, error: 'Cửa sổ đã bị đóng.' };
+    await sleepMs(2000);
+    if (await isGeminiPageReady(wc)) {
+      geminiWebLoggedIn = true;
+      win.hide(); // Ẩn đi, giữ nguyên phiên — KHÔNG đóng
+      return { success: true };
+    }
+  }
+  return { success: false, error: 'Hết thời gian chờ đăng nhập (5 phút). Hãy thử lại.' };
+});
+
+// Kiểm tra trạng thái đăng nhập hiện tại (dùng khi mở lại app, hoặc trước khi tạo ảnh)
+ipcMain.handle('gemini-web-check-session', async () => {
+  try {
+    const win = getGeminiWebWindow();
+    const wc = win.webContents;
+    if (!geminiWebLoggedIn) {
+      // App vừa khởi động lại — thử kiểm tra xem phiên cũ (lưu trên đĩa) còn dùng được không
+      try { await wc.loadURL('https://gemini.google.com/app'); } catch (e) {}
+      await sleepMs(2500);
+      geminiWebLoggedIn = await isGeminiPageReady(wc);
+    }
+    return { loggedIn: geminiWebLoggedIn };
+  } catch (e) {
+    return { loggedIn: false, error: e.message };
+  }
+});
 
 // Điều khiển gán file vào input[type=file] qua Chrome DevTools Protocol
 // (JS thường không thể gán file vào input vì lý do bảo mật của trình duyệt)
@@ -297,19 +358,27 @@ async function attachFileViaCDP(win, filePath) {
   });
 }
 
-function sleepMs(ms) { return new Promise(r => setTimeout(r, ms)); }
-
 ipcMain.handle('gemini-web-generate-image', async (event, { prompt, refImageBase64 }) => {
   const win = getGeminiWebWindow();
   const wc = win.webContents;
   let tmpImgPath = null;
 
   try {
-    win.show();
+    if (!geminiWebLoggedIn) {
+      throw new Error('Chưa đăng nhập Gemini Web. Vào Cài đặt → bấm "Đăng nhập Gemini Web" trước.');
+    }
 
-    // Mở cuộc trò chuyện mới bằng cách nạp lại trang gốc
-    await wc.loadURL('https://gemini.google.com/app');
-    await sleepMs(3000); // chờ trang tải xong hoàn toàn
+    // KHÔNG tải lại URL gốc (tránh làm mất trạng thái phiên) — chỉ thử bấm "New chat"
+    // nếu tìm thấy, còn không thì tạo ảnh ngay trong cuộc trò chuyện hiện tại
+    await wc.executeJavaScript(`
+      (function(){
+        const btns=[...document.querySelectorAll('button, [role="button"], a')];
+        const newChatBtn=btns.find(b=>/new chat|cuộc trò chuyện mới/i.test(b.getAttribute('aria-label')||b.textContent||''));
+        if(newChatBtn){ newChatBtn.click(); return true; }
+        return false;
+      })();
+    `).catch(() => false);
+    await sleepMs(800);
 
     // ── BƯỚC 1: chọn model "3.5 Flash" ──
     // Thử tìm nút chọn model (thường hiển thị tên model hiện tại) rồi bấm vào lựa chọn "3.5 Flash"
