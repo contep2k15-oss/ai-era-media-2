@@ -446,11 +446,21 @@ ipcMain.handle('gemini-web-generate-image', async (event, { prompt, refImageBase
     }
     await sleepMs(500);
 
-    // ── BƯỚC 4: bấm Gửi ──
+    // ── BƯỚC 4: bấm Gửi ── (chỉ tìm trong khu vực ô soạn tin, không tìm khắp trang)
     const sendResult = await wc.executeJavaScript(`
       (function(){
-        const btns=[...document.querySelectorAll('button, [role="button"]')];
-        const sendBtn=btns.find(b=>/send|gửi/i.test(b.getAttribute('aria-label')||'') && !b.disabled);
+        const input = document.querySelector('[contenteditable="true"]') || document.querySelector('textarea');
+        if(!input) return false;
+        // Đi lên vài cấp cha để lấy đúng khu vực thanh soạn tin (chứa cả nút Gửi cạnh ô nhập)
+        let container = input.closest('form')
+          || input.parentElement?.parentElement?.parentElement?.parentElement
+          || input.parentElement;
+        if(!container) return false;
+        const btns=[...container.querySelectorAll('button')].filter(b=>!b.disabled && b.offsetParent!==null);
+        // Ưu tiên nút có aria-label rõ ràng chứa send/gửi
+        let sendBtn=btns.find(b=>/send|gửi/i.test(b.getAttribute('aria-label')||''));
+        // Nếu không thấy, lấy nút CUỐI CÙNG trong khu vực soạn tin (thường đúng là nút Gửi)
+        if(!sendBtn && btns.length) sendBtn=btns[btns.length-1];
         if(sendBtn){ sendBtn.click(); return true; }
         return false;
       })();
