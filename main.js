@@ -446,37 +446,46 @@ ipcMain.handle('gemini-web-generate-image', async (event, { prompt, refImageBase
     }
     await sleepMs(500);
 
-    // ── BƯỚC 4: bấm Gửi ── (tìm theo VỊ TRÍ trên màn hình — cùng hàng ngang với ô nhập,
-    // nằm bên phải — không phụ thuộc cấu trúc HTML lồng nhau, đáng tin cậy hơn nhiều)
-    const sendResult = await wc.executeJavaScript(`
+    // ── BƯỚC 4: GỬI — giả lập tổ hợp phím Ctrl+Enter thay vì dò tìm nút bấm ──
+    // (Gemini web dùng Ctrl+Enter để gửi — tránh hoàn toàn rủi ro bấm nhầm nút khác
+    // trên trang, vốn rất mong manh khi giao diện có nhiều nút)
+    wc.sendInputEvent({ type: 'keyDown', keyCode: 'Control' });
+    wc.sendInputEvent({ type: 'keyDown', keyCode: 'Enter', modifiers: ['control'] });
+    wc.sendInputEvent({ type: 'char', keyCode: 'Enter', modifiers: ['control'] });
+    wc.sendInputEvent({ type: 'keyUp', keyCode: 'Enter', modifiers: ['control'] });
+    wc.sendInputEvent({ type: 'keyUp', keyCode: 'Control' });
+    await sleepMs(1000);
+
+    // Kiểm tra xem tin nhắn đã thực sự được gửi chưa (ô nhập phải trống lại sau khi gửi)
+    const sentCheck = await wc.executeJavaScript(`
       (function(){
         const input = document.querySelector('[contenteditable="true"]') || document.querySelector('textarea');
-        if(!input) return {ok:false, reason:'khong tim thay lai o nhap'};
-        const inputRect = input.getBoundingClientRect();
-        const midY = (inputRect.top + inputRect.bottom) / 2;
-
-        // Ưu tiên nút có aria-label rõ ràng chứa send/gửi, ở BẤT KỲ đâu trên trang,
-        // miễn là nằm cùng hàng ngang (trong khoảng chiều cao) với ô nhập
-        const allBtns=[...document.querySelectorAll('button, [role="button"]')]
-          .filter(b=>!b.disabled && b.offsetParent!==null)
-          .map(b=>({el:b, rect:b.getBoundingClientRect()}))
-          .filter(o=>o.rect.top < inputRect.bottom + 60 && o.rect.bottom > inputRect.top - 10 && o.rect.width>0);
-
-        let target = allBtns.find(o=>/send|gửi/i.test(o.el.getAttribute('aria-label')||''));
-
-        // Nếu không có aria-label rõ ràng, chọn nút NẰM BÊN PHẢI NHẤT cùng hàng ngang
-        // (mẫu hình phổ biến: [+] [ô nhập.......] [model] [mic] [GỬI] — Gửi luôn ở cuối cùng bên phải)
-        if(!target && allBtns.length){
-          allBtns.sort((a,b)=>b.rect.right - a.rect.right);
-          target = allBtns[0];
-        }
-
-        if(target){ target.el.click(); return {ok:true}; }
-        return {ok:false, reason:'khong tim thay nut nao cung hang voi o nhap', candidates: allBtns.length};
+        if(!input) return {ok:false, reason:'mat o nhap sau khi nhan Enter'};
+        const stillHasText = (input.isContentEditable ? input.innerText : input.value).trim().length > 0;
+        return {ok:!stillHasText, stillHasText};
       })();
-    `);
-    if (!sendResult || !sendResult.ok) {
-      throw new Error('Không tìm thấy nút Gửi trên trang Gemini — giao diện có thể đã đổi. Chi tiết: ' + JSON.stringify(sendResult));
+    `).catch(e => ({ok:false, reason:'loi kiem tra: '+e.message}));
+
+    // Nếu Enter không gửi được (ô nhập vẫn còn text), thử phương án dự phòng:
+    // tìm nút có aria-label chứa send/gửi TRONG PHẠM VI GẦN ô nhập nhất (ancestor chung gần nhất)
+    if (!sentCheck || !sentCheck.ok) {
+      const fallbackSend = await wc.executeJavaScript(`
+        (function(){
+          const input = document.querySelector('[contenteditable="true"]') || document.querySelector('textarea');
+          if(!input) return {ok:false, reason:'khong tim thay lai o nhap'};
+          // Tìm ancestor gần nhất có chứa ít nhất 1 nút — thu hẹp dần từng cấp cha một
+          let node = input.parentElement;
+          for(let depth=0; depth<6 && node; depth++, node=node.parentElement){
+            const btns=[...node.querySelectorAll('button')].filter(b=>!b.disabled && b.offsetParent!==null);
+            const sendBtn=btns.find(b=>/send|gửi/i.test(b.getAttribute('aria-label')||''));
+            if(sendBtn){ sendBtn.click(); return {ok:true, depth}; }
+          }
+          return {ok:false, reason:'khong tim thay nut Gui sau khi Ctrl+Enter khong hoat dong'};
+        })();
+      `);
+      if (!fallbackSend || !fallbackSend.ok) {
+        throw new Error('Nhấn Ctrl+Enter không gửi được, và không tìm thấy nút Gửi dự phòng. Chi tiết: ' + JSON.stringify(fallbackSend));
+      }
     }
 
     // ── BƯỚC 5: đợi ảnh xuất hiện trong câu trả lời (tối đa 90s) ──
