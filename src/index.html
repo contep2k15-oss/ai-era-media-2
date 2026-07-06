@@ -2253,7 +2253,7 @@ async function generate(){
     ?`\n\nVISUAL DNA (MUST apply to ALL character ai_prompt fields): ${igDNA_CHAR}`
     :'';
 
-  const schema=`{"project":{"title":"string","genre":"string","video_genre":"documentary|drama|action|comedy|horror|romance|sci-fi|historical|educational|vlog|other","content_style":"string","tone":"string","target_audience":"string","setting":"string — short summary","setting_dna":"string — 20-40 từ keyword mô tả CHI TIẾT bối cảnh/môi trường lặp lại xuyên suốt video: kiến trúc, nội thất, đồ vật đặc trưng, địa hình, thời tiết/ánh sáng ngoại cảnh, trang phục nền, đồ dùng thời đại — dùng để giữ bối cảnh nhất quán khi tạo ảnh AI cho các cảnh khác nhau. Tách biệt với art_style (đây là NỘI DUNG bối cảnh, không phải kỹ thuật vẽ). VD: 1930s rural America, wooden farmhouses, dust bowl fields, dirt roads, vintage automobiles, gas lanterns, worn overalls, telephone poles, grain silos","time_period":"string","art_style":"string","color_palette":"string","cinematography":"string","pacing":"fast|medium|slow","style_analysis":{"medium":"string — Anime|Live Action|Animation|Motion Graphics|Documentary|Mixed","genre":"string — thể loại cụ thể: Action/Shonen/Historical Drama/etc","style":"string — phong cách cụ thể: Dark Military/Ghibli Pastoral/Neo-noir/etc","niche":"string — ngách cụ thể: Dystopian horror/Titan threat/Political thriller/etc","visual_dna":"string — 20-40 từ keyword cho AI image generation, VD: dark shonen anime, military dystopia, high contrast shadows, muted earth tones, dramatic Dutch angles, speed lines, intense facial expressions"}},"characters":[{"id":1,"role":"main|sub|villain|crowd|soldier|support|other","name":"string","archetype":"string","gender":"male|female|unknown","age_range":"string","appearance":{"hair":"string","eyes":"string","skin":"string","build":"string","height":"string"},"outfit":"string","personality_tags":["string"],"role_in_story":"string","ai_prompt":"Full 80-120 word AI image generation prompt. MUST include: full body standing pose, complete limbs visible (both arms and hands, both legs and feet), character standing alone, white or simple background, character name label written at the bottom of the image. Self-contained paste-ready for Midjourney/SDXL/Gemini Imagen","negative_prompt":"string — MUST include: cropped body, missing limbs, missing hands, missing feet, cut-off legs, multiple characters, group shot, partial body"}]}`;
+  const schema=`{"project":{"title":"string","genre":"string","video_genre":"documentary|drama|action|comedy|horror|romance|sci-fi|historical|educational|vlog|other","content_style":"string","tone":"string","target_audience":"string","setting":"string — short summary","setting_dna":"string — 20-40 từ keyword mô tả CHI TIẾT bối cảnh/môi trường lặp lại xuyên suốt video: kiến trúc, nội thất, đồ vật đặc trưng, địa hình, thời tiết/ánh sáng ngoại cảnh, trang phục nền, đồ dùng thời đại — dùng để giữ bối cảnh nhất quán khi tạo ảnh AI cho các cảnh khác nhau. Tách biệt với art_style (đây là NỘI DUNG bối cảnh, không phải kỹ thuật vẽ). VD: 1930s rural America, wooden farmhouses, dust bowl fields, dirt roads, vintage automobiles, gas lanterns, worn overalls, telephone poles, grain silos","time_period":"string","art_style":"string","color_palette":"string","cinematography":"string","pacing":"fast|medium|slow","style_analysis":{"medium":"string — Anime|Live Action|Animation|Motion Graphics|Documentary|Mixed","genre":"string — thể loại cụ thể: Action/Shonen/Historical Drama/etc","style":"string — phong cách cụ thể: Dark Military/Ghibli Pastoral/Neo-noir/etc","niche":"string — ngách cụ thể: Dystopian horror/Titan threat/Political thriller/etc","visual_dna":"string — 20-40 từ keyword cho AI image generation, VD: dark shonen anime, military dystopia, high contrast shadows, muted earth tones, dramatic Dutch angles, speed lines, intense facial expressions"}},"characters":[{"id":1,"role":"main|sub|villain|crowd|soldier|support|other","name":"string","entity_type":"human|animal|anthropomorphized_object|creature|robot|other — what KIND of character this actually is based on the video, do NOT default to human if the video's subject is something else (e.g. a country/map with cartoon arms and legs, an animal, an object, an abstract concept given a face)","archetype":"string","gender":"male|female|unknown|n/a","age_range":"string","appearance":{"description":"string — one rich, vivid, FULLY DESCRIPTIVE paragraph covering whatever visual traits are actually relevant to this entity_type (for human: hair/eyes/skin/build/notable features; for animal: species/fur or feather pattern/coloring/size/distinguishing marks; for anthropomorphized object or map: exactly what the object/shape is, its material/color/texture, and any added cartoon features like eyes, mouth, arms, legs, hands; for other types: whatever makes it visually identifiable). Write it so a reader can immediately and clearly picture the character just from this description — be concrete and specific, not vague.","hair":"string — leave empty if not applicable to this entity_type","eyes":"string — leave empty if not applicable","skin":"string — leave empty if not applicable","build":"string — leave empty if not applicable","height":"string — leave empty if not applicable"},"outfit":"string — leave empty or describe accessories/markings if not applicable","personality_tags":["string"],"role_in_story":"string","ai_prompt":"Full 80-120 word AI image generation prompt, written as a clear, vivid, easy-to-visualize description matching entity_type exactly (do not force human anatomy onto a non-human character). MUST include: full body / full form view appropriate to what this entity is, complete and unobscured, standing/positioned alone, white or simple background, character name label written at the bottom of the image. Self-contained paste-ready for Midjourney/SDXL/Gemini Imagen","negative_prompt":"string — MUST include: cropped/cut off, multiple characters, group shot, partial view; add human-specific exclusions (missing limbs, missing hands, missing feet) ONLY if entity_type is human or has human-like limbs"}]}`;
 
   const promptText=`Watch this video carefully — analyze the ACTUAL visual footage across the video's full duration (not just the thumbnail).
 
@@ -2277,14 +2277,14 @@ TASK 3 — CHARACTER SHEET:
 Generate a complete Character Reference Sheet for ALL character types in this video's universe.
 
 RULES:
-1. Auto-determine character types from genre/setting/visual cues
+1. Auto-determine character types from genre/setting/visual cues. CRITICAL: do NOT assume all characters are human — carefully identify what each "character" actually IS in this specific video (a person, an animal, an anthropomorphized object/map/country with cartoon limbs, a robot, an abstract concept given a face, etc.) and set entity_type accordingly. Many educational/geography/economics-explainer videos use non-human personified "characters" (e.g. a country's map drawn with arms and legs) — represent these accurately, not as generic humans.
 2. MANDATORY: AT LEAST ONE role="main" and AT LEAST ONE role="sub". Non-negotiable.
 3. Also include: villain(s), crowd rep, soldier/guard rep if relevant
 4. Give names or descriptive titles to unnamed characters
 5. ${styleInstructions}
 6. Each character must be visually distinct and memorable
-7. IMPORTANT for ai_prompt: Full body standing pose, complete arms/hands/legs/feet visible, character standing ALONE, name label at bottom of image.
-8. ai_prompt must be self-contained, optimized for image generation
+7. IMPORTANT for ai_prompt: full form view appropriate to entity_type (standing pose with visible limbs ONLY if the character actually has a humanoid/animal body — do not force this on objects that wouldn't have limbs unless the video specifically shows them personified with limbs), character alone, name label at bottom of image.
+8. ai_prompt must be self-contained, optimized for image generation, and maximally clear/descriptive — written so someone reading it can immediately picture the exact character without seeing the video
 9. For video_genre: analyze the actual content type (documentary/drama/action/etc)
 10. For content_style: how the video is made (cinematic narration/talking head/animation/etc)
 11. For tone: emotional register (dark/epic/comedic/etc)
@@ -2480,7 +2480,7 @@ function renderResults(data,url,styleName){
     <div class="info-grid">
       <div class="info-cell"><div class="info-key">🎭 Vai trò</div><div class="info-val">${esc(c.role_in_story||'—')}</div></div>
       <div class="info-cell"><div class="info-key">👘 Trang phục</div><div class="info-val">${esc(c.outfit||'—')}</div></div>
-      <div class="info-cell"><div class="info-key">💇 Ngoại hình</div><div class="info-val">Tóc: ${esc(app.hair||'—')}<br>Mắt: ${esc(app.eyes||'—')}<br>Da: ${esc(app.skin||'—')}<br>Vóc dáng: ${esc(app.build||'—')}</div></div>
+      <div class="info-cell"><div class="info-key">💇 Ngoại hình</div><div class="info-val">${formatAppearanceHTML(app)}</div></div>
       <div class="info-cell"><div class="info-key">✨ Tính cách</div><div class="info-val">${tags||'—'}</div></div>
     </div>
 
@@ -2545,6 +2545,23 @@ function showErr(msg){$('errEl').innerHTML=msg.replace(/\n/g,'<br>');$('errEl').
 function hideErr(){$('errEl').classList.remove('show');}
 function esc(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
 
+// Hiển thị ngoại hình nhân vật — ưu tiên trường "description" tự do mới (phù hợp mọi loại
+// nhân vật: người/vật/vật thể nhân cách hóa...), tự động fallback về hair/eyes/skin/build
+// cũ nếu là dữ liệu tạo từ trước khi có trường description
+function formatAppearanceHTML(app){
+  app=app||{};
+  if(app.description&&app.description.trim()){
+    return esc(app.description);
+  }
+  const parts=[];
+  if(app.hair)parts.push(`Tóc: ${esc(app.hair)}`);
+  if(app.eyes)parts.push(`Mắt: ${esc(app.eyes)}`);
+  if(app.skin)parts.push(`Da: ${esc(app.skin)}`);
+  if(app.build)parts.push(`Vóc dáng: ${esc(app.build)}`);
+  if(app.height)parts.push(`Chiều cao: ${esc(app.height)}`);
+  return parts.length?parts.join('<br>'):'—';
+}
+
 
 // ── RESCAN MODAL ──
 let rescanCandidates=[];
@@ -2573,7 +2590,7 @@ async function openRescanModal(){
     ?'Automatically detect the most appropriate character art style from the video thumbnail and context.'
     :`Apply this art style: ${styleStr}`;
 
-  const schema=`{"new_characters":[{"role":"main|sub|villain|crowd|soldier|support|other","name":"string","archetype":"string","gender":"male|female|unknown","age_range":"string","appearance":{"hair":"string","eyes":"string","skin":"string","build":"string","height":"string"},"outfit":"string","personality_tags":["string"],"role_in_story":"string","ai_prompt":"Full 80-120 word image generation prompt, full body standing alone, complete limbs, name label at bottom","negative_prompt":"string, must include: cropped body, missing limbs, multiple characters"}]}`;
+  const schema=`{"new_characters":[{"role":"main|sub|villain|crowd|soldier|support|other","name":"string","entity_type":"human|animal|anthropomorphized_object|creature|robot|other — what KIND of character this actually is based on the video, do NOT default to human","archetype":"string","gender":"male|female|unknown|n/a","age_range":"string","appearance":{"description":"string — one rich, vivid, fully descriptive paragraph matching entity_type (species/material/color/added cartoon features as relevant) so a reader can immediately visualize it","hair":"string — empty if not applicable","eyes":"string — empty if not applicable","skin":"string — empty if not applicable","build":"string — empty if not applicable","height":"string — empty if not applicable"},"outfit":"string","personality_tags":["string"],"role_in_story":"string","ai_prompt":"Full 80-120 word image generation prompt matching entity_type exactly, full form view alone, name label at bottom","negative_prompt":"string, must include: cropped/cut off, multiple characters"}]}`;
 
   const promptText=`Analyze this YouTube video (URL: ${url}).
 I already have these characters: ${existingNames}.
@@ -2778,7 +2795,7 @@ function rerenderCharsGrid(){
     <div class="info-grid">
       <div class="info-cell"><div class="info-key">🎭 Vai trò</div><div class="info-val">${esc(c.role_in_story||'—')}</div></div>
       <div class="info-cell"><div class="info-key">👘 Trang phục</div><div class="info-val">${esc(c.outfit||'—')}</div></div>
-      <div class="info-cell"><div class="info-key">💇 Ngoại hình</div><div class="info-val">Tóc: ${esc(app.hair||'—')}<br>Mắt: ${esc(app.eyes||'—')}<br>Da: ${esc(app.skin||'—')}<br>Vóc dáng: ${esc(app.build||'—')}</div></div>
+      <div class="info-cell"><div class="info-key">💇 Ngoại hình</div><div class="info-val">${formatAppearanceHTML(app)}</div></div>
       <div class="info-cell"><div class="info-key">✨ Tính cách</div><div class="info-val">${tags||'—'}</div></div>
     </div>
     <div class="prompt-label">AI Prompt — Midjourney / SDXL / Gemini Imagen</div>
@@ -4430,7 +4447,7 @@ function igToggleRefPrompt(idx){
       ?buildVideoRefNote(name)
       :'';
     ta.value=`Character reference sheet of ${name}. ${c.ai_prompt||''}
-Full body standing pose, facing forward, arms slightly away from body so all limbs clearly visible. Plain white background. Studio lighting, even and flat. Complete figure from head to toe, no cropping. High quality character illustration. Small name label "${name}" at the very bottom center.${videoRefNote}`;
+Full, complete, unobstructed view of the ENTIRE character/subject exactly as it naturally appears — if humanoid, standing facing forward with limbs clearly visible; if an animal, object, map, or other non-human entity, show its complete natural form/shape with all defining features visible (do not force a human standing pose onto a non-human subject). Plain white background. Studio lighting, even and flat. No cropping — the full character/subject must fit entirely in frame. High quality character illustration. Small name label "${name}" at the very bottom center.${videoRefNote}`;
   }
 
   if(wrap.style.display==='none'){
@@ -4461,7 +4478,7 @@ async function igGenerateRef(idx){
   // Dùng prompt từ textarea nếu user đã sửa, nếu không dùng prompt mặc định
   const editedTA=$(`igrefprompt_${idx}`);
   const defaultRefPrompt=`Character reference sheet of ${name}. ${c.ai_prompt||''}
-Full body standing pose, facing forward, arms slightly away from body so all limbs clearly visible. Plain white background. Studio lighting, even and flat. Complete figure from head to toe, no cropping. High quality character illustration. Small name label "${name}" at the very bottom center.${videoRefNote}`;
+Full, complete, unobstructed view of the ENTIRE character/subject exactly as it naturally appears — if humanoid, standing facing forward with limbs clearly visible; if an animal, object, map, or other non-human entity, show its complete natural form/shape with all defining features visible (do not force a human standing pose onto a non-human subject). Plain white background. Studio lighting, even and flat. No cropping — the full character/subject must fit entirely in frame. High quality character illustration. Small name label "${name}" at the very bottom center.${videoRefNote}`;
   const refPrompt=(editedTA&&editedTA.value.trim())?editedTA.value.trim():defaultRefPrompt;
   // Điền vào textarea để user thấy prompt đang dùng
   if(editedTA&&!editedTA.value.trim()) editedTA.value=defaultRefPrompt;
