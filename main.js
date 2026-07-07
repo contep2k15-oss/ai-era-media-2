@@ -1,4 +1,4 @@
-const { app, BrowserWindow, shell, ipcMain, dialog } = require('electron');
+const { app, BrowserWindow, shell, ipcMain, dialog, clipboard, nativeImage } = require('electron');
 const path = require('path');
 const fs = require('fs');
 const os = require('os');
@@ -269,6 +269,7 @@ ipcMain.handle('google-auth-status', async () => {
 // ══════════════════════════════════════════════════
 let geminiWebWin = null;
 let geminiWebLoggedIn = false;
+let geminiModelSelected = false; // chỉ chọn model 1 lần/phiên, tránh bấm nhầm khi lặp lại
 
 function sleepMs(ms) { return new Promise(r => setTimeout(r, ms)); }
 
@@ -315,6 +316,7 @@ ipcMain.handle('gemini-web-login', async () => {
     await sleepMs(2000);
     if (await isGeminiPageReady(wc)) {
       geminiWebLoggedIn = true;
+      geminiModelSelected = false; // đăng nhập lại → thử chọn model lại 1 lần nữa
       win.hide(); // Ẩn đi, giữ nguyên phiên — KHÔNG đóng
       return { success: true };
     }
@@ -370,60 +372,105 @@ ipcMain.handle('gemini-web-generate-image', async (event, { prompt, refImageBase
 
     win.show(); // Hiện cửa sổ trong lúc tạo ảnh để có thể theo dõi/debug
 
-    // KHÔNG tải lại URL gốc (tránh làm mất trạng thái phiên) — chỉ thử bấm "New chat"
-    // nếu tìm thấy, còn không thì tạo ảnh ngay trong cuộc trò chuyện hiện tại
-    await wc.executeJavaScript(`
-      (function(){
-        const btns=[...document.querySelectorAll('button, [role="button"], a')];
-        const newChatBtn=btns.find(b=>/new chat|cuộc trò chuyện mới/i.test(b.getAttribute('aria-label')||b.textContent||''));
-        if(newChatBtn){ newChatBtn.click(); return true; }
-        return false;
-      })();
-    `).catch(() => false);
-    await sleepMs(800);
+    // Mở cuộc trò chuyện mới bằng TỔ HỢP PHÍM Ctrl+Shift+O — hoàn toàn không dò/click DOM,
+    // tránh triệt để rủi ro bấm nhầm nút khác trên trang (nguồn gốc mọi lỗi trước đây).
+    wc.sendInputEvent({ type: 'keyDown', keyCode: 'Control' });
+    wc.sendInputEvent({ type: 'keyDown', keyCode: 'Shift' });
+    wc.sendInputEvent({ type: 'keyDown', keyCode: 'O', modifiers: ['control', 'shift'] });
+    wc.sendInputEvent({ type: 'char', keyCode: 'O', modifiers: ['control', 'shift'] });
+    wc.sendInputEvent({ type: 'keyUp', keyCode: 'O', modifiers: ['control', 'shift'] });
+    wc.sendInputEvent({ type: 'keyUp', keyCode: 'Shift' });
+    wc.sendInputEvent({ type: 'keyUp', keyCode: 'Control' });
+    await sleepMs(1200); // chờ trang chuyển sang cuộc trò chuyện mới
 
-    // ── BƯỚC 1: chọn model "3.5 Flash" ──
-    // Thử tìm nút chọn model (thường hiển thị tên model hiện tại) rồi bấm vào lựa chọn "3.5 Flash"
-    const modelSelectResult = await wc.executeJavaScript(`
-      (function(){
-        try{
-          const btns=[...document.querySelectorAll('button, [role="button"]')];
-          const modelBtn=btns.find(b=>/flash|pro|model/i.test(b.textContent||'') && b.offsetParent!==null);
-          if(modelBtn){ modelBtn.click(); return {clicked:true}; }
-          return {clicked:false};
-        }catch(e){return {error:e.message};}
-      })();
-    `);
-    if (modelSelectResult && modelSelectResult.clicked) {
-      await sleepMs(800);
-      await wc.executeJavaScript(`
+    // ── BƯỚC 1: chọn model "3.5 Flash" — CHỈ làm 1 LẦN DUY NHẤT trong cả phiên làm việc ──
+    // (model đã chọn sẽ được Gemini nhớ cho các cuộc trò chuyện mới tiếp theo — không cần chọn lại,
+    // vừa nhanh hơn vừa tránh rủi ro bấm nhầm mỗi lần lặp lại bước này)
+    if (!geminiModelSelected) {
+      const modelSelectResult = await wc.executeJavaScript(`
         (function(){
-          const opts=[...document.querySelectorAll('[role="menuitem"], [role="option"], li, button')];
-          const target=opts.find(o=>/3\\.5\\s*flash/i.test(o.textContent||''));
-          if(target){ target.click(); return true; }
-          return false;
+          try{
+            // So khớp CHÍNH XÁC toàn bộ nội dung nút (không phải "chứa đoạn text"),
+            // tránh khớp nhầm các phần tử khác (VD chữ "Pro" ở khu vực hồ sơ tài khoản)
+            const btns=[...document.querySelectorAll('button, [role="button"]')];
+            const modelBtn=btns.find(b=>{
+              const t=(b.textContent||'').trim();
+              return /^(flash|pro|\\d\\.\\d\\s*flash|\\d\\.\\d\\s*pro)$/i.test(t) && b.offsetParent!==null;
+            });
+            if(modelBtn){ modelBtn.click(); return {clicked:true}; }
+            return {clicked:false};
+          }catch(e){return {error:e.message};}
         })();
       `);
-      await sleepMs(500);
+      if (modelSelectResult && modelSelectResult.clicked) {
+        await sleepMs(800);
+        await wc.executeJavaScript(`
+          (function(){
+            const opts=[...document.querySelectorAll('[role="menuitem"], [role="option"]')];
+            const target=opts.find(o=>/3\\.5\\s*flash/i.test((o.textContent||'').trim()));
+            if(target){ target.click(); return true; }
+            return false;
+          })();
+        `);
+        await sleepMs(500);
+      }
+      geminiModelSelected = true; // đánh dấu đã xử lý — không thử lại nữa dù thành công hay không
     }
-    // Nếu không tìm được nút chọn model, bỏ qua bước này — dùng model mặc định hiện tại của trang
 
-    // ── BƯỚC 2: đính kèm ảnh tham chiếu (nếu có) ──
+    // ── BƯỚC 2: đính kèm ảnh tham chiếu (nếu có) — bằng clipboard + Ctrl+V ──
+    // Không dò/click nút nào trên trang cả (nguồn gốc lỗi bấm nhầm sidebar nhiều lần trước đây).
+    // Ghi ảnh vào clipboard hệ thống rồi giả lập Ctrl+V — dán ảnh là cơ chế phổ biến,
+    // ổn định ở hầu hết khung chat hiện đại, không phụ thuộc cấu trúc HTML của trang.
+    let savedClipboard = null; // để khôi phục lại clipboard gốc của bạn sau khi dùng xong
     if (refImageBase64) {
-      tmpImgPath = path.join(os.tmpdir(), `gemini_ref_${Date.now()}.png`);
-      fs.writeFileSync(tmpImgPath, Buffer.from(refImageBase64, 'base64'));
-      // Cần bấm nút "đính kèm/upload" trước để input[type=file] xuất hiện trong DOM (nếu bị ẩn/lazy-render)
+      // 1) Lưu lại clipboard hiện tại của bạn trước khi ghi đè
+      try {
+        const formats = clipboard.availableFormats();
+        savedClipboard = {
+          text: formats.includes('text/plain') ? clipboard.readText() : '',
+          html: formats.includes('text/html') ? clipboard.readHTML() : '',
+          imageDataURL: (() => {
+            const img = clipboard.readImage();
+            return img && !img.isEmpty() ? img.toDataURL() : null;
+          })(),
+        };
+      } catch (e) { savedClipboard = null; }
+
+      // 2) Ghi ảnh tham chiếu vào clipboard
+      const img = nativeImage.createFromBuffer(Buffer.from(refImageBase64, 'base64'));
+      clipboard.writeImage(img);
+
+      // 3) Focus vào ô chat rồi giả lập Ctrl+V
       await wc.executeJavaScript(`
         (function(){
-          const btns=[...document.querySelectorAll('button, [role="button"]')];
-          const attachBtn=btns.find(b=>/attach|upload|add file|hình ảnh|tệp/i.test(b.getAttribute('aria-label')||''));
-          if(attachBtn){ attachBtn.click(); return true; }
-          return false;
+          const input = document.querySelector('[contenteditable="true"]') || document.querySelector('textarea');
+          if(input) input.focus();
+          return !!input;
         })();
-      `);
-      await sleepMs(500);
-      await attachFileViaCDP(win, tmpImgPath);
-      await sleepMs(1500); // chờ ảnh upload xong lên giao diện
+      `).catch(() => false);
+      wc.sendInputEvent({ type: 'keyDown', keyCode: 'Control' });
+      wc.sendInputEvent({ type: 'keyDown', keyCode: 'V', modifiers: ['control'] });
+      wc.sendInputEvent({ type: 'char', keyCode: 'V', modifiers: ['control'] });
+      wc.sendInputEvent({ type: 'keyUp', keyCode: 'V', modifiers: ['control'] });
+      wc.sendInputEvent({ type: 'keyUp', keyCode: 'Control' });
+      await sleepMs(1500); // chờ ảnh dán xong hiện lên giao diện
+
+      // 4) Khôi phục lại clipboard gốc của bạn ngay sau khi dán xong
+      try {
+        if (savedClipboard) {
+          if (savedClipboard.imageDataURL) {
+            clipboard.writeImage(nativeImage.createFromDataURL(savedClipboard.imageDataURL));
+          } else if (savedClipboard.html) {
+            clipboard.writeHTML(savedClipboard.html);
+          } else if (savedClipboard.text) {
+            clipboard.writeText(savedClipboard.text);
+          } else {
+            clipboard.clear();
+          }
+        } else {
+          clipboard.clear();
+        }
+      } catch (e) {}
     }
 
     // ── BƯỚC 3: gõ prompt vào ô chat (kèm link YouTube nếu có, để Gemini xem video làm ngữ cảnh) ──
