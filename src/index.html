@@ -4406,7 +4406,8 @@ async function igCallGeminiImage(apiKey, optimizedPrompt, refImageBase64, endpoi
   if(igWebSimEnable && window.electronAPI?.geminiWebGenerateImage){
     const res=await window.electronAPI.geminiWebGenerateImage({
       prompt:optimizedPrompt,
-      refImageBase64:refImageBase64||null
+      refImageBase64:refImageBase64||null,
+      videoUrl:videoUrl||null
     });
     if(!res||!res.success) throw new Error('Gemini Web: '+(res?.error||'lỗi không xác định'));
     // res.imageDataUrl dạng "data:image/png;base64,...." → tách lấy phần base64

@@ -358,7 +358,7 @@ async function attachFileViaCDP(win, filePath) {
   });
 }
 
-ipcMain.handle('gemini-web-generate-image', async (event, { prompt, refImageBase64 }) => {
+ipcMain.handle('gemini-web-generate-image', async (event, { prompt, refImageBase64, videoUrl }) => {
   const win = getGeminiWebWindow();
   const wc = win.webContents;
   let tmpImgPath = null;
@@ -426,16 +426,17 @@ ipcMain.handle('gemini-web-generate-image', async (event, { prompt, refImageBase
       await sleepMs(1500); // chờ ảnh upload xong lên giao diện
     }
 
-    // ── BƯỚC 3: gõ prompt vào ô chat ──
+    // ── BƯỚC 3: gõ prompt vào ô chat (kèm link YouTube nếu có, để Gemini xem video làm ngữ cảnh) ──
+    const fullText = videoUrl ? (videoUrl + '\n\n' + prompt) : prompt;
     const typeResult = await wc.executeJavaScript(`
       (function(){
         const input = document.querySelector('[contenteditable="true"]') || document.querySelector('textarea');
         if(!input) return {ok:false, reason:'khong tim thay o nhap prompt'};
         input.focus();
         if(input.isContentEditable){
-          input.innerText = ${JSON.stringify(prompt)};
+          input.innerText = ${JSON.stringify(fullText)};
         } else {
-          input.value = ${JSON.stringify(prompt)};
+          input.value = ${JSON.stringify(fullText)};
         }
         input.dispatchEvent(new InputEvent('input', {bubbles:true}));
         return {ok:true};
@@ -444,7 +445,8 @@ ipcMain.handle('gemini-web-generate-image', async (event, { prompt, refImageBase
     if (!typeResult || !typeResult.ok) {
       throw new Error('Không tìm thấy ô nhập prompt trên trang Gemini — giao diện có thể đã đổi. Chi tiết: ' + (typeResult && typeResult.reason));
     }
-    await sleepMs(500);
+    // Nếu có link video, chờ thêm để Gemini kịp nhận diện link và hiện preview (nếu có)
+    await sleepMs(videoUrl ? 2500 : 500);
 
     // ── BƯỚC 4: GỬI — giả lập tổ hợp phím Ctrl+Enter thay vì dò tìm nút bấm ──
     // (Gemini web dùng Ctrl+Enter để gửi — tránh hoàn toàn rủi ro bấm nhầm nút khác
