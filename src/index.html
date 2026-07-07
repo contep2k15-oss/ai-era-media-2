@@ -4344,6 +4344,20 @@ const IG_MODEL=MODEL_IMAGE;
 
 // ── CHẾ ĐỘ GIẢ LẬP: tạo ảnh qua Gemini Web thay vì Vertex API (miễn phí, thử nghiệm) ──
 let igWebSimEnable=false;
+
+// Tính khoảng nghỉ giữa các lần tạo ảnh khi dùng Chế độ Giả lập:
+// - Ngẫu nhiên 1.5-4s mỗi lần (không cố định, tránh nhịp điệu máy móc dễ bị phát hiện)
+// - Cứ khoảng 12-20 ảnh, chèn 1 khoảng nghỉ dài hơn (15-35s) giống người dùng thật nghỉ tay
+let igWebSimImageCount=0;
+let igWebSimNextLongBreakAt=Math.floor(Math.random()*9)+12; // lần nghỉ dài đầu tiên: sau 12-20 ảnh
+function igWebSimGetDelay(){
+  igWebSimImageCount++;
+  if(igWebSimImageCount>=igWebSimNextLongBreakAt){
+    igWebSimNextLongBreakAt=igWebSimImageCount+Math.floor(Math.random()*9)+12; // hẹn lần nghỉ dài tiếp theo
+    return Math.floor(Math.random()*20000)+15000; // nghỉ dài: 15-35s
+  }
+  return Math.floor(Math.random()*2500)+1500; // nghỉ ngắn ngẫu nhiên: 1.5-4s
+}
 function igOnWebSimToggle(checked){
   igWebSimEnable=checked;
   if(checked) igWebSimCheckStatus();
@@ -4497,7 +4511,7 @@ async function igGenerateAllRefs(){
     await igGenerateRef(idx);
     done++;
     btn.innerHTML=`⏳ ${done}/${todo.length} xong...`;
-    if(done < todo.length) await new Promise(r=>setTimeout(r,20000)); // 20s giữa nhân vật
+    if(done < todo.length) await new Promise(r=>setTimeout(r, igWebSimEnable?igWebSimGetDelay():20000)); // 20s giữa nhân vật (Vertex) — Gemini Web dùng delay ngẫu nhiên
   }
 
   btn.disabled=false;
@@ -4828,9 +4842,10 @@ async function igRunAll(){
     await Promise.all(batch);
     if(i+PARALLEL<total&&!igStopped){
       // Adaptive delay: OK liên tiếp → giảm, 429 → tăng
-      const lastOK=igGeneratedImages[i]!=null;
-      $('igProgLabel').textContent=`🎨 ${igGeneratedImages.filter(Boolean).length}/${total} xong… chờ 30s`;
-      await new Promise(r=>setTimeout(r,igDelay));
+      // Chế độ Giả lập (Gemini Web) dùng delay ngẫu nhiên, không cố định — tránh nhịp điệu máy móc dễ bị phát hiện
+      const delayNow=igWebSimEnable?igWebSimGetDelay():igDelay;
+      $('igProgLabel').textContent=`🎨 ${igGeneratedImages.filter(Boolean).length}/${total} xong… chờ ${Math.round(delayNow/1000)}s`;
+      await new Promise(r=>setTimeout(r,delayNow));
     }
   }
 
