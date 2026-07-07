@@ -4401,9 +4401,10 @@ async function igWebSimLogin(){
   btn.disabled=false;
 }
 
-async function igCallGeminiImage(apiKey, optimizedPrompt, refImageBase64, endpoint, extraRefBase64, videoUrl){
+async function igCallGeminiImage(apiKey, optimizedPrompt, refImageBase64, endpoint, extraRefBase64, videoUrl, forceVertex){
   // Chế độ Giả lập: đi qua Gemini Web (gemini.google.com) thay vì Vertex AI
-  if(igWebSimEnable && window.electronAPI?.geminiWebGenerateImage){
+  // (forceVertex=true dùng cho ảnh tham chiếu nhân vật — vẫn giữ Vertex vì có kèm video + tạo ảnh cùng lúc, dễ bị model trả lời chữ thay vì ảnh trên Gemini Web)
+  if(igWebSimEnable && !forceVertex && window.electronAPI?.geminiWebGenerateImage){
     const res=await window.electronAPI.geminiWebGenerateImage({
       prompt:optimizedPrompt,
       refImageBase64:refImageBase64||null,
@@ -4579,7 +4580,7 @@ Full, complete, unobstructed view of the ENTIRE character/subject exactly as it 
       attempts++;
       try{
         btn.textContent=attempts>1?`🔄 Retry ${attempts}/4…`:'🎨 Đang tạo ảnh...';
-        imgB64=await igCallGeminiImage(imgApiKey, refPrompt, null, imgEndpoint, null, (useVideoRef&&!videoRefFailed)?videoUrl:null);
+        imgB64=await igCallGeminiImage(imgApiKey, refPrompt, null, imgEndpoint, null, (useVideoRef&&!videoRefFailed)?videoUrl:null, true);
       }catch(e){
         const isExhaustedRef=(e.message||'').match(/exhausted|quota|limit|429|resource/i);
         const isRetry=(e.message||'').match(/demand|retry|500|503|overload|temporarily/i);
