@@ -488,42 +488,31 @@ ipcMain.handle('gemini-web-generate-image', async (event, { prompt, refImageBase
       }
     }
 
-    // ── BƯỚC 5: đợi ảnh xuất hiện trong câu trả lời (tối đa 90s) ──
+    // ── BƯỚC 5: đọc trực tiếp dữ liệu ảnh ĐÃ HIỂN THỊ bằng canvas — không qua mạng,
+    // không phụ thuộc địa chỉ blob: (dễ hết hạn) hay session.downloadURL (không hiểu blob:) ──
     let imageDataUrl = null;
     let lastDiag = null;
     const deadline = Date.now() + 90000;
     while (Date.now() < deadline) {
-      await sleepMs(2000);
+      await sleepMs(1500);
       const result = await wc.executeJavaScript(`
-        (async function(){
-          // Ưu tiên tìm <img> đủ lớn (ảnh thật), quét từ cuối DOM lên (ảnh mới nhất thường ở cuối)
+        (function(){
           const imgs=[...document.querySelectorAll('img')].reverse();
-          const genImg=imgs.find(im=>im.naturalWidth>200 && im.naturalHeight>200);
-          if(genImg){
-            try{
-              const res=await fetch(genImg.src, {credentials:'include'});
-              if(!res.ok) return {ok:false, reason:'fetch anh that bai, status='+res.status, srcPreview:genImg.src.slice(0,60)};
-              const blob=await res.blob();
-              const dataUrl=await new Promise((resolve,reject)=>{
-                const fr=new FileReader();
-                fr.onload=()=>resolve(fr.result);
-                fr.onerror=reject;
-                fr.readAsDataURL(blob);
-              });
-              return {ok:true, dataUrl};
-            }catch(e){ return {ok:false, reason:'loi fetch/doc anh: '+e.message}; }
+          const genImg=imgs.find(im=>im.naturalWidth>200 && im.naturalHeight>200 && im.complete);
+          if(!genImg) return {ok:false, reason:'chua thay anh nao du lon/tai xong', totalImgs:imgs.length};
+          try{
+            const canvas=document.createElement('canvas');
+            canvas.width=genImg.naturalWidth;
+            canvas.height=genImg.naturalHeight;
+            const ctx=canvas.getContext('2d');
+            ctx.drawImage(genImg,0,0);
+            const dataUrl=canvas.toDataURL('image/png');
+            return {ok:true, dataUrl};
+          }catch(e){
+            return {ok:false, reason:'canvas bi chan (tainted): '+e.message};
           }
-          // Fallback: ảnh có thể được vẽ vào <canvas> thay vì <img>
-          const canvases=[...document.querySelectorAll('canvas')].filter(c=>c.width>200&&c.height>200);
-          if(canvases.length){
-            try{
-              const dataUrl=canvases[canvases.length-1].toDataURL('image/png');
-              return {ok:true, dataUrl};
-            }catch(e){ return {ok:false, reason:'canvas bi khoa CORS: '+e.message}; }
-          }
-          return {ok:false, reason:'chua thay img hoac canvas nao du lon', totalImgs:imgs.length, totalCanvas:document.querySelectorAll('canvas').length};
         })();
-      `).catch(e => ({ok:false, reason:'loi thuc thi JS: '+e.message}));
+      `).catch(e => ({ ok: false, reason: 'loi thuc thi JS: ' + e.message }));
       lastDiag = result;
       if (result && result.ok && result.dataUrl) { imageDataUrl = result.dataUrl; break; }
     }
