@@ -597,29 +597,34 @@ ipcMain.handle('gemini-web-generate-image', async (event, { prompt, refImageBase
     }
 
     // ── BƯỚC 5: đọc trực tiếp dữ liệu ảnh ĐÃ HIỂN THỊ bằng canvas — không qua mạng ──
-    // Ưu tiên tìm ảnh trong <button class="image-button"> — đây là "dấu hiệu" CHẮC CHẮN
-    // của ảnh Gemini THỰC SỰ TẠO RA (khác hẳn ảnh tham chiếu bạn gửi lên, không có wrapper
-    // này). Đáng tin cậy hơn nhiều so với cách so sánh "ảnh cũ/mới" (địa chỉ blob: có thể đổi).
+    // CHỈ tin tưởng ảnh trong <button class="image-button"> — dấu hiệu CHẮC CHẮN của ảnh
+    // Gemini THỰC SỰ TẠO RA (đã xác nhận qua debug thực tế). KHÔNG dùng cách dự phòng "lọc
+    // ảnh mới xuất hiện" quá sớm nữa — vì địa chỉ blob: của chính ảnh tham chiếu có thể đổi
+    // sau khi gửi, khiến cách dự phòng dễ lấy nhầm ẢNH THAM CHIẾU ngay ở lần kiểm tra đầu
+    // tiên (trước khi Gemini kịp vẽ xong ảnh thật) rồi dừng lại luôn, không đợi tiếp.
     let imageDataUrl = null;
     let lastDiag = null;
     const deadline = Date.now() + 90000;
+    const fallbackStartsAt = deadline - 15000; // chỉ cho phép dự phòng ở 15s cuối cùng
     while (Date.now() < deadline) {
       await sleepMs(1500);
+      const allowFallback = Date.now() >= fallbackStartsAt;
       const result = await wc.executeJavaScript(`
         (function(){
           const existingSrcs = new Set(${JSON.stringify(existingImgSrcs)});
-          // Cách 1 (ưu tiên): ảnh nằm trong button.image-button — chắc chắn là ảnh Gemini tạo ra
+          const allowFallback = ${allowFallback};
+          // Cách 1 (LUÔN ưu tiên): ảnh nằm trong button.image-button — chắc chắn Gemini tạo ra
           let candidates=[...document.querySelectorAll('button.image-button img')]
             .filter(im=>im.naturalWidth>200 && im.naturalHeight>200 && im.complete);
           let usedFallback=false;
-          // Cách 2 (dự phòng): nếu không có button.image-button, quay lại lọc ảnh mới xuất hiện
-          if(!candidates.length){
+          // Cách 2 (CHỈ dùng khi đã chờ khá lâu mà vẫn không có button.image-button nào):
+          if(!candidates.length && allowFallback){
             usedFallback=true;
             candidates=[...document.querySelectorAll('img')]
               .filter(im=>im.naturalWidth>200 && im.naturalHeight>200 && im.complete && !existingSrcs.has(im.src));
           }
           const genImg=candidates[candidates.length-1]; // ảnh mới nhất trong danh sách tìm được
-          if(!genImg) return {ok:false, reason:'chua thay anh nao du lon/tai xong', usedFallback, totalImgs:document.querySelectorAll('img').length};
+          if(!genImg) return {ok:false, reason:'chua thay anh trong button.image-button (dang cho Gemini ve xong)', usedFallback, totalImgs:document.querySelectorAll('img').length};
           try{
             const canvas=document.createElement('canvas');
             canvas.width=genImg.naturalWidth;
