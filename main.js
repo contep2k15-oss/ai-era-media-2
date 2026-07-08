@@ -596,8 +596,10 @@ ipcMain.handle('gemini-web-generate-image', async (event, { prompt, refImageBase
       }
     }
 
-    // ── BƯỚC 5: đọc trực tiếp dữ liệu ảnh ĐÃ HIỂN THỊ bằng canvas — không qua mạng,
-    // không phụ thuộc địa chỉ blob: (dễ hết hạn) hay session.downloadURL (không hiểu blob:) ──
+    // ── BƯỚC 5: đọc trực tiếp dữ liệu ảnh ĐÃ HIỂN THỊ bằng canvas — không qua mạng ──
+    // Ưu tiên tìm ảnh trong <button class="image-button"> — đây là "dấu hiệu" CHẮC CHẮN
+    // của ảnh Gemini THỰC SỰ TẠO RA (khác hẳn ảnh tham chiếu bạn gửi lên, không có wrapper
+    // này). Đáng tin cậy hơn nhiều so với cách so sánh "ảnh cũ/mới" (địa chỉ blob: có thể đổi).
     let imageDataUrl = null;
     let lastDiag = null;
     const deadline = Date.now() + 90000;
@@ -606,9 +608,18 @@ ipcMain.handle('gemini-web-generate-image', async (event, { prompt, refImageBase
       const result = await wc.executeJavaScript(`
         (function(){
           const existingSrcs = new Set(${JSON.stringify(existingImgSrcs)});
-          const imgs=[...document.querySelectorAll('img')].reverse();
-          const genImg=imgs.find(im=>im.naturalWidth>200 && im.naturalHeight>200 && im.complete && !existingSrcs.has(im.src));
-          if(!genImg) return {ok:false, reason:'chua thay anh MOI nao du lon/tai xong (co the anh tham chieu cu con dinh)', totalImgs:imgs.length};
+          // Cách 1 (ưu tiên): ảnh nằm trong button.image-button — chắc chắn là ảnh Gemini tạo ra
+          let candidates=[...document.querySelectorAll('button.image-button img')]
+            .filter(im=>im.naturalWidth>200 && im.naturalHeight>200 && im.complete);
+          let usedFallback=false;
+          // Cách 2 (dự phòng): nếu không có button.image-button, quay lại lọc ảnh mới xuất hiện
+          if(!candidates.length){
+            usedFallback=true;
+            candidates=[...document.querySelectorAll('img')]
+              .filter(im=>im.naturalWidth>200 && im.naturalHeight>200 && im.complete && !existingSrcs.has(im.src));
+          }
+          const genImg=candidates[candidates.length-1]; // ảnh mới nhất trong danh sách tìm được
+          if(!genImg) return {ok:false, reason:'chua thay anh nao du lon/tai xong', usedFallback, totalImgs:document.querySelectorAll('img').length};
           try{
             const canvas=document.createElement('canvas');
             canvas.width=genImg.naturalWidth;
@@ -616,9 +627,9 @@ ipcMain.handle('gemini-web-generate-image', async (event, { prompt, refImageBase
             const ctx=canvas.getContext('2d');
             ctx.drawImage(genImg,0,0);
             const dataUrl=canvas.toDataURL('image/png');
-            return {ok:true, dataUrl};
+            return {ok:true, dataUrl, usedFallback};
           }catch(e){
-            return {ok:false, reason:'canvas bi chan (tainted): '+e.message};
+            return {ok:false, reason:'canvas bi chan (tainted): '+e.message, usedFallback};
           }
         })();
       `).catch(e => ({ ok: false, reason: 'loi thuc thi JS: ' + e.message }));
