@@ -418,14 +418,9 @@ ipcMain.handle('gemini-web-generate-image', async (event, { prompt, refImageBase
       geminiModelSelected = true; // đánh dấu đã xử lý — không thử lại nữa dù thành công hay không
     }
 
-    // ── BƯỚC 2: đính kèm ảnh tham chiếu (nếu có) ──
-    // Cách CHÍNH: bấm nút "+" → "Tải tệp lên" → gán file qua CDP — không đụng tới clipboard
-    // của bạn, an toàn tuyệt đối nếu bạn đang copy/paste thứ khác song song.
-    // Cách DỰ PHÒNG (nếu cách chính lỡ thất bại): clipboard + Ctrl+V như trước.
-    let savedClipboard = null; // để khôi phục lại clipboard gốc của bạn nếu phải dùng cách dự phòng
+    // Mở cuộc trò chuyện MỚI nếu có ảnh tham chiếu mới cần đính kèm — đảm bảo ô soạn tin
+    // hoàn toàn sạch, không bị dính ảnh tham chiếu của lượt tạo ảnh trước đó
     if (refImageBase64) {
-      // Mở cuộc trò chuyện MỚI trước khi đính kèm ảnh tham chiếu mới — đảm bảo ô soạn tin
-      // hoàn toàn sạch, không bị dính ảnh tham chiếu của lượt tạo ảnh trước đó
       wc.sendInputEvent({ type: 'keyDown', keyCode: 'Control' });
       wc.sendInputEvent({ type: 'keyDown', keyCode: 'Shift' });
       wc.sendInputEvent({ type: 'keyDown', keyCode: 'O', modifiers: ['control', 'shift'] });
@@ -434,7 +429,39 @@ ipcMain.handle('gemini-web-generate-image', async (event, { prompt, refImageBase
       wc.sendInputEvent({ type: 'keyUp', keyCode: 'Shift' });
       wc.sendInputEvent({ type: 'keyUp', keyCode: 'Control' });
       await sleepMs(1200);
+    }
 
+    // ── BƯỚC 2: gõ prompt vào ô chat TRƯỚC (kèm link YouTube nếu có) ──
+    // Đính kèm ảnh sau cùng, ngay trước khi gửi — tránh việc ghi chữ vào ô nhập (thao tác
+    // qua code) làm gián đoạn liên kết giữa ảnh đã đính kèm và tin nhắn (từng gặp: ảnh bị
+    // "bỏ lại" trong ô soạn tin, chỉ có chữ được gửi đi).
+    const fullText = videoUrl ? (videoUrl + '\n\n' + prompt) : prompt;
+    const typeResult = await wc.executeJavaScript(`
+      (function(){
+        const input = document.querySelector('[contenteditable="true"]') || document.querySelector('textarea');
+        if(!input) return {ok:false, reason:'khong tim thay o nhap prompt'};
+        input.focus();
+        if(input.isContentEditable){
+          input.innerText = ${JSON.stringify(fullText)};
+        } else {
+          input.value = ${JSON.stringify(fullText)};
+        }
+        input.dispatchEvent(new InputEvent('input', {bubbles:true}));
+        return {ok:true};
+      })();
+    `);
+    if (!typeResult || !typeResult.ok) {
+      throw new Error('Không tìm thấy ô nhập prompt trên trang Gemini — giao diện có thể đã đổi. Chi tiết: ' + (typeResult && typeResult.reason));
+    }
+    // Nếu có link video, chờ thêm để Gemini kịp nhận diện link và hiện preview (nếu có)
+    await sleepMs(videoUrl ? 2500 : 500);
+
+    // ── BƯỚC 3: đính kèm ảnh tham chiếu (nếu có) — SAU KHI đã gõ xong prompt ──
+    // Cách CHÍNH: bấm nút "+" → "Tải tệp lên" → gán file qua CDP — không đụng tới clipboard
+    // của bạn, an toàn tuyệt đối nếu bạn đang copy/paste thứ khác song song.
+    // Cách DỰ PHÒNG (nếu cách chính lỡ thất bại): clipboard + Ctrl+V.
+    let savedClipboard = null; // để khôi phục lại clipboard gốc của bạn nếu phải dùng cách dự phòng
+    if (refImageBase64) {
       tmpImgPath = path.join(os.tmpdir(), `gemini_ref_${Date.now()}.png`);
       fs.writeFileSync(tmpImgPath, Buffer.from(refImageBase64, 'base64'));
 
@@ -494,11 +521,22 @@ ipcMain.handle('gemini-web-generate-image', async (event, { prompt, refImageBase
         const img = nativeImage.createFromBuffer(Buffer.from(refImageBase64, 'base64'));
         clipboard.writeImage(img);
 
-        // 3) Focus vào ô chat rồi giả lập Ctrl+V
+        // 3) Focus vào CUỐI ô chat (không xóa chữ đã gõ) rồi giả lập Ctrl+V để chèn thêm ảnh
         await wc.executeJavaScript(`
           (function(){
             const input = document.querySelector('[contenteditable="true"]') || document.querySelector('textarea');
-            if(input) input.focus();
+            if(input){
+              input.focus();
+              // Đưa con trỏ về cuối nội dung đã gõ, tránh dán ảnh đè lên giữa chữ
+              if(input.isContentEditable && window.getSelection){
+                const range=document.createRange();
+                range.selectNodeContents(input);
+                range.collapse(false);
+                const sel=window.getSelection();
+                sel.removeAllRanges();
+                sel.addRange(range);
+              }
+            }
             return !!input;
           })();
         `).catch(() => false);
@@ -529,32 +567,10 @@ ipcMain.handle('gemini-web-generate-image', async (event, { prompt, refImageBase
     }
 
     // Ghi lại danh sách TOÀN BỘ ảnh đã có sẵn trên trang trước khi gửi (bao gồm ảnh tham
-    // chiếu vừa dán) — dùng để lọc bỏ, tránh lấy nhầm ảnh tham chiếu làm "ảnh vừa tạo ra"
+    // chiếu vừa đính kèm) — dùng để lọc bỏ, tránh lấy nhầm ảnh tham chiếu làm "ảnh vừa tạo ra"
     const existingImgSrcs = await wc.executeJavaScript(`
       [...document.querySelectorAll('img')].map(im => im.src)
     `).catch(() => []);
-
-    // ── BƯỚC 3: gõ prompt vào ô chat (kèm link YouTube nếu có, để Gemini xem video làm ngữ cảnh) ──
-    const fullText = videoUrl ? (videoUrl + '\n\n' + prompt) : prompt;
-    const typeResult = await wc.executeJavaScript(`
-      (function(){
-        const input = document.querySelector('[contenteditable="true"]') || document.querySelector('textarea');
-        if(!input) return {ok:false, reason:'khong tim thay o nhap prompt'};
-        input.focus();
-        if(input.isContentEditable){
-          input.innerText = ${JSON.stringify(fullText)};
-        } else {
-          input.value = ${JSON.stringify(fullText)};
-        }
-        input.dispatchEvent(new InputEvent('input', {bubbles:true}));
-        return {ok:true};
-      })();
-    `);
-    if (!typeResult || !typeResult.ok) {
-      throw new Error('Không tìm thấy ô nhập prompt trên trang Gemini — giao diện có thể đã đổi. Chi tiết: ' + (typeResult && typeResult.reason));
-    }
-    // Nếu có link video, chờ thêm để Gemini kịp nhận diện link và hiện preview (nếu có)
-    await sleepMs(videoUrl ? 2500 : 500);
 
     // ── BƯỚC 4: GỬI — giả lập tổ hợp phím Ctrl+Enter thay vì dò tìm nút bấm ──
     // (Gemini web dùng Ctrl+Enter để gửi — tránh hoàn toàn rủi ro bấm nhầm nút khác
