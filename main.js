@@ -341,22 +341,43 @@ ipcMain.handle('gemini-web-check-session', async () => {
   }
 });
 
-// Điều khiển gán file vào input[type=file] qua Chrome DevTools Protocol
-// (JS thường không thể gán file vào input vì lý do bảo mật của trình duyệt)
-async function attachFileViaCDP(win, filePath) {
+// Bật chế độ CHẶN hộp thoại chọn file THẬT của hệ điều hành — khi bật, mọi thao tác
+// (bấm nút "Tải tệp lên"...) mở hộp thoại chọn file sẽ KHÔNG hiện hộp thoại Windows thật
+// nữa, mà phát ra sự kiện CDP để ta tự cấp file bằng code (không bao giờ có hộp thoại
+// "quên đóng" chặn màn hình như trước).
+async function enableFileChooserInterception(win) {
   const wc = win.webContents;
   if (!wc.debugger.isAttached()) wc.debugger.attach('1.3');
-  // Tìm input[type=file] trong DOM qua Runtime + DOM domain
-  await wc.debugger.sendCommand('DOM.enable');
-  const doc = await wc.debugger.sendCommand('DOM.getDocument', { depth: -1, pierce: true });
-  const nodeIdResult = await wc.debugger.sendCommand('DOM.querySelector', {
-    nodeId: doc.root.nodeId,
-    selector: 'input[type="file"]',
-  });
-  if (!nodeIdResult.nodeId) throw new Error('Không tìm thấy input[type=file] trên trang Gemini — giao diện có thể đã đổi.');
-  await wc.debugger.sendCommand('DOM.setFileInputFiles', {
-    files: [filePath],
-    nodeId: nodeIdResult.nodeId,
+  await wc.debugger.sendCommand('Page.enable');
+  await wc.debugger.sendCommand('Page.setInterceptFileChooserDialog', { enabled: true });
+}
+
+// Đợi sự kiện "hộp thoại chọn file được yêu cầu mở" (Page.fileChooserOpened) rồi tự động
+// cấp file qua CDP — hộp thoại thật của Windows sẽ KHÔNG BAO GIỜ xuất hiện.
+function waitForFileChooserAndSupply(win, filePath, timeoutMs) {
+  const wc = win.webContents;
+  return new Promise((resolve, reject) => {
+    let settled = false;
+    const timer = setTimeout(() => {
+      if (settled) return;
+      settled = true;
+      wc.debugger.removeListener('message', onMessage);
+      reject(new Error('Hết thời gian chờ hộp thoại chọn file (CDP) — có thể trang không yêu cầu chọn file.'));
+    }, timeoutMs);
+
+    function onMessage(_event, method) {
+      if (method === 'Page.fileChooserOpened') {
+        if (settled) return;
+        settled = true;
+        clearTimeout(timer);
+        wc.debugger.removeListener('message', onMessage);
+        wc.debugger.sendCommand('Page.handleFileChooser', {
+          action: 'accept',
+          files: [filePath],
+        }).then(resolve).catch(reject);
+      }
+    }
+    wc.debugger.on('message', onMessage);
   });
 }
 
@@ -479,6 +500,11 @@ ipcMain.handle('gemini-web-generate-image', async (event, { prompt, refImageBase
 
         if (plusClicked) {
           await sleepMs(700);
+          // Bật chặn hộp thoại chọn file THẬT trước khi bấm "Tải tệp lên" — nhờ vậy
+          // hộp thoại Windows sẽ không bao giờ mở ra, tránh hẳn lỗi "quên đóng"
+          await enableFileChooserInterception(win);
+          const fileChooserPromise = waitForFileChooserAndSupply(win, tmpImgPath, 8000);
+
           // 2) Bấm "Tải tệp lên" — dùng đúng data-test-id cố định của icon bên trong mục đó
           const uploadClicked = await wc.executeJavaScript(`
             (function(){
@@ -494,8 +520,7 @@ ipcMain.handle('gemini-web-generate-image', async (event, { prompt, refImageBase
           `).catch(() => false);
 
           if (uploadClicked) {
-            await sleepMs(700);
-            await attachFileViaCDP(win, tmpImgPath);
+            await fileChooserPromise; // CDP tự động cấp file — không có hộp thoại thật nào mở ra
             await sleepMs(1500);
             attachedViaMenu = true;
           }
