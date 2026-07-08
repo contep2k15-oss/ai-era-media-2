@@ -390,12 +390,13 @@ ipcMain.handle('gemini-web-generate-image', async (event, { prompt, refImageBase
       const modelSelectResult = await wc.executeJavaScript(`
         (function(){
           try{
-            // So khớp CHÍNH XÁC toàn bộ nội dung nút (không phải "chứa đoạn text"),
-            // tránh khớp nhầm các phần tử khác (VD chữ "Pro" ở khu vực hồ sơ tài khoản)
+            // Dùng đúng aria-label cố định của nút chọn model: "Mở công cụ chọn chế độ, hiện tại là X"
+            // — cụm "Mở công cụ chọn chế độ" không đổi dù model hiện tại là gì, và không trùng
+            // với bất kỳ phần tử nào khác trên trang (khác hẳn so khớp chữ "Flash"/"Pro" đơn thuần).
             const btns=[...document.querySelectorAll('button, [role="button"]')];
             const modelBtn=btns.find(b=>{
-              const t=(b.textContent||'').trim();
-              return /^(flash|pro|\\d\\.\\d\\s*flash|\\d\\.\\d\\s*pro)$/i.test(t) && b.offsetParent!==null;
+              const label=(b.getAttribute('aria-label')||'');
+              return /mở công cụ chọn chế độ|open model selector|model selector/i.test(label) && b.offsetParent!==null;
             });
             if(modelBtn){ modelBtn.click(); return {clicked:true}; }
             return {clicked:false};
@@ -417,61 +418,121 @@ ipcMain.handle('gemini-web-generate-image', async (event, { prompt, refImageBase
       geminiModelSelected = true; // đánh dấu đã xử lý — không thử lại nữa dù thành công hay không
     }
 
-    // ── BƯỚC 2: đính kèm ảnh tham chiếu (nếu có) — bằng clipboard + Ctrl+V ──
-    // Không dò/click nút nào trên trang cả (nguồn gốc lỗi bấm nhầm sidebar nhiều lần trước đây).
-    // Ghi ảnh vào clipboard hệ thống rồi giả lập Ctrl+V — dán ảnh là cơ chế phổ biến,
-    // ổn định ở hầu hết khung chat hiện đại, không phụ thuộc cấu trúc HTML của trang.
-    let savedClipboard = null; // để khôi phục lại clipboard gốc của bạn sau khi dùng xong
+    // ── BƯỚC 2: đính kèm ảnh tham chiếu (nếu có) ──
+    // Cách CHÍNH: bấm nút "+" → "Tải tệp lên" → gán file qua CDP — không đụng tới clipboard
+    // của bạn, an toàn tuyệt đối nếu bạn đang copy/paste thứ khác song song.
+    // Cách DỰ PHÒNG (nếu cách chính lỡ thất bại): clipboard + Ctrl+V như trước.
+    let savedClipboard = null; // để khôi phục lại clipboard gốc của bạn nếu phải dùng cách dự phòng
     if (refImageBase64) {
-      // 1) Lưu lại clipboard hiện tại của bạn trước khi ghi đè
-      try {
-        const formats = clipboard.availableFormats();
-        savedClipboard = {
-          text: formats.includes('text/plain') ? clipboard.readText() : '',
-          html: formats.includes('text/html') ? clipboard.readHTML() : '',
-          imageDataURL: (() => {
-            const img = clipboard.readImage();
-            return img && !img.isEmpty() ? img.toDataURL() : null;
-          })(),
-        };
-      } catch (e) { savedClipboard = null; }
-
-      // 2) Ghi ảnh tham chiếu vào clipboard
-      const img = nativeImage.createFromBuffer(Buffer.from(refImageBase64, 'base64'));
-      clipboard.writeImage(img);
-
-      // 3) Focus vào ô chat rồi giả lập Ctrl+V
-      await wc.executeJavaScript(`
-        (function(){
-          const input = document.querySelector('[contenteditable="true"]') || document.querySelector('textarea');
-          if(input) input.focus();
-          return !!input;
-        })();
-      `).catch(() => false);
+      // Mở cuộc trò chuyện MỚI trước khi đính kèm ảnh tham chiếu mới — đảm bảo ô soạn tin
+      // hoàn toàn sạch, không bị dính ảnh tham chiếu của lượt tạo ảnh trước đó
       wc.sendInputEvent({ type: 'keyDown', keyCode: 'Control' });
-      wc.sendInputEvent({ type: 'keyDown', keyCode: 'V', modifiers: ['control'] });
-      wc.sendInputEvent({ type: 'char', keyCode: 'V', modifiers: ['control'] });
-      wc.sendInputEvent({ type: 'keyUp', keyCode: 'V', modifiers: ['control'] });
+      wc.sendInputEvent({ type: 'keyDown', keyCode: 'Shift' });
+      wc.sendInputEvent({ type: 'keyDown', keyCode: 'O', modifiers: ['control', 'shift'] });
+      wc.sendInputEvent({ type: 'char', keyCode: 'O', modifiers: ['control', 'shift'] });
+      wc.sendInputEvent({ type: 'keyUp', keyCode: 'O', modifiers: ['control', 'shift'] });
+      wc.sendInputEvent({ type: 'keyUp', keyCode: 'Shift' });
       wc.sendInputEvent({ type: 'keyUp', keyCode: 'Control' });
-      await sleepMs(1500); // chờ ảnh dán xong hiện lên giao diện
+      await sleepMs(1200);
 
-      // 4) Khôi phục lại clipboard gốc của bạn ngay sau khi dán xong
+      tmpImgPath = path.join(os.tmpdir(), `gemini_ref_${Date.now()}.png`);
+      fs.writeFileSync(tmpImgPath, Buffer.from(refImageBase64, 'base64'));
+
+      let attachedViaMenu = false;
       try {
-        if (savedClipboard) {
-          if (savedClipboard.imageDataURL) {
-            clipboard.writeImage(nativeImage.createFromDataURL(savedClipboard.imageDataURL));
-          } else if (savedClipboard.html) {
-            clipboard.writeHTML(savedClipboard.html);
-          } else if (savedClipboard.text) {
-            clipboard.writeText(savedClipboard.text);
+        // 1) Bấm nút "+" — dùng đúng aria-label cố định: "Nội dung tải lên và công cụ"
+        const plusClicked = await wc.executeJavaScript(`
+          (function(){
+            const btns=[...document.querySelectorAll('button, [role="button"]')];
+            const plusBtn=btns.find(b=>/nội dung tải lên và công cụ|upload content and tools/i.test(b.getAttribute('aria-label')||'') && b.offsetParent!==null);
+            if(plusBtn){ plusBtn.click(); return true; }
+            return false;
+          })();
+        `).catch(() => false);
+
+        if (plusClicked) {
+          await sleepMs(700);
+          // 2) Bấm "Tải tệp lên" — dùng đúng data-test-id cố định của icon bên trong mục đó
+          const uploadClicked = await wc.executeJavaScript(`
+            (function(){
+              const icon = document.querySelector('[data-test-id="local-images-files-uploader-icon"]');
+              let target = icon ? (icon.closest('[role="menuitem"]') || icon.closest('button') || icon.closest('li')) : null;
+              if(!target){
+                const items=[...document.querySelectorAll('[role="menuitem"], li')];
+                target = items.find(o=>/tải tệp lên|upload file/i.test((o.textContent||'').trim()));
+              }
+              if(target){ target.click(); return true; }
+              return false;
+            })();
+          `).catch(() => false);
+
+          if (uploadClicked) {
+            await sleepMs(700);
+            await attachFileViaCDP(win, tmpImgPath);
+            await sleepMs(1500);
+            attachedViaMenu = true;
+          }
+        }
+      } catch (e) { attachedViaMenu = false; }
+
+      // ── DỰ PHÒNG: nếu cách chính thất bại, dùng clipboard + Ctrl+V ──
+      if (!attachedViaMenu) {
+        // 1) Lưu lại clipboard hiện tại của bạn trước khi ghi đè
+        try {
+          const formats = clipboard.availableFormats();
+          savedClipboard = {
+            text: formats.includes('text/plain') ? clipboard.readText() : '',
+            html: formats.includes('text/html') ? clipboard.readHTML() : '',
+            imageDataURL: (() => {
+              const img = clipboard.readImage();
+              return img && !img.isEmpty() ? img.toDataURL() : null;
+            })(),
+          };
+        } catch (e) { savedClipboard = null; }
+
+        // 2) Ghi ảnh tham chiếu vào clipboard
+        const img = nativeImage.createFromBuffer(Buffer.from(refImageBase64, 'base64'));
+        clipboard.writeImage(img);
+
+        // 3) Focus vào ô chat rồi giả lập Ctrl+V
+        await wc.executeJavaScript(`
+          (function(){
+            const input = document.querySelector('[contenteditable="true"]') || document.querySelector('textarea');
+            if(input) input.focus();
+            return !!input;
+          })();
+        `).catch(() => false);
+        wc.sendInputEvent({ type: 'keyDown', keyCode: 'Control' });
+        wc.sendInputEvent({ type: 'keyDown', keyCode: 'V', modifiers: ['control'] });
+        wc.sendInputEvent({ type: 'char', keyCode: 'V', modifiers: ['control'] });
+        wc.sendInputEvent({ type: 'keyUp', keyCode: 'V', modifiers: ['control'] });
+        wc.sendInputEvent({ type: 'keyUp', keyCode: 'Control' });
+        await sleepMs(1500); // chờ ảnh dán xong hiện lên giao diện
+
+        // 4) Khôi phục lại clipboard gốc của bạn ngay sau khi dán xong
+        try {
+          if (savedClipboard) {
+            if (savedClipboard.imageDataURL) {
+              clipboard.writeImage(nativeImage.createFromDataURL(savedClipboard.imageDataURL));
+            } else if (savedClipboard.html) {
+              clipboard.writeHTML(savedClipboard.html);
+            } else if (savedClipboard.text) {
+              clipboard.writeText(savedClipboard.text);
+            } else {
+              clipboard.clear();
+            }
           } else {
             clipboard.clear();
           }
-        } else {
-          clipboard.clear();
-        }
-      } catch (e) {}
+        } catch (e) {}
+      }
     }
+
+    // Ghi lại danh sách TOÀN BỘ ảnh đã có sẵn trên trang trước khi gửi (bao gồm ảnh tham
+    // chiếu vừa dán) — dùng để lọc bỏ, tránh lấy nhầm ảnh tham chiếu làm "ảnh vừa tạo ra"
+    const existingImgSrcs = await wc.executeJavaScript(`
+      [...document.querySelectorAll('img')].map(im => im.src)
+    `).catch(() => []);
 
     // ── BƯỚC 3: gõ prompt vào ô chat (kèm link YouTube nếu có, để Gemini xem video làm ngữ cảnh) ──
     const fullText = videoUrl ? (videoUrl + '\n\n' + prompt) : prompt;
@@ -515,21 +576,19 @@ ipcMain.handle('gemini-web-generate-image', async (event, { prompt, refImageBase
       })();
     `).catch(e => ({ok:false, reason:'loi kiem tra: '+e.message}));
 
-    // Nếu Enter không gửi được (ô nhập vẫn còn text), thử phương án dự phòng:
-    // tìm nút có aria-label chứa send/gửi TRONG PHẠM VI GẦN ô nhập nhất (ancestor chung gần nhất)
+    // Nếu Ctrl+Enter không gửi được (ô nhập vẫn còn text), thử phương án dự phòng:
+    // dùng đúng icon mũi tên lên bên trong nút Gửi (data-mat-icon-name="arrow_upward")
+    // — thuộc tính kỹ thuật đặc trưng, không thể trùng với phần tử nào khác trên trang.
     if (!sentCheck || !sentCheck.ok) {
       const fallbackSend = await wc.executeJavaScript(`
         (function(){
-          const input = document.querySelector('[contenteditable="true"]') || document.querySelector('textarea');
-          if(!input) return {ok:false, reason:'khong tim thay lai o nhap'};
-          // Tìm ancestor gần nhất có chứa ít nhất 1 nút — thu hẹp dần từng cấp cha một
-          let node = input.parentElement;
-          for(let depth=0; depth<6 && node; depth++, node=node.parentElement){
-            const btns=[...node.querySelectorAll('button')].filter(b=>!b.disabled && b.offsetParent!==null);
-            const sendBtn=btns.find(b=>/send|gửi/i.test(b.getAttribute('aria-label')||''));
-            if(sendBtn){ sendBtn.click(); return {ok:true, depth}; }
-          }
-          return {ok:false, reason:'khong tim thay nut Gui sau khi Ctrl+Enter khong hoat dong'};
+          const icon = document.querySelector('[data-mat-icon-name="arrow_upward"]');
+          if(!icon) return {ok:false, reason:'khong tim thay icon gui (arrow_upward)'};
+          const btn = icon.closest('button');
+          if(!btn) return {ok:false, reason:'khong tim thay button cha cua icon gui'};
+          if(btn.disabled) return {ok:false, reason:'nut Gui dang bi disabled'};
+          btn.click();
+          return {ok:true};
         })();
       `);
       if (!fallbackSend || !fallbackSend.ok) {
@@ -546,9 +605,10 @@ ipcMain.handle('gemini-web-generate-image', async (event, { prompt, refImageBase
       await sleepMs(1500);
       const result = await wc.executeJavaScript(`
         (function(){
+          const existingSrcs = new Set(${JSON.stringify(existingImgSrcs)});
           const imgs=[...document.querySelectorAll('img')].reverse();
-          const genImg=imgs.find(im=>im.naturalWidth>200 && im.naturalHeight>200 && im.complete);
-          if(!genImg) return {ok:false, reason:'chua thay anh nao du lon/tai xong', totalImgs:imgs.length};
+          const genImg=imgs.find(im=>im.naturalWidth>200 && im.naturalHeight>200 && im.complete && !existingSrcs.has(im.src));
+          if(!genImg) return {ok:false, reason:'chua thay anh MOI nao du lon/tai xong (co the anh tham chieu cu con dinh)', totalImgs:imgs.length};
           try{
             const canvas=document.createElement('canvas');
             canvas.width=genImg.naturalWidth;
