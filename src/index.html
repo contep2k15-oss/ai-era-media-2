@@ -912,19 +912,18 @@ html,body{height:100%;overflow:hidden;background:var(--bg0);color:var(--text);fo
 
       <div class="settings-section" style="margin-top:12px;padding-top:12px;border-top:1px solid var(--border2);">
         <div class="settings-label">Công cụ Debug</div>
-        <button onclick="window.electronAPI?.toggleDevTools()" style="padding:7px 14px;background:var(--bg3);border:1px solid var(--border2);border-radius:7px;color:var(--text2);font-size:12px;font-weight:600;cursor:pointer;">
+        <button id="devToolsBtn" onclick="window.electronAPI?.toggleDevTools()" style="padding:7px 14px;background:var(--bg3);border:1px solid var(--border2);border-radius:7px;color:var(--text2);font-size:12px;font-weight:600;cursor:pointer;">
           🛠️ Bật / Tắt DevTools
         </button>
-        <div style="margin-top:5px;font-size:10px;color:var(--text3);">Mở bảng kiểm tra lỗi (Console) — chỉ dùng khi cần debug</div>
+        <div id="devToolsHint" style="margin-top:5px;font-size:10px;color:var(--text3);">Mở bảng kiểm tra lỗi (Console) — chỉ dùng khi cần debug</div>
       </div>
 
       <div class="settings-section" style="margin-top:12px;padding-top:12px;border-top:1px solid var(--border2);">
         <div class="settings-label">⚗️ Chế độ Giả lập (Thử nghiệm)</div>
         <label style="display:flex;align-items:center;gap:8px;cursor:pointer;margin-top:6px;">
-          <input type="checkbox" id="igWebSimEnable" onchange="igOnWebSimToggle(this.checked)">
+          <input type="checkbox" id="igWebSimEnable" checked onchange="igOnWebSimToggle(this.checked)">
           <span style="font-size:12px;color:var(--text2);">Tạo ảnh nhân vật qua Gemini Web (miễn phí, không tốn credit Vertex)</span>
         </label>
-        <div style="margin-top:5px;font-size:10px;color:var(--text3);">Mở cửa sổ gemini.google.com riêng, tự động gõ prompt + đính kèm ảnh tham chiếu. Tính năng thử nghiệm — có thể lỗi nếu Google đổi giao diện.</div>
         <div style="margin-top:10px;display:flex;align-items:center;gap:10px;">
           <button id="igWebLoginBtn" onclick="igWebSimLogin()" style="padding:7px 14px;background:var(--bg3);border:1px solid var(--border2);border-radius:7px;color:var(--text2);font-size:12px;font-weight:600;cursor:pointer;">
             🔑 Đăng nhập Gemini Web
@@ -4343,7 +4342,7 @@ RULES:
 const IG_MODEL=MODEL_IMAGE;
 
 // ── CHẾ ĐỘ GIẢ LẬP: tạo ảnh qua Gemini Web thay vì Vertex API (miễn phí, thử nghiệm) ──
-let igWebSimEnable=false;
+let igWebSimEnable=true; // Mặc định BẬT Chế độ Giả lập (Gemini Web)
 
 // Tính khoảng nghỉ giữa các lần tạo ảnh khi dùng Chế độ Giả lập:
 // - Ngẫu nhiên 1.5-4s mỗi lần (không cố định, tránh nhịp điệu máy móc dễ bị phát hiện)
@@ -6155,7 +6154,12 @@ function licMD5Sig(key) {
 
 async function licCheckOnline(key) {
   const sig = licMD5Sig(key);
-  const url = `${LICENSE_API}?key=${encodeURIComponent(key)}&sig=${sig}`;
+  let deviceId = '';
+  try {
+    const res = await window.electronAPI?.getDeviceId?.();
+    deviceId = res?.deviceId || '';
+  } catch (e) {}
+  const url = `${LICENSE_API}?key=${encodeURIComponent(key)}&sig=${sig}&device=${encodeURIComponent(deviceId)}`;
   const res = await fetch(url);
   return await res.json();
 }
@@ -6205,6 +6209,21 @@ function licHideGate(data, key) {
   if (data.days_left <= 7) {
     if (el('sLicDays')) el('sLicDays').style.color = '#ef4444';
     if (el('sLicExpiry')) el('sLicExpiry').style.color = '#ef4444';
+  }
+
+  // Chỉ tài khoản "admin" mới có quyền bật DevTools
+  const isAdminUser = (data.user || '').trim().toLowerCase() === 'admin';
+  const devBtn = el('devToolsBtn');
+  const devHint = el('devToolsHint');
+  if (devBtn) {
+    devBtn.disabled = !isAdminUser;
+    devBtn.style.opacity = isAdminUser ? '1' : '0.4';
+    devBtn.style.cursor = isAdminUser ? 'pointer' : 'not-allowed';
+  }
+  if (devHint) {
+    devHint.textContent = isAdminUser
+      ? 'Mở bảng kiểm tra lỗi (Console) — chỉ dùng khi cần debug'
+      : 'Chỉ tài khoản admin mới có quyền bật DevTools';
   }
 }
 
@@ -6265,6 +6284,7 @@ async function checkLicense() {
         blocked:   '🚫 Key đã bị khóa. Liên hệ Mr Duong',
         expired:   '⏰ Key đã hết hạn. Liên hệ Mr Duong để gia hạn',
         invalid_request: '❌ Key không hợp lệ',
+        device_mismatch: '🔒 Key này đã được kích hoạt trên máy khác. Liên hệ Mr Duong để reset thiết bị',
       };
       msg.style.color = '#ef4444';
       msg.textContent = reasons[result.reason] || '❌ Lỗi không xác định';

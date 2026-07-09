@@ -1,4 +1,50 @@
 const { app, BrowserWindow, shell, ipcMain, dialog, clipboard, nativeImage } = require('electron');
+const crypto = require('crypto');
+const { execSync } = require('child_process');
+
+// ══════════════════════════════════════════════════
+//  MÃ ĐỊNH DANH MÁY (Device ID) — dùng để khóa license vào đúng 1 máy
+//  Lấy từ GUID phần cứng thật của hệ điều hành (không phải file, không thể
+//  copy sang máy khác được — Windows Registry MachineGuid / macOS IOPlatformUUID
+//  / Linux /etc/machine-id).
+// ══════════════════════════════════════════════════
+function getRawMachineId() {
+  try {
+    if (process.platform === 'win32') {
+      const out = execSync('reg query "HKLM\\SOFTWARE\\Microsoft\\Cryptography" /v MachineGuid').toString();
+      const match = out.match(/MachineGuid\s+REG_SZ\s+([a-fA-F0-9-]+)/i);
+      if (match) return match[1].trim();
+    } else if (process.platform === 'darwin') {
+      const out = execSync('ioreg -rd1 -c IOPlatformExpertDevice').toString();
+      const match = out.match(/"IOPlatformUUID"\s*=\s*"([^"]+)"/);
+      if (match) return match[1].trim();
+    } else {
+      if (fs.existsSync('/etc/machine-id')) {
+        return fs.readFileSync('/etc/machine-id', 'utf8').trim();
+      }
+      if (fs.existsSync('/var/lib/dbus/machine-id')) {
+        return fs.readFileSync('/var/lib/dbus/machine-id', 'utf8').trim();
+      }
+    }
+  } catch (e) {}
+  return null;
+}
+
+function getDeviceId() {
+  const raw = getRawMachineId();
+  if (!raw) return null;
+  // Băm SHA-256 trước khi gửi đi — không để lộ GUID phần cứng thật ra ngoài,
+  // chỉ gửi mã đã băm (vẫn ổn định, duy nhất theo máy, nhưng không đảo ngược lại được)
+  return crypto.createHash('sha256').update(raw + '::aieramedia_device_salt_2026').digest('hex');
+}
+
+ipcMain.handle('get-device-id', async () => {
+  try {
+    return { deviceId: getDeviceId() };
+  } catch (e) {
+    return { deviceId: null, error: e.message };
+  }
+});
 const path = require('path');
 const fs = require('fs');
 const os = require('os');

@@ -17,4 +17,5 @@ contextBridge.exposeInMainWorld('electronAPI', {
   geminiWebGenerateImage: (params) => ipcRenderer.invoke('gemini-web-generate-image', params),
   geminiWebLogin: () => ipcRenderer.invoke('gemini-web-login'),
   geminiWebCheckSession: () => ipcRenderer.invoke('gemini-web-check-session'),
+  getDeviceId: () => ipcRenderer.invoke('get-device-id'),
 });
