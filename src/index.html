@@ -3558,6 +3558,26 @@ function ttsSplitSourceIntoSegments(sourceText, numSegments){
 }
 
 // Tạo 1 đoạn trong kịch bản dài — nhận ngữ cảnh đuôi đoạn trước để nối mạch liền lạc
+// Gọi Vertex có TỰ ĐỘNG THỬ LẠI khi gặp lỗi 429 (hết quota tạm thời) — tránh hủy ngang
+// cả quy trình (VD viết kịch bản dài nhiều đoạn) chỉ vì 1 lần bị giới hạn tốc độ thoáng qua
+async function callVertexWithRetry429(model, body, apiKey, progressCb, maxRetries){
+  maxRetries = maxRetries || 4;
+  let lastErr = null;
+  for(let attempt=0; attempt<=maxRetries; attempt++){
+    try{
+      return await callVertexOrStudio(model, body, apiKey);
+    }catch(e){
+      lastErr = e;
+      const is429 = /429|resource exhausted|quota/i.test(e.message||'');
+      if(!is429 || attempt===maxRetries) throw e;
+      const waitSec = Math.min(10*Math.pow(2, attempt), 90); // 10s, 20s, 40s, 80s, tối đa 90s
+      if(progressCb) progressCb(`⏳ Hết quota tạm thời, tự động thử lại sau ${waitSec}s (lần ${attempt+1}/${maxRetries})...`);
+      await new Promise(r=>setTimeout(r, waitSec*1000));
+    }
+  }
+  throw lastErr;
+}
+
 async function ttsGenerateSegment(sourceChunk, segWords, stylePrompt, apiKey, prevTailText, segIndex, totalSegs, progressCb){
   const durInstruction=`TARGET LENGTH for THIS SEGMENT: approximately ${segWords} words. Acceptable range: ${Math.round(segWords*0.9)}–${Math.round(segWords*1.1)} words. This is a STRICT requirement — do not undershoot OR overshoot significantly. If the source material for this segment is thin, elaborate with more descriptive detail, context, or examples to reach the target. Do NOT pad excessively or ramble past the target.`;
 
@@ -3587,10 +3607,10 @@ SOURCE SUBTITLE FOR THIS SEGMENT:
 ${sourceChunk}`;
 
   if(progressCb)progressCb(`⏳ Đang viết đoạn ${segIndex+1}/${totalSegs}...`);
-  const data=await callVertexOrStudio(MODEL_TEXT_SCRIPT,{
+  const data=await callVertexWithRetry429(MODEL_TEXT_SCRIPT,{
     contents:[{role:'user',parts:[{text:prompt}]}],
     generationConfig:{temperature:0.7,maxOutputTokens:16384,thinkingConfig:{thinkingLevel:'low'}}
-  },apiKey);
+  },apiKey,progressCb);
   if(data.error) throw new Error(data.error.message||'Lỗi API');
   const text=data.candidates?.[0]?.content?.parts?.map(p=>p.text||'').join('')||'';
   if(!text) throw new Error(`Đoạn ${segIndex+1}/${totalSegs}: API trả về nội dung trống`);
@@ -3638,10 +3658,10 @@ Write approximately ${Math.max(needMore,80)} MORE words that continue naturally 
 EXISTING SCRIPT (do not repeat this, continue naturally from here):
 ...${current.slice(-1500)}`;
     try{
-      const data=await callVertexOrStudio(MODEL_TEXT_SCRIPT,{
+      const data=await callVertexWithRetry429(MODEL_TEXT_SCRIPT,{
         contents:[{role:'user',parts:[{text:expandPrompt}]}],
         generationConfig:{temperature:0.7,maxOutputTokens:8192,thinkingConfig:{thinkingLevel:'low'}}
-      },apiKey);
+      },apiKey,progressCb);
       if(data.error)break;
       const more=data.candidates?.[0]?.content?.parts?.map(p=>p.text||'').join('')||'';
       if(!more.trim())break;
@@ -3722,10 +3742,10 @@ ${subTruncated}`;
   for(const model of REWRITE_MODELS){
     try{
       $('ttsBtnRewrite').textContent=`⏳ Đang viết lại (${model})...`;
-      const data=await callVertexOrStudio(model,{
+      const data=await callVertexWithRetry429(model,{
         contents:[{role:'user',parts:[{text:prompt}]}],
         generationConfig:{temperature:0.7,maxOutputTokens:16384,thinkingConfig:{thinkingLevel:'low'}}
-      },apiKey);
+      },apiKey,(msg)=>{$('ttsBtnRewrite').textContent=msg;});
       if(data.error){
         const msg=data.error.message||'';
         // High demand → thử model khác
@@ -6211,8 +6231,9 @@ function licHideGate(data, key) {
     if (el('sLicExpiry')) el('sLicExpiry').style.color = '#ef4444';
   }
 
-  // Chỉ tài khoản "admin" mới có quyền bật DevTools
-  const isAdminUser = (data.user || '').trim().toLowerCase() === 'admin';
+  // Chỉ tài khoản có Key bắt đầu bằng "ADMIN-" mới có quyền bật DevTools
+  // (không dùng tên hiển thị vì có thể ghi nhiều kiểu khác nhau, VD "Mr Duong (Admin)")
+  const isAdminUser = (key || '').trim().toUpperCase().startsWith('ADMIN-');
   const devBtn = el('devToolsBtn');
   const devHint = el('devToolsHint');
   if (devBtn) {
