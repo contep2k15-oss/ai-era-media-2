@@ -409,6 +409,23 @@ ipcMain.handle('gemini-web-check-session', async () => {
   }
 });
 
+// Đăng xuất Gemini Web — xóa sạch cookie/dữ liệu phiên đăng nhập của session riêng
+// (persist:gemini-automation), để có thể đăng nhập tài khoản Google KHÁC ở lần sau
+ipcMain.handle('gemini-web-logout', async () => {
+  try {
+    const win = getGeminiWebWindow();
+    const ses = win.webContents.session;
+    await ses.clearStorageData(); // xóa cookie, localStorage, cache... của riêng session này
+    geminiWebLoggedIn = false;
+    geminiModelSelected = false; // đăng nhập tài khoản mới có thể có model mặc định khác
+    // Tải lại trang để phản ánh trạng thái đã đăng xuất (không hiện cửa sổ, chỉ làm ngầm)
+    try { await win.webContents.loadURL('https://gemini.google.com/app'); } catch (e) {}
+    return { success: true };
+  } catch (e) {
+    return { success: false, error: e.message };
+  }
+});
+
 // Bật chế độ CHẶN hộp thoại chọn file THẬT của hệ điều hành — khi bật, mọi thao tác
 // (bấm nút "Tải tệp lên"...) mở hộp thoại chọn file sẽ KHÔNG hiện hộp thoại Windows thật
 // nữa, mà phát ra sự kiện CDP để ta tự cấp file bằng code (không bao giờ có hộp thoại

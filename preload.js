@@ -18,4 +18,5 @@ contextBridge.exposeInMainWorld('electronAPI', {
   geminiWebLogin: () => ipcRenderer.invoke('gemini-web-login'),
   geminiWebCheckSession: () => ipcRenderer.invoke('gemini-web-check-session'),
   getDeviceId: () => ipcRenderer.invoke('get-device-id'),
+  geminiWebLogout: () => ipcRenderer.invoke('gemini-web-logout'),
 });

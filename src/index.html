@@ -924,13 +924,16 @@ html,body{height:100%;overflow:hidden;background:var(--bg0);color:var(--text);fo
           <input type="checkbox" id="igWebSimEnable" checked onchange="igOnWebSimToggle(this.checked)">
           <span style="font-size:12px;color:var(--text2);">Tạo ảnh nhân vật qua Gemini Web (miễn phí, không tốn credit Vertex)</span>
         </label>
-        <div style="margin-top:10px;display:flex;align-items:center;gap:10px;">
+        <div style="margin-top:10px;display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
           <button id="igWebLoginBtn" onclick="igWebSimLogin()" style="padding:7px 14px;background:var(--bg3);border:1px solid var(--border2);border-radius:7px;color:var(--text2);font-size:12px;font-weight:600;cursor:pointer;">
             🔑 Đăng nhập Gemini Web
           </button>
+          <button id="igWebLogoutBtn" onclick="igWebSimLogout()" style="padding:7px 14px;background:var(--bg3);border:1px solid var(--border2);border-radius:7px;color:#ef4444;font-size:12px;font-weight:600;cursor:pointer;">
+            🚪 Đăng xuất
+          </button>
           <span id="igWebLoginStatus" style="font-size:11px;color:var(--text3);">Chưa kiểm tra trạng thái</span>
         </div>
-        <div style="margin-top:5px;font-size:10px;color:var(--text3);">Chỉ cần đăng nhập 1 lần — phiên được giữ nguyên (ẩn cửa sổ, không đóng) cho các lần tạo ảnh sau.</div>
+        <div style="margin-top:5px;font-size:10px;color:var(--text3);">Chỉ cần đăng nhập 1 lần — phiên được giữ nguyên (ẩn cửa sổ, không đóng) cho các lần tạo ảnh sau. Đăng xuất để đổi sang tài khoản Google khác.</div>
       </div>
     </div>
   </div>
@@ -4420,6 +4423,28 @@ async function igWebSimLogin(){
   btn.disabled=false;
 }
 
+async function igWebSimLogout(){
+  if(!window.electronAPI?.geminiWebLogout){
+    alert('Tính năng này chưa khả dụng trên bản đang chạy.');
+    return;
+  }
+  if(!confirm('Đăng xuất khỏi Gemini Web hiện tại? Bạn sẽ cần đăng nhập lại (có thể bằng tài khoản Google khác) trước khi tạo ảnh tiếp.')) return;
+  const btn=$('igWebLogoutBtn');
+  btn.disabled=true;
+  igWebSimSetStatus('🚪 Đang đăng xuất...','var(--text3)');
+  try{
+    const res=await window.electronAPI.geminiWebLogout();
+    if(res?.success){
+      igWebSimSetStatus('⚠️ Đã đăng xuất — bấm "Đăng nhập Gemini Web" để đăng nhập tài khoản mới','#f59e0b');
+    } else {
+      igWebSimSetStatus('❌ Đăng xuất thất bại: '+(res?.error||'lỗi không xác định'),'#ef4444');
+    }
+  }catch(e){
+    igWebSimSetStatus('❌ Lỗi: '+e.message,'#ef4444');
+  }
+  btn.disabled=false;
+}
+
 async function igCallGeminiImage(apiKey, optimizedPrompt, refImageBase64, endpoint, extraRefBase64, videoUrl, forceVertex){
   // Chế độ Giả lập: đi qua Gemini Web (gemini.google.com) thay vì Vertex AI
   // (forceVertex=true dùng cho ảnh tham chiếu nhân vật — vẫn giữ Vertex vì có kèm video + tạo ảnh cùng lúc, dễ bị model trả lời chữ thay vì ảnh trên Gemini Web)
@@ -4929,6 +4954,28 @@ async function igRunAll(){
 Visual Style: ${igDNA_IG}`:'';
       const settingDNA=igSettingDNA?`
 Setting/Environment: ${igSettingDNA}`:'';
+
+      // GIỮ KHUNG HÌNH: nếu ô này Same-Frame, dùng ảnh cảnh TRƯỚC (cùng cảnh) làm tham
+      // chiếu DUY NHẤT thay vì ảnh nhân vật — đồng bộ với generateOne()
+      let usedSameFrameRef=false;
+      if(p.sameFrame){
+        const sceneNum=p.label.split('.')[0];
+        for(let j=i-1;j>=0;j--){
+          const prevP=igParsedPrompts[j];
+          if(!prevP)continue;
+          if(prevP.label.split('.')[0]!==sceneNum)break;
+          if(igGeneratedImages[j]?.dataUrl){
+            primaryRefB64=igGeneratedImages[j].dataUrl.split(',')[1];
+            usedSameFrameRef=true;
+            break;
+          }
+        }
+      }
+      const sameFrameNote=usedSameFrameRef
+        ?`
+SAME-FRAME REFERENCE: The attached reference image is the previous shot in this scene — keep the EXACT same background, camera angle, framing, and lighting as that image. Only change the character's pose/gesture/expression as described above.`
+        :'';
+
       let finalPrompt;
       if(Object.keys(charDNAMap).length>0){
         const dnaSnippet=Object.entries(charDNAMap).map(([name,dna])=>`[${name}: ${dna.visual_summary||dna.hair||''}]`).join(' ');
@@ -4937,13 +4984,13 @@ Setting/Environment: ${igSettingDNA}`:'';
 ${p.text}
 
 Character DNA: ${dnaSnippet}
-Maintain character consistency.${settingDNA}
+Maintain character consistency.${settingDNA}${sameFrameNote}
 
 REMINDER: NO white margins, NO white padding, full bleed to all edges.`;
       } else {
         finalPrompt=`[${aspectStr}]
 
-${p.text}${styleDNA}${settingDNA}
+${p.text}${styleDNA}${settingDNA}${sameFrameNote}
 
 REMINDER: NO white margins, NO white padding, full bleed to all edges.`;
       }
@@ -5053,12 +5100,33 @@ async function igRegenOne(i){
   const aspectStr=igGetAspectPrompt();
   const styleDNA=igDNA_IG?`\nVisual Style: ${igDNA_IG}`:'';
   const settingDNA=igSettingDNA?`\nSetting/Environment: ${igSettingDNA}`:'';
+
+  // ── GIỮ KHUNG HÌNH: nếu ô này được đánh dấu Same-Frame, dùng ảnh cảnh TRƯỚC (cùng cảnh)
+  // làm tham chiếu DUY NHẤT thay vì ảnh nhân vật — đồng bộ với logic ở generateOne() ──
+  let usedSameFrameRef=false;
+  if(p.sameFrame){
+    const sceneNum=p.label.split('.')[0];
+    for(let j=i-1;j>=0;j--){
+      const prevP=igParsedPrompts[j];
+      if(!prevP)continue;
+      if(prevP.label.split('.')[0]!==sceneNum)break; // sang cảnh khác thì dừng
+      if(igGeneratedImages[j]?.dataUrl){
+        primaryRefB64=igGeneratedImages[j].dataUrl.split(',')[1]; // thay thế ref nhân vật bằng ảnh cảnh trước
+        usedSameFrameRef=true;
+        break;
+      }
+    }
+  }
+  const sameFrameNote=usedSameFrameRef
+    ?`\n\nSAME-FRAME REFERENCE: The attached reference image is the previous shot in this scene — keep the EXACT same background, camera angle, framing, and lighting as that image. Only change the character's pose/gesture/expression as described above.`
+    :'';
+
   let finalPrompt;
   if(Object.keys(charDNAMap).length>0){
     const dnaSnippet=Object.entries(charDNAMap).map(([name,dna])=>`[${name}: ${dna?.visual_summary||dna?.hair||''}]`).join(' ');
-    finalPrompt=`[${aspectStr}]\n\n${userPrompt}\n\nCharacter DNA: ${dnaSnippet}\nMaintain character consistency.${settingDNA}\n\nREMINDER: NO white margins, NO white padding, full bleed to all edges.`;
+    finalPrompt=`[${aspectStr}]\n\n${userPrompt}\n\nCharacter DNA: ${dnaSnippet}\nMaintain character consistency.${settingDNA}${sameFrameNote}\n\nREMINDER: NO white margins, NO white padding, full bleed to all edges.`;
   } else {
-    finalPrompt=`[${aspectStr}]\n\n${userPrompt}${styleDNA}${settingDNA}\n\nREMINDER: NO white margins, NO white padding, full bleed to all edges.`;
+    finalPrompt=`[${aspectStr}]\n\n${userPrompt}${styleDNA}${settingDNA}${sameFrameNote}\n\nREMINDER: NO white margins, NO white padding, full bleed to all edges.`;
   }
 
   try{
