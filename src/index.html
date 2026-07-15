@@ -854,6 +854,7 @@ html,body{height:100%;overflow:hidden;background:var(--bg0);color:var(--text);fo
 
 
 <!-- ══ SETTINGS MODAL ══ -->
+</div><!-- end #panelSheet -->
 <div class="settings-overlay" id="settingsOverlay">
   <div class="settings-modal">
     <div class="settings-head">
@@ -919,10 +920,10 @@ html,body{height:100%;overflow:hidden;background:var(--bg0);color:var(--text);fo
       </div>
 
       <div class="settings-section" style="margin-top:12px;padding-top:12px;border-top:1px solid var(--border2);">
-        <div class="settings-label">⚗️ Chế độ Giả lập (Thử nghiệm)</div>
+        <div class="settings-label">⚗️ Chế độ Giả lập</div>
         <label style="display:flex;align-items:center;gap:8px;cursor:pointer;margin-top:6px;">
           <input type="checkbox" id="igWebSimEnable" checked onchange="igOnWebSimToggle(this.checked)">
-          <span style="font-size:12px;color:var(--text2);">Tạo ảnh nhân vật qua Gemini Web (miễn phí, không tốn credit Vertex)</span>
+          <span style="font-size:12px;color:var(--text2);">Tạo ảnh qua Gemini giả lập</span>
         </label>
         <div style="margin-top:10px;display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
           <button id="igWebLoginBtn" onclick="igWebSimLogin()" style="padding:7px 14px;background:var(--bg3);border:1px solid var(--border2);border-radius:7px;color:var(--text2);font-size:12px;font-weight:600;cursor:pointer;">
@@ -1030,7 +1031,6 @@ html,body{height:100%;overflow:hidden;background:var(--bg0);color:var(--text);fo
     </div>
   </div>
 </div>
-</div><!-- end #panelSheet -->
 
 <!-- ══════════════════════════════════════════════════
      TAB 2 — PROMPT ENGINEER
@@ -4366,6 +4366,7 @@ const IG_MODEL=MODEL_IMAGE;
 
 // ── CHẾ ĐỘ GIẢ LẬP: tạo ảnh qua Gemini Web thay vì Vertex API (miễn phí, thử nghiệm) ──
 let igWebSimEnable=true; // Mặc định BẬT Chế độ Giả lập (Gemini Web)
+let igGeminiLoginLost=false; // Cờ báo mất đăng nhập Gemini giữa chừng — dùng để tự động tạm dừng cả hàng đợi
 
 // Tính khoảng nghỉ giữa các lần tạo ảnh khi dùng Chế độ Giả lập:
 // - Ngẫu nhiên 1.5-4s mỗi lần (không cố định, tránh nhịp điệu máy móc dễ bị phát hiện)
@@ -4414,6 +4415,7 @@ async function igWebSimLogin(){
     const res=await window.electronAPI.geminiWebLogin();
     if(res?.success){
       igWebSimSetStatus('✅ Đăng nhập thành công — cửa sổ đã ẩn, phiên được giữ nguyên','var(--accent2)');
+      igGeminiLoginLost=false; // Đã đăng nhập lại — xóa cờ mất đăng nhập, cho phép chạy tiếp bình thường
     } else {
       igWebSimSetStatus('❌ '+(res?.error||'Đăng nhập thất bại'),'#ef4444');
     }
@@ -4421,6 +4423,17 @@ async function igWebSimLogin(){
     igWebSimSetStatus('❌ Lỗi: '+e.message,'#ef4444');
   }
   btn.disabled=false;
+}
+
+// Khóa/mở nút Đăng xuất Gemini Web — khóa trong lúc đang chạy tác vụ tạo ảnh hàng loạt,
+// tránh xóa phiên đăng nhập giữa chừng làm hỏng các ảnh còn đang xử lý dở
+function igSetLogoutLocked(locked){
+  const btn=$('igWebLogoutBtn');
+  if(!btn)return;
+  btn.disabled=locked;
+  btn.style.opacity=locked?'0.4':'1';
+  btn.style.cursor=locked?'not-allowed':'pointer';
+  btn.title=locked?'Đang chạy tác vụ tạo ảnh — đợi dừng hẳn trước khi đăng xuất':'';
 }
 
 async function igWebSimLogout(){
@@ -4454,7 +4467,15 @@ async function igCallGeminiImage(apiKey, optimizedPrompt, refImageBase64, endpoi
       refImageBase64:refImageBase64||null,
       videoUrl:videoUrl||null
     });
-    if(!res||!res.success) throw new Error('Gemini Web: '+(res?.error||'lỗi không xác định'));
+    if(!res||!res.success){
+      const errMsg=res?.error||'lỗi không xác định';
+      // Phát hiện đúng lỗi "mất đăng nhập" — đặt cờ để dừng cả hàng đợi ngay,
+      // tránh để mọi ảnh còn lại lần lượt báo lỗi vô ích
+      if(/chưa đăng nhập/i.test(errMsg)){
+        igGeminiLoginLost=true;
+      }
+      throw new Error('Gemini Web: '+errMsg);
+    }
     // res.imageDataUrl dạng "data:image/png;base64,...." → tách lấy phần base64
     return res.imageDataUrl.split(',')[1];
   }
@@ -4710,6 +4731,7 @@ async function igRunAll(){
   }
 
   $('igBtnRun').disabled=true;
+  igSetLogoutLocked(true); // Khóa nút Đăng xuất trong lúc đang chạy tác vụ tạo ảnh
   $('igProgWrap').style.display='block';
 
   // Show kết quả panel TRƯỚC khi populate grid — để DOM elements tồn tại
@@ -4886,6 +4908,19 @@ async function igRunAll(){
     const batch=[];
     for(let j=i;j<Math.min(i+PARALLEL,total);j++) batch.push(generateOne(j));
     await Promise.all(batch);
+
+    // Phát hiện mất đăng nhập Gemini giữa chừng → TỰ ĐỘNG TẠM DỪNG cả hàng đợi ngay,
+    // tránh để các ảnh còn lại lần lượt báo lỗi vô ích. Đăng nhập lại rồi bấm Tiếp tục.
+    if(igGeminiLoginLost && !igStopped){
+      igPaused=true;
+      $('igBtnPause').textContent='▶ Tiếp tục';
+      $('igBtnPause').className='prog-ctrl-btn restart';
+      $('igPausedBadge')?.classList.add('show');
+      $('igProgLabel').textContent=`⚠️ Mất phiên đăng nhập Gemini — đã TỰ ĐỘNG TẠM DỪNG. Vào Cài đặt → Đăng nhập lại Gemini Web → quay lại đây bấm "Tiếp tục".`;
+      igGeminiLoginLost=false; // reset để không lặp lại thông báo liên tục trong lúc đang chờ
+      while(igPaused){await new Promise(r=>setTimeout(r,200));if(igStopped)break;}
+    }
+
     if(i+PARALLEL<total&&!igStopped){
       // Adaptive delay: OK liên tiếp → giảm, 429 → tăng
       // Chế độ Giả lập (Gemini Web) dùng delay ngẫu nhiên, không cố định — tránh nhịp điệu máy móc dễ bị phát hiện
@@ -4898,6 +4933,7 @@ async function igRunAll(){
   if(igStopped){
     $('igProgLabel').textContent=`⏹ Đã dừng — ${igGeneratedImages.length}/${total} ảnh`;
     $('igBtnRun').disabled=false;
+    igSetLogoutLocked(false);
     $('igBtnPause').style.display='none';$('igBtnStop').style.display='none';
     $('igBtnRestart').style.display='';
     return;
@@ -5043,6 +5079,7 @@ REMINDER: NO white margins, NO white padding, full bleed to all edges.`;
   }
   $('igResultsTitle').textContent=`${finalFail===0?'✅':'⚠'} ${finalOK}/${total} ảnh`;
   $('igBtnRun').disabled=false;
+  igSetLogoutLocked(false);
   igResetControls();
 }
 

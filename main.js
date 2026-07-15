@@ -364,11 +364,18 @@ function getGeminiWebWindow() {
 
 async function isGeminiPageReady(wc) {
   return await wc.executeJavaScript(`
-    !!(document.querySelector('[contenteditable="true"]') || document.querySelector('textarea'))
+    (function(){
+      const hasInput = !!(document.querySelector('[contenteditable="true"]') || document.querySelector('textarea'));
+      // Loại trừ các trang trung gian (chọn tài khoản, banner cookie...) — nếu vẫn còn
+      // thấy nút "Đăng nhập/Sign in" thì CHẮC CHẮN chưa thực sự vào được trang chat
+      const btns=[...document.querySelectorAll('button, a')];
+      const hasSignInBtn = btns.some(b=>/^sign in$|^đăng nhập$/i.test((b.textContent||'').trim()));
+      return hasInput && !hasSignInBtn;
+    })();
   `).catch(() => false);
 }
 
-// Đăng nhập: hiện cửa sổ, chờ bạn tự đăng nhập, phát hiện khi trang chat sẵn sàng
+// Đăng nhập: hiện cửa sổ, chờ bạn tự đăng nhập, phát hiện khi trang chat THỰC SỰ sẵn sàng
 ipcMain.handle('gemini-web-login', async () => {
   const win = getGeminiWebWindow();
   const wc = win.webContents;
@@ -378,15 +385,26 @@ ipcMain.handle('gemini-web-login', async () => {
     await wc.loadURL('https://gemini.google.com/app');
   } catch (e) {}
 
+  // Chờ tối thiểu 5s đầu tiên trước khi bắt đầu kiểm tra — tránh bắt nhầm các trang
+  // trung gian (chọn tài khoản, banner cookie...) xuất hiện thoáng qua lúc mới tải
+  await sleepMs(5000);
+
   const deadline = Date.now() + 5 * 60 * 1000; // tối đa 5 phút chờ bạn đăng nhập
+  let consecutiveReady = 0;
+  const REQUIRED_CONSECUTIVE = 3; // phải "sẵn sàng" liên tiếp 3 lần mới coi là thật sự xong
   while (Date.now() < deadline) {
     if (win.isDestroyed()) return { success: false, error: 'Cửa sổ đã bị đóng.' };
     await sleepMs(2000);
     if (await isGeminiPageReady(wc)) {
-      geminiWebLoggedIn = true;
-      geminiModelSelected = false; // đăng nhập lại → thử chọn model lại 1 lần nữa
-      win.hide(); // Ẩn đi, giữ nguyên phiên — KHÔNG đóng
-      return { success: true };
+      consecutiveReady++;
+      if (consecutiveReady >= REQUIRED_CONSECUTIVE) {
+        geminiWebLoggedIn = true;
+        geminiModelSelected = false; // đăng nhập lại → thử chọn model lại 1 lần nữa
+        win.hide(); // Ẩn đi, giữ nguyên phiên — KHÔNG đóng
+        return { success: true };
+      }
+    } else {
+      consecutiveReady = 0; // reset nếu có 1 lần không đạt — tránh cộng dồn qua các trang trung gian khác nhau
     }
   }
   return { success: false, error: 'Hết thời gian chờ đăng nhập (5 phút). Hãy thử lại.' };
