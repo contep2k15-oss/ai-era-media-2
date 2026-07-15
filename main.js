@@ -496,16 +496,25 @@ ipcMain.handle('gemini-web-generate-image', async (event, { prompt, refImageBase
 
     win.show(); // Hiện cửa sổ trong lúc tạo ảnh để có thể theo dõi/debug
 
-    // Mở cuộc trò chuyện mới bằng TỔ HỢP PHÍM Ctrl+Shift+O — hoàn toàn không dò/click DOM,
-    // tránh triệt để rủi ro bấm nhầm nút khác trên trang (nguồn gốc mọi lỗi trước đây).
-    wc.sendInputEvent({ type: 'keyDown', keyCode: 'Control' });
-    wc.sendInputEvent({ type: 'keyDown', keyCode: 'Shift' });
-    wc.sendInputEvent({ type: 'keyDown', keyCode: 'O', modifiers: ['control', 'shift'] });
-    wc.sendInputEvent({ type: 'char', keyCode: 'O', modifiers: ['control', 'shift'] });
-    wc.sendInputEvent({ type: 'keyUp', keyCode: 'O', modifiers: ['control', 'shift'] });
-    wc.sendInputEvent({ type: 'keyUp', keyCode: 'Shift' });
-    wc.sendInputEvent({ type: 'keyUp', keyCode: 'Control' });
-    await sleepMs(1200); // chờ trang chuyển sang cuộc trò chuyện mới
+    // Mở cuộc trò chuyện MỚI nếu có ảnh tham chiếu mới cần đính kèm — TẢI LẠI TOÀN BỘ TRANG
+    // (không dùng phím tắt Ctrl+Shift+O nữa) để đảm bảo XÓA SẠCH mọi "bản nháp" ảnh đính kèm
+    // còn sót lại từ lượt tạo ảnh trước — đã xác nhận Ctrl+Shift+O không xóa được bản nháp này.
+    // Đặt TRƯỚC bước chọn model — vì tải lại trang có thể làm mất lựa chọn model đã chọn trước đó.
+    if (refImageBase64) {
+      try { await wc.loadURL('https://gemini.google.com/app'); } catch (e) {}
+      // Kiểm tra CHỦ ĐỘNG (tối đa 20s) xem trang đã thực sự tải xong và sẵn sàng chưa —
+      // thay vì chỉ chờ cố định 3s (dễ lỗi nếu mạng/máy chậm hơn dự kiến)
+      const pageDeadline = Date.now() + 20000;
+      let pageReady = false;
+      while (Date.now() < pageDeadline) {
+        await sleepMs(500);
+        if (await isGeminiPageReady(wc)) { pageReady = true; break; }
+      }
+      if (!pageReady) {
+        throw new Error('Trang Gemini chưa tải xong sau 20s (đã tải lại để xóa ảnh đính kèm cũ) — có thể mạng chậm hoặc trang lỗi.');
+      }
+      geminiModelSelected = false; // trang vừa tải lại — cần chọn lại model cho chắc chắn
+    }
 
     // ── BƯỚC 1: chọn model "3.5 Flash" — CHỈ làm 1 LẦN DUY NHẤT trong cả phiên làm việc ──
     // (model đã chọn sẽ được Gemini nhớ cho các cuộc trò chuyện mới tiếp theo — không cần chọn lại,
@@ -540,19 +549,6 @@ ipcMain.handle('gemini-web-generate-image', async (event, { prompt, refImageBase
         await sleepMs(500);
       }
       geminiModelSelected = true; // đánh dấu đã xử lý — không thử lại nữa dù thành công hay không
-    }
-
-    // Mở cuộc trò chuyện MỚI nếu có ảnh tham chiếu mới cần đính kèm — đảm bảo ô soạn tin
-    // hoàn toàn sạch, không bị dính ảnh tham chiếu của lượt tạo ảnh trước đó
-    if (refImageBase64) {
-      wc.sendInputEvent({ type: 'keyDown', keyCode: 'Control' });
-      wc.sendInputEvent({ type: 'keyDown', keyCode: 'Shift' });
-      wc.sendInputEvent({ type: 'keyDown', keyCode: 'O', modifiers: ['control', 'shift'] });
-      wc.sendInputEvent({ type: 'char', keyCode: 'O', modifiers: ['control', 'shift'] });
-      wc.sendInputEvent({ type: 'keyUp', keyCode: 'O', modifiers: ['control', 'shift'] });
-      wc.sendInputEvent({ type: 'keyUp', keyCode: 'Shift' });
-      wc.sendInputEvent({ type: 'keyUp', keyCode: 'Control' });
-      await sleepMs(1200);
     }
 
     // ── BƯỚC 2: gõ prompt vào ô chat TRƯỚC (kèm link YouTube nếu có) ──
