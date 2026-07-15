@@ -4128,6 +4128,10 @@ function igRefreshCharGrid(){
     </div>
     <div id="igrefprompt_wrap_${i}" style="display:none;padding:4px 8px 6px;border-top:1px solid var(--border2);">
       <textarea id="igrefprompt_${i}" rows="3" style="width:100%;font-size:10px;padding:4px 6px;background:var(--bg2);color:var(--text2);border:1px solid var(--border2);border-radius:4px;resize:vertical;box-sizing:border-box;"></textarea>
+      <div style="margin-top:6px;display:flex;gap:6px;">
+        <input type="text" id="igreffeedback_${i}" placeholder="Góp ý sửa lỗi (VD: mũ quá to, làm nhỏ lại)" style="flex:1;font-size:10px;padding:4px 6px;background:var(--bg2);color:var(--text2);border:1px solid var(--border2);border-radius:4px;box-sizing:border-box;">
+        <button id="igairewritebtn_${i}" onclick="igAiRewriteRefPrompt(${i})" style="padding:4px 10px;background:var(--accent2);border:none;border-radius:4px;color:#0a0f0e;font-size:10px;font-weight:700;cursor:pointer;white-space:nowrap;">✨ AI sửa prompt</button>
+      </div>
     </div>
     <button id="igrefedibtn_${i}" onclick="igToggleRefPrompt(${i})" style="width:100%;padding:3px;background:none;border:none;border-top:1px solid var(--border2);color:var(--text3);font-size:10px;cursor:pointer;">✏️ Sửa prompt ref</button>`;
   }).join('');
@@ -4610,6 +4614,68 @@ Full, complete, unobstructed view of the ENTIRE character/subject exactly as it 
     wrap.style.display='none';
     if(btn) btn.textContent='✏️ Sửa prompt ref';
   }
+}
+
+// Nhờ AI viết lại prompt ảnh tham chiếu dựa trên góp ý cụ thể của người dùng (VD: "mũ quá to")
+// — chỉ điền kết quả vào ô "Sửa prompt ref", KHÔNG tự động tạo ảnh lại (để người dùng xem
+// trước prompt mới, tự bấm Generate Ref khi ưng ý).
+async function igAiRewriteRefPrompt(idx){
+  const c=lastChars[idx];
+  if(!c){alert('Không tìm thấy dữ liệu nhân vật.');return;}
+  const name=c.name||'Unknown';
+
+  const feedbackInput=$(`igreffeedback_${idx}`);
+  const feedback=(feedbackInput?.value||'').trim();
+  if(!feedback){
+    alert('Vui lòng nhập góp ý cụ thể (VD: "mũ quá to, làm nhỏ lại") trước khi bấm AI sửa prompt.');
+    return;
+  }
+
+  const ta=$(`igrefprompt_${idx}`);
+  const currentPrompt=(ta?.value||'').trim();
+  if(!currentPrompt){
+    alert('Ô "Sửa prompt ref" đang trống — hãy để app tự điền prompt hiện tại trước (mở/đóng lại mục Sửa prompt ref), hoặc tạo ảnh tham chiếu ít nhất 1 lần.');
+    return;
+  }
+
+  const apiKey=$('apiKey').value.trim(); // apiKey không cần — Vertex OAuth
+  const btn=$(`igairewritebtn_${idx}`);
+  btn.disabled=true;
+  const btnOriginalText=btn.textContent;
+  btn.textContent='⏳ Đang sửa...';
+
+  try{
+    const rewritePrompt=`Bạn là chuyên gia viết prompt tạo ảnh AI. Dưới đây là prompt hiện tại đang dùng để tạo ảnh tham chiếu cho nhân vật "${name}":
+
+"""
+${currentPrompt}
+"""
+
+Người dùng góp ý về ảnh đã tạo ra từ prompt này như sau:
+
+"""
+${feedback}
+"""
+
+Hãy viết lại ĐÚNG prompt trên để khắc phục chính xác vấn đề người dùng nêu. GIỮ NGUYÊN mọi phần khác không liên quan tới góp ý đó (không đổi phong cách, bố cục, các chi tiết khác nếu không được yêu cầu). Chỉ xuất ra prompt đã sửa — không thêm giải thích, không thêm markdown, không bọc trong dấu ngoặc kép.`;
+
+    const data=await callVertexWithRetry429(MODEL_TEXT,{
+      contents:[{role:'user',parts:[{text:rewritePrompt}]}],
+      generationConfig:{temperature:0.4,maxOutputTokens:1024}
+    },apiKey,(msg)=>{btn.textContent=msg;});
+    if(data.error) throw new Error(data.error.message||'Lỗi API');
+    const newPrompt=(data.candidates?.[0]?.content?.parts?.map(p=>p.text||'').join('')||'').trim();
+    if(!newPrompt) throw new Error('AI không trả về nội dung');
+
+    if(ta) ta.value=newPrompt;
+    if(feedbackInput) feedbackInput.value='';
+    btn.textContent='✅ Đã sửa xong — kiểm tra rồi bấm Generate Ref';
+    setTimeout(()=>{ if(btn) btn.textContent=btnOriginalText; },3000);
+  }catch(e){
+    alert('Lỗi khi nhờ AI sửa prompt: '+e.message);
+    btn.textContent=btnOriginalText;
+  }
+  btn.disabled=false;
 }
 
 async function igGenerateRef(idx){
